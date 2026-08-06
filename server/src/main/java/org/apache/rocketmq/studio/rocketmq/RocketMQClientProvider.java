@@ -24,6 +24,7 @@ import org.apache.rocketmq.remoting.protocol.body.ProducerInfo;
 import org.apache.rocketmq.remoting.protocol.body.ProducerConnection;
 import org.apache.rocketmq.remoting.protocol.body.ProducerTableInfo;
 import org.apache.rocketmq.remoting.protocol.body.SubscriptionGroupWrapper;
+import org.apache.rocketmq.remoting.protocol.body.TopicList;
 import org.apache.rocketmq.remoting.protocol.route.BrokerData;
 import org.apache.rocketmq.studio.cluster.client.ClientConnectionVO;
 import org.apache.rocketmq.studio.cluster.client.ClientProvider;
@@ -32,10 +33,8 @@ import org.apache.rocketmq.studio.common.exception.BusinessException;
 import org.apache.rocketmq.studio.common.domain.enums.ClientLanguage;
 import org.apache.rocketmq.studio.common.domain.enums.ClientType;
 import org.apache.rocketmq.studio.common.domain.enums.Protocol;
-import org.apache.rocketmq.tools.admin.DefaultMQAdminExt;
 import org.apache.rocketmq.tools.admin.MQAdminExt;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
 
@@ -60,12 +59,9 @@ public class RocketMQClientProvider implements ClientProvider {
 
     private static final long SUBSCRIPTION_GROUP_TIMEOUT_MILLIS = 5000L;
 
-    private final ObjectProvider<DefaultMQAdminExt> adminExtProvider;
     private final RuntimeAdminClientResolver runtimeAdminClientResolver;
 
-    public RocketMQClientProvider(ObjectProvider<DefaultMQAdminExt> adminExtProvider,
-                                  RuntimeAdminClientResolver runtimeAdminClientResolver) {
-        this.adminExtProvider = adminExtProvider;
+    public RocketMQClientProvider(RuntimeAdminClientResolver runtimeAdminClientResolver) {
         this.runtimeAdminClientResolver = runtimeAdminClientResolver;
     }
 
@@ -87,8 +83,27 @@ public class RocketMQClientProvider implements ClientProvider {
     }
 
     @Override
-    public List<ClientConnectionVO> findProducerConnections(String topic, String producerGroup) {
-        DefaultMQAdminExt adminExt = requireAdminExt();
+    public List<String> listTopics(String instanceId) {
+        return runtimeAdminClientResolver.execute(instanceId, adminExt -> {
+            TopicList topicList = adminExt.fetchAllTopicList();
+            if (topicList == null || topicList.getTopicList() == null) {
+                return List.of();
+            }
+            return topicList.getTopicList().stream()
+                    .filter(Objects::nonNull)
+                    .sorted()
+                    .toList();
+        });
+    }
+
+    @Override
+    public List<ClientConnectionVO> findProducerConnections(String instanceId, String topic, String producerGroup) {
+        return runtimeAdminClientResolver.execute(instanceId,
+                adminExt -> findProducerConnections(adminExt, topic, producerGroup));
+    }
+
+    private List<ClientConnectionVO> findProducerConnections(
+            MQAdminExt adminExt, String topic, String producerGroup) {
         try {
             ProducerConnection producerConnection =
                     adminExt.examineProducerConnectionInfo(producerGroup, topic);
@@ -315,14 +330,6 @@ public class RocketMQClientProvider implements ClientProvider {
                 || group.startsWith("%RETRY%")
                 || group.startsWith("SELF_TEST_")
                 || group.startsWith("CID_HOUSEKEEPING");
-    }
-
-    private DefaultMQAdminExt requireAdminExt() {
-        DefaultMQAdminExt adminExt = adminExtProvider.getIfAvailable();
-        if (adminExt == null) {
-            throw new BusinessException(501, "Client connection provider is not configured");
-        }
-        return adminExt;
     }
 
     private String rootMessage(Throwable error) {

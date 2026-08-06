@@ -156,6 +156,8 @@ const translations: Record<string, Record<Lang, string>> = {
   'instance.namePlaceholder': { zh: '例：rocketmq-production', en: 'e.g. rocketmq-production' },
   'instance.accessType': { zh: '接入方式', en: 'Access Type' },
   'instance.selectAccessType': { zh: '选择接入方式', en: 'Select access type' },
+  'instance.selectInstance': { zh: '选择实例', en: 'Select instance' },
+  'instance.fetchFailed': { zh: '加载实例失败', en: 'Failed to load instances' },
   'instance.endpoint': { zh: '接入地址', en: 'Endpoint' },
   'instance.endpointPlaceholder': {
     zh: '例：proxy.example.com:8080',

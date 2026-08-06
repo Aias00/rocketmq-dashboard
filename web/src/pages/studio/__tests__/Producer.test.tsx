@@ -22,10 +22,15 @@ import { App } from 'antd';
 import { LangProvider } from '../../../i18n/LangContext';
 import ProducerPage from '../Producer';
 import { fetchTopicList, queryProducerConnection } from '../../../api/producer';
+import { listInstances } from '../../../services/instanceService';
 
 vi.mock('../../../api/producer', () => ({
   fetchTopicList: vi.fn(),
   queryProducerConnection: vi.fn(),
+}));
+
+vi.mock('../../../services/instanceService', () => ({
+  listInstances: vi.fn(),
 }));
 
 beforeAll(() => {
@@ -55,27 +60,55 @@ const renderWithProviders = (ui: React.ReactElement) => {
 describe('ProducerPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(listInstances).mockResolvedValue([
+      {
+        id: 'instance-a',
+        name: 'production',
+        remark: '',
+        type: 'DIRECT',
+        endpoint: 'namesrv-a:9876',
+        topicCount: 2,
+        consumerGroupCount: 1,
+        createdAt: '2026-01-01 00:00:00',
+        updatedAt: '2026-01-01 00:00:00',
+      },
+    ]);
     vi.mocked(fetchTopicList).mockResolvedValue(['order-events', 'payment-events']);
     vi.mocked(queryProducerConnection).mockResolvedValue([]);
   });
 
-  it('loads topic options after mount', async () => {
+  const selectInstance = async (user: ReturnType<typeof userEvent.setup>) => {
+    await waitFor(() => {
+      expect(listInstances).toHaveBeenCalledTimes(1);
+    });
+    const instanceSelect = screen.getAllByRole('combobox')[0];
+    fireEvent.mouseDown(instanceSelect.parentElement!);
+    await user.click(
+      await screen.findByText('production (namesrv-a:9876)', {
+        selector: '.ant-select-item-option-content',
+      }),
+    );
+    await waitFor(() => {
+      expect(fetchTopicList).toHaveBeenCalledWith('instance-a');
+    });
+  };
+
+  it('loads instances after mount without reading topics from the default endpoint', async () => {
     renderWithProviders(<ProducerPage />);
 
     await waitFor(() => {
-      expect(fetchTopicList).toHaveBeenCalledTimes(1);
+      expect(listInstances).toHaveBeenCalledTimes(1);
     });
+    expect(fetchTopicList).not.toHaveBeenCalled();
   });
 
   it('renders topic options loaded from the API', async () => {
     const user = userEvent.setup();
     renderWithProviders(<ProducerPage />);
 
-    await waitFor(() => {
-      expect(fetchTopicList).toHaveBeenCalledTimes(1);
-    });
-
-    await user.click(screen.getByRole('combobox'));
+    await selectInstance(user);
+    const topicSelect = screen.getAllByRole('combobox')[1];
+    await user.click(topicSelect);
     await screen.findByRole('option', { name: 'order-events' });
     expect(await screen.findByRole('option', { name: 'payment-events' })).toBeInTheDocument();
   });
@@ -92,8 +125,8 @@ describe('ProducerPage', () => {
     ]);
     renderWithProviders(<ProducerPage />);
 
-    await waitFor(() => expect(fetchTopicList).toHaveBeenCalledTimes(1));
-    const topicSelect = screen.getByRole('combobox');
+    await selectInstance(user);
+    const topicSelect = screen.getAllByRole('combobox')[1];
     fireEvent.mouseDown(topicSelect.parentElement!);
     await user.click(
       await screen.findByText('order-events', { selector: '.ant-select-item-option-content' }),
@@ -102,7 +135,11 @@ describe('ProducerPage', () => {
     await user.click(screen.getByRole('button', { name: /搜索/ }));
 
     await waitFor(() => {
-      expect(queryProducerConnection).toHaveBeenCalledWith('order-events', 'order-producer');
+      expect(queryProducerConnection).toHaveBeenCalledWith(
+        'instance-a',
+        'order-events',
+        'order-producer',
+      );
     });
     expect(await screen.findByText('producer-1')).toBeInTheDocument();
   });
@@ -111,8 +148,8 @@ describe('ProducerPage', () => {
     const user = userEvent.setup();
     renderWithProviders(<ProducerPage />);
 
-    await waitFor(() => expect(fetchTopicList).toHaveBeenCalledTimes(1));
-    const topicSelect = screen.getByRole('combobox');
+    await selectInstance(user);
+    const topicSelect = screen.getAllByRole('combobox')[1];
     fireEvent.mouseDown(topicSelect.parentElement!);
     await user.click(
       await screen.findByText('order-events', { selector: '.ant-select-item-option-content' }),

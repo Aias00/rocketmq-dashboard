@@ -30,11 +30,17 @@ public class ProducerConnectionService {
 
     private final ClientProvider clientProvider;
 
-    public List<ProducerConnectionVO> listConnections(String topic, String producerGroup) {
-        log.info("Listing producer connections, topic={}, producerGroup={}", topic, producerGroup);
+    public List<String> listTopics(String instanceId) {
+        return clientProvider.listTopics(requireFilter(instanceId, "instanceId"));
+    }
+
+    public List<ProducerConnectionVO> listConnections(String instanceId, String topic, String producerGroup) {
+        log.info("Listing producer connections, instanceId={}, topic={}, producerGroup={}",
+                instanceId, topic, producerGroup);
+        String normalizedInstanceId = requireFilter(instanceId, "instanceId");
         String normalizedTopic = requireFilter(topic, "topic");
         String normalizedProducerGroup = requireFilter(producerGroup, "producerGroup");
-        return clientProvider.findProducerConnections(normalizedTopic, normalizedProducerGroup).stream()
+        return clientProvider.findProducerConnections(normalizedInstanceId, normalizedTopic, normalizedProducerGroup).stream()
                 .map(this::toProducerConnection)
                 .toList();
     }

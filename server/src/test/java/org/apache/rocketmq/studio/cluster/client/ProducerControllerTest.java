@@ -50,10 +50,11 @@ class ProducerControllerTest {
                 .language("Java")
                 .versionDesc("5.1.0")
                 .build();
-        when(producerConnectionService.listConnections("order-topic", "pg-order"))
+        when(producerConnectionService.listConnections("instance-a", "order-topic", "pg-order"))
                 .thenReturn(List.of(connection));
 
         mockMvc.perform(get("/api/producer/connection")
+                        .param("instanceId", "instance-a")
                         .param("topic", "order-topic")
                         .param("producerGroup", "pg-order"))
                 .andExpect(status().isOk())
@@ -63,12 +64,35 @@ class ProducerControllerTest {
                 .andExpect(jsonPath("$.connectionSet[0].language").value("Java"))
                 .andExpect(jsonPath("$.connectionSet[0].versionDesc").value("5.1.0"));
 
-        verify(producerConnectionService).listConnections("order-topic", "pg-order");
+        verify(producerConnectionService).listConnections("instance-a", "order-topic", "pg-order");
+    }
+
+    @Test
+    void listTopicsShouldRequireInstanceId() throws Exception {
+        mockMvc.perform(get("/api/producer/topics"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(400))
+                .andExpect(jsonPath("$.message").value("instanceId is required"));
+
+        verifyNoInteractions(producerConnectionService);
+    }
+
+    @Test
+    void listConnectionsShouldRequireInstanceId() throws Exception {
+        mockMvc.perform(get("/api/producer/connection")
+                        .param("topic", "order-topic")
+                        .param("producerGroup", "pg-order"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(400))
+                .andExpect(jsonPath("$.message").value("instanceId is required"));
+
+        verifyNoInteractions(producerConnectionService);
     }
 
     @Test
     void listConnectionsShouldRequireTopic() throws Exception {
         mockMvc.perform(get("/api/producer/connection")
+                        .param("instanceId", "instance-a")
                         .param("producerGroup", "pg-order"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(400))
@@ -80,6 +104,7 @@ class ProducerControllerTest {
     @Test
     void listConnectionsShouldRequireProducerGroup() throws Exception {
         mockMvc.perform(get("/api/producer/connection")
+                        .param("instanceId", "instance-a")
                         .param("topic", "order-topic"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(400))
@@ -91,6 +116,7 @@ class ProducerControllerTest {
     @Test
     void listConnectionsShouldRejectBlankParameters() throws Exception {
         mockMvc.perform(get("/api/producer/connection")
+                        .param("instanceId", "instance-a")
                         .param("topic", " ")
                         .param("producerGroup", "pg-order"))
                 .andExpect(status().isBadRequest())

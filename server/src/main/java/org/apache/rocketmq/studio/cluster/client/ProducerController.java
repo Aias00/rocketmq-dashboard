@@ -23,6 +23,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/producer")
 @RequiredArgsConstructor
@@ -30,13 +32,21 @@ public class ProducerController {
 
     private final ProducerConnectionService producerConnectionService;
 
+    @GetMapping("/topics")
+    public List<String> listTopics(@RequestParam(required = false) String instanceId) {
+        requireParameter(instanceId, "instanceId");
+        return producerConnectionService.listTopics(instanceId);
+    }
+
     @GetMapping("/connection")
     public ProducerConnectionResultVO listConnections(
+            @RequestParam(required = false) String instanceId,
             @RequestParam(required = false) String topic,
             @RequestParam(required = false) String producerGroup) {
+        requireParameter(instanceId, "instanceId");
         requireParameter(topic, "topic");
         requireParameter(producerGroup, "producerGroup");
-        return new ProducerConnectionResultVO(producerConnectionService.listConnections(topic, producerGroup));
+        return new ProducerConnectionResultVO(producerConnectionService.listConnections(instanceId, topic, producerGroup));
     }
 
     private void requireParameter(String value, String name) {

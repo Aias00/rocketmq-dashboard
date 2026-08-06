@@ -24,9 +24,13 @@ import {
   queryProducerConnection,
   type ProducerConnection,
 } from '../../api/producer';
+import { listInstances } from '../../services/instanceService';
+import type { Instance } from '../../api/instance';
 
 const ProducerPage = () => {
   const [form] = Form.useForm();
+  const [instances, setInstances] = useState<Instance[]>([]);
+  const [selectedInstanceId, setSelectedInstanceId] = useState<string>();
   const [topicList, setTopicList] = useState<string[]>([]);
   const [connectionList, setConnectionList] = useState<ProducerConnection[]>([]);
   const [loading, setLoading] = useState(false);
@@ -37,9 +41,35 @@ const ProducerPage = () => {
   useEffect(() => {
     let cancelled = false;
 
+    const loadInstances = async () => {
+      try {
+        const nextInstances = await listInstances();
+        if (!cancelled) {
+          setInstances(nextInstances);
+        }
+      } catch {
+        if (!cancelled) {
+          message.error(t('instance.fetchFailed'));
+        }
+      }
+    };
+
+    void loadInstances();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [message, t]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!selectedInstanceId) {
+      return undefined;
+    }
+
     const loadTopics = async () => {
       try {
-        const topics = await fetchTopicList();
+        const topics = await fetchTopicList(selectedInstanceId);
         if (!cancelled) {
           setTopicList(topics);
         }
@@ -51,16 +81,23 @@ const ProducerPage = () => {
     };
 
     void loadTopics();
-
     return () => {
       cancelled = true;
     };
-  }, [fetchTopicFailedMessage, message]);
+  }, [fetchTopicFailedMessage, message, selectedInstanceId]);
 
-  const onFinish = async (values: { selectedTopic: string; producerGroup: string }) => {
+  const onFinish = async (values: {
+    instanceId: string;
+    selectedTopic: string;
+    producerGroup: string;
+  }) => {
     setLoading(true);
     try {
-      const connections = await queryProducerConnection(values.selectedTopic, values.producerGroup);
+      const connections = await queryProducerConnection(
+        values.instanceId,
+        values.selectedTopic,
+        values.producerGroup,
+      );
       setConnectionList(connections);
       if (connections.length === 0) {
         message.info(t('producer.noConnections'));
@@ -110,6 +147,27 @@ const ProducerPage = () => {
       <Card bordered={false} style={{ borderRadius: 8, boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
         <Form form={form} layout="inline" onFinish={onFinish} style={{ marginBottom: 20 }}>
           <Form.Item
+            label={t('instance.title')}
+            name="instanceId"
+            rules={[{ required: true, message: t('instance.selectInstance') }]}
+          >
+            <Select
+              showSearch
+              placeholder={t('instance.selectInstance')}
+              style={{ width: 260 }}
+              optionFilterProp="label"
+              options={instances.map((instance) => ({
+                value: instance.id,
+                label: `${instance.name} (${instance.endpoint})`,
+              }))}
+              onChange={(instanceId) => {
+                setSelectedInstanceId(instanceId);
+                form.setFieldValue('selectedTopic', undefined);
+                setConnectionList([]);
+              }}
+            />
+          </Form.Item>
+          <Form.Item
             label="TOPIC"
             name="selectedTopic"
             rules={[{ required: true, message: t('producer.selectTopic') }]}
@@ -120,6 +178,7 @@ const ProducerPage = () => {
               style={{ width: 300 }}
               optionFilterProp="label"
               options={topicList.map((topic) => ({ value: topic, label: topic }))}
+              disabled={!selectedInstanceId}
             />
           </Form.Item>
           <Form.Item

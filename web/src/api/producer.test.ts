@@ -33,29 +33,20 @@ describe('Producer API', () => {
     vi.unstubAllGlobals();
   });
 
-  it('fetches Studio topic records sorted alphabetically', async () => {
-    mock.onGet('/topics').reply(200, {
-      code: 200,
-      data: [{ name: 'order-events' }, { name: 'user-signup' }, { name: 'batch-process' }],
+  it('fetches topic records from the selected instance sorted alphabetically', async () => {
+    mock.onGet('/producer/topics').reply((config) => {
+      expect(config.params.instanceId).toBe('instance-a');
+      return [200, ['order-events', 'user-signup', 'batch-process']];
     });
 
-    const result = await fetchTopicList();
-    expect(result).toEqual(['batch-process', 'order-events', 'user-signup']);
-  });
-
-  it('keeps compatibility with legacy topicList responses', async () => {
-    mock.onGet('/topics').reply(200, {
-      topicList: ['order-events', 'user-signup', 'batch-process'],
-    });
-
-    const result = await fetchTopicList();
+    const result = await fetchTopicList('instance-a');
     expect(result).toEqual(['batch-process', 'order-events', 'user-signup']);
   });
 
   it('handles empty topic list', async () => {
-    mock.onGet('/topics').reply(200, { topicList: [] });
+    mock.onGet('/producer/topics').reply(200, []);
 
-    const result = await fetchTopicList();
+    const result = await fetchTopicList('instance-a');
     expect(result).toEqual([]);
   });
 
@@ -75,12 +66,13 @@ describe('Producer API', () => {
       },
     ];
     mock.onGet('/producer/connection').reply((config) => {
+      expect(config.params.instanceId).toBe('instance-a');
       expect(config.params.topic).toBe('order-events');
       expect(config.params.producerGroup).toBe('order-producer');
       return [200, { connectionSet: connections }];
     });
 
-    const result = await queryProducerConnection('order-events', 'order-producer');
+    const result = await queryProducerConnection('instance-a', 'order-events', 'order-producer');
     expect(result).toHaveLength(2);
     expect(result[0].clientId).toBe('producer-1');
   });
@@ -88,7 +80,7 @@ describe('Producer API', () => {
   it('handles empty producer connections', async () => {
     mock.onGet('/producer/connection').reply(200, { connectionSet: [] });
 
-    const result = await queryProducerConnection('topic', 'group');
+    const result = await queryProducerConnection('instance-a', 'topic', 'group');
     expect(result).toEqual([]);
   });
 });

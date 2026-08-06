@@ -25,31 +25,22 @@ export interface ProducerConnection {
   versionDesc: string;
 }
 
-interface TopicRecord {
-  name: string;
-}
-
-interface TopicListResponse {
-  data?: TopicRecord[];
-  topicList?: string[];
-}
-
 // ─── API ────────────────────────────────────────────────────────
 
-/** Fetch all topic names */
-export async function fetchTopicList(): Promise<string[]> {
-  const res = await client.get<TopicListResponse>('/topics');
-  const topics = res.data.data?.map((topic) => topic.name) ?? res.data.topicList ?? [];
-  return topics.sort();
+/** Fetch topic names from the selected RocketMQ instance. */
+export async function fetchTopicList(instanceId: string): Promise<string[]> {
+  const res = await client.get<string[]>('/producer/topics', { params: { instanceId } });
+  return res.data.slice().sort();
 }
 
 /** Query producer connections by topic and producer group */
 export async function queryProducerConnection(
+  instanceId: string,
   topic: string,
   producerGroup: string,
 ): Promise<ProducerConnection[]> {
   const res = await client.get<{ connectionSet: ProducerConnection[] }>('/producer/connection', {
-    params: { topic, producerGroup },
+    params: { instanceId, topic, producerGroup },
   });
   return res.data?.connectionSet ?? [];
 }

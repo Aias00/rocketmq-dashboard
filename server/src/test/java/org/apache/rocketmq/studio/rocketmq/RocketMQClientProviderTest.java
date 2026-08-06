@@ -24,18 +24,17 @@ import org.apache.rocketmq.remoting.protocol.body.ProducerInfo;
 import org.apache.rocketmq.remoting.protocol.body.ProducerConnection;
 import org.apache.rocketmq.remoting.protocol.body.ProducerTableInfo;
 import org.apache.rocketmq.remoting.protocol.body.SubscriptionGroupWrapper;
+import org.apache.rocketmq.remoting.protocol.body.TopicList;
 import org.apache.rocketmq.remoting.protocol.route.BrokerData;
 import org.apache.rocketmq.remoting.protocol.subscription.SubscriptionGroupConfig;
 import org.apache.rocketmq.studio.cluster.client.ClientConnectionVO;
 import org.apache.rocketmq.studio.cluster.broker.RuntimeAdminClientResolver;
 import org.apache.rocketmq.studio.common.exception.BusinessException;
-import org.apache.rocketmq.tools.admin.DefaultMQAdminExt;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.beans.factory.ObjectProvider;
 
 import java.util.HashMap;
 import java.util.HashSet;
@@ -56,10 +55,7 @@ import static org.mockito.Mockito.when;
 class RocketMQClientProviderTest {
 
     @Mock
-    private ObjectProvider<DefaultMQAdminExt> adminExtProvider;
-
-    @Mock
-    private DefaultMQAdminExt adminExt;
+    private org.apache.rocketmq.tools.admin.DefaultMQAdminExt adminExt;
 
     @Mock
     private RuntimeAdminClientResolver runtimeAdminClientResolver;
@@ -68,8 +64,7 @@ class RocketMQClientProviderTest {
 
     @BeforeEach
     void setUp() {
-        lenient().when(adminExtProvider.getIfAvailable()).thenReturn(adminExt);
-        provider = new RocketMQClientProvider(adminExtProvider, runtimeAdminClientResolver);
+        provider = new RocketMQClientProvider(runtimeAdminClientResolver);
         lenient().when(runtimeAdminClientResolver.execute(anyString(), any())).thenAnswer(invocation ->
                 invocation.<org.apache.rocketmq.studio.cluster.broker.MqAdminExtFactory.AdminAction<Object>>
                         getArgument(1).apply(adminExt));
@@ -153,7 +148,7 @@ class RocketMQClientProviderTest {
         when(adminExt.examineProducerConnectionInfo("pg-order", "TopicA"))
                 .thenReturn(producerConnection);
 
-        List<ClientConnectionVO> connections = provider.findProducerConnections("TopicA", "pg-order");
+        List<ClientConnectionVO> connections = provider.findProducerConnections("instance-a", "TopicA", "pg-order");
 
         assertThat(connections).singleElement().satisfies(connection -> {
             assertThat(connection.getClientId()).isEqualTo("producer-client");
@@ -168,10 +163,22 @@ class RocketMQClientProviderTest {
         when(adminExt.examineProducerConnectionInfo("pg-order", "TopicA"))
                 .thenThrow(new IllegalStateException("broker unavailable"));
 
-        assertThatThrownBy(() -> provider.findProducerConnections("TopicA", "pg-order"))
+        assertThatThrownBy(() -> provider.findProducerConnections("instance-a", "TopicA", "pg-order"))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("Failed to query producer connections: broker unavailable")
                 .satisfies(error -> assertThat(((BusinessException) error).getCode()).isEqualTo(502));
+    }
+
+    @Test
+    void listTopicsUsesTheSelectedInstanceAdminClient() throws Exception {
+        TopicList topicList = new TopicList();
+        topicList.setTopicList(new HashSet<>(List.of("z-topic", "a-topic")));
+        when(adminExt.fetchAllTopicList()).thenReturn(topicList);
+
+        assertThat(provider.listTopics("instance-a")).containsExactly("a-topic", "z-topic");
+
+        verify(runtimeAdminClientResolver).execute(anyString(), any());
+        verify(adminExt).fetchAllTopicList();
     }
 
     @Test
