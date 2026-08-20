@@ -59,7 +59,7 @@ class AlertRuleControllerTest {
                 .metric("rocketmq_consumer_lag_messages")
                 .enabled(true)
                 .build();
-        when(alertService.listRules()).thenReturn(List.of(rule));
+        when(alertService.listRules(AlertDomain.BUSINESS)).thenReturn(List.of(rule));
 
         mockMvc.perform(get("/api/alert-rules"))
                 .andExpect(status().isOk())
@@ -91,7 +91,7 @@ class AlertRuleControllerTest {
                 .metric("rocketmq_consumer_lag_messages")
                 .enabled(true)
                 .build();
-        when(alertService.createRule(any(AlertRuleVO.class))).thenReturn(created);
+        when(alertService.createRule(eq(AlertDomain.BUSINESS), any(AlertRuleVO.class))).thenReturn(created);
 
         mockMvc.perform(post("/api/alert-rules/create")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -180,7 +180,7 @@ class AlertRuleControllerTest {
                 .name("High Lag")
                 .enabled(false)
                 .build();
-        when(alertService.toggleRule(1L, false)).thenReturn(toggled);
+        when(alertService.toggleRule(AlertDomain.BUSINESS, 1L, false)).thenReturn(toggled);
 
         mockMvc.perform(post("/api/alert-rules/toggle")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -190,7 +190,7 @@ class AlertRuleControllerTest {
                 .andExpect(jsonPath("$.data.id").value(1))
                 .andExpect(jsonPath("$.data.enabled").value(false));
 
-        verify(alertService).toggleRule(eq(1L), eq(false));
+        verify(alertService).toggleRule(eq(AlertDomain.BUSINESS), eq(1L), eq(false));
     }
 
     @Test
@@ -238,7 +238,7 @@ class AlertRuleControllerTest {
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.message").value("success"));
 
-        verify(alertService).deleteRule(1L);
+        verify(alertService).deleteRule(AlertDomain.BUSINESS, 1L);
     }
 
     @Test
@@ -256,7 +256,7 @@ class AlertRuleControllerTest {
     @Test
     void bulkToggleShouldReturnPartialResults() throws Exception {
         AlertRuleVO updated = AlertRuleVO.builder().id(1L).enabled(false).build();
-        when(alertService.bulkToggleRules(List.of(1L, 999L), false))
+        when(alertService.bulkToggleRules(AlertDomain.BUSINESS, List.of(1L, 999L), false))
                 .thenReturn(AlertRuleBulkResultVO.builder()
                         .succeededIds(List.of(1L))
                         .failures(Map.of(999L, "Alert rule not found"))

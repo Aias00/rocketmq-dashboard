@@ -30,6 +30,8 @@ public class RmqAlertRule {
     @TableId(type = IdType.AUTO)
     private Long id;
 
+    private String domain;
+
     private String name;
 
     private String metric;

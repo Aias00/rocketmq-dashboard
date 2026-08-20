@@ -257,6 +257,7 @@ CREATE TABLE IF NOT EXISTS rmq_alert_rule (
   broker_name VARCHAR(128),
   cluster_name VARCHAR(128),
   severity VARCHAR(32),
+  domain VARCHAR(16) NOT NULL DEFAULT 'BUSINESS' COMMENT 'BUSINESS or CLUSTER alert rule domain',
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 

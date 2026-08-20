@@ -29,6 +29,8 @@ import java.util.List;
 @AllArgsConstructor
 public class AlertRuleVO {
     private Long id;
+    @Builder.Default
+    private AlertDomain domain = AlertDomain.BUSINESS;
     private String name;
     private String metric;
     private String operator;

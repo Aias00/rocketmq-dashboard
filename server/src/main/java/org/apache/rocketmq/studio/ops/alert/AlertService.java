@@ -51,6 +51,12 @@ public class AlertService {
         return alertRepository.findAllRules();
     }
 
+    public List<AlertRuleVO> listRules(AlertDomain domain) {
+        return listRules().stream()
+                .filter(rule -> domain == resolveDomain(rule))
+                .toList();
+    }
+
     public String exportPrometheusRulesYaml() {
         List<AlertRuleVO> rules = alertRepository.findAllRules().stream()
                 .filter(AlertRuleVO::isEnabled)
@@ -105,6 +111,15 @@ public class AlertService {
         return saved;
     }
 
+    public AlertRuleVO createRule(AlertDomain domain, AlertRuleVO rule) {
+        requireDomain(domain);
+        if (rule == null) {
+            return createRule(null);
+        }
+        rule.setDomain(domain);
+        return createRule(rule);
+    }
+
 
     public AlertRuleVO updateRule(AlertRuleVO rule) {
         if (rule == null) {
@@ -124,6 +139,30 @@ public class AlertService {
         return rule;
     }
 
+    public AlertRuleVO updateRule(AlertDomain domain, AlertRuleVO rule) {
+        requireDomain(domain);
+        validateRuleId(rule == null ? null : rule.getId());
+        AlertRuleVO existing = alertRepository.findAllRules().stream()
+                .filter(candidate -> Objects.equals(candidate.getId(), rule.getId()))
+                .findFirst()
+                .orElseThrow(() -> ruleNotFound(rule.getId()));
+        if (resolveDomain(existing) != domain) {
+            throw new BusinessException(404, "Alert rule not found: " + rule.getId());
+        }
+        rule.setDomain(domain);
+        return updateRule(rule);
+    }
+
+    private AlertDomain resolveDomain(AlertRuleVO rule) {
+        return rule.getDomain() == null ? AlertDomain.BUSINESS : rule.getDomain();
+    }
+
+    private void requireDomain(AlertDomain domain) {
+        if (domain == null) {
+            throw new BusinessException(400, "Alert domain is required");
+        }
+    }
+
 
     public AlertRuleVO toggleRule(Long id, boolean enabled) {
         log.info("Toggling alert rule id={}, enabled={}", id, enabled);
@@ -139,10 +178,30 @@ public class AlertService {
         return saved;
     }
 
+    public AlertRuleVO toggleRule(AlertDomain domain, Long id, boolean enabled) {
+        requireDomain(domain);
+        AlertRuleVO rule = findRuleInDomain(domain, id);
+        rule.setEnabled(enabled);
+        if (!alertRepository.replaceRule(rule)) {
+            throw ruleNotFound(id);
+        }
+        auditRule("TOGGLE_ALERT_RULE", rule, "enabled=" + enabled);
+        return rule;
+    }
+
 
     public void deleteRule(Long id) {
         log.info("Deleting alert rule id={}", id);
         validateRuleId(id);
+        if (!alertRepository.deleteRule(id)) {
+            throw ruleNotFound(id);
+        }
+        recordAudit("DELETE_ALERT_RULE", "ALERT_RULE", String.valueOf(id), null, null);
+    }
+
+    public void deleteRule(AlertDomain domain, Long id) {
+        requireDomain(domain);
+        findRuleInDomain(domain, id);
         if (!alertRepository.deleteRule(id)) {
             throw ruleNotFound(id);
         }
@@ -183,6 +242,12 @@ public class AlertService {
                 .succeededIds(succeeded).failures(failures).updatedRules(updated).build();
     }
 
+    public AlertRuleBulkResultVO bulkToggleRules(AlertDomain domain, List<Long> ids, boolean enabled) {
+        requireDomain(domain);
+        return bulkUpdateRules(domain, ids, rule -> rule.setEnabled(enabled),
+                "TOGGLE_ALERT_RULE", "enabled=" + enabled + ", bulk=true");
+    }
+
     public AlertRuleBulkResultVO bulkDeleteRules(List<Long> ids) {
         List<Long> normalizedIds = normalizeBulkIds(ids);
         List<Long> succeeded = new ArrayList<>();
@@ -201,6 +266,82 @@ public class AlertService {
         }
         return AlertRuleBulkResultVO.builder()
                 .succeededIds(succeeded).failures(failures).updatedRules(List.of()).build();
+    }
+
+    public AlertRuleBulkResultVO bulkDeleteRules(AlertDomain domain, List<Long> ids) {
+        requireDomain(domain);
+        List<Long> normalizedIds = normalizeBulkIds(ids);
+        Map<Long, AlertRuleVO> rulesById = rulesById();
+        List<Long> succeeded = new ArrayList<>();
+        Map<Long, String> failures = new LinkedHashMap<>();
+        for (Long id : normalizedIds) {
+            AlertRuleVO rule = rulesById.get(id);
+            if (rule == null || resolveDomain(rule) != domain) {
+                failures.put(id, "Alert rule not found");
+                continue;
+            }
+            try {
+                if (!alertRepository.deleteRule(id)) {
+                    failures.put(id, "Alert rule not found");
+                    continue;
+                }
+                recordAudit("DELETE_ALERT_RULE", "ALERT_RULE", String.valueOf(id), null, "bulk=true");
+                succeeded.add(id);
+            } catch (RuntimeException failure) {
+                failures.put(id, failure.getMessage() == null ? "Delete failed" : failure.getMessage());
+            }
+        }
+        return AlertRuleBulkResultVO.builder()
+                .succeededIds(succeeded).failures(failures).updatedRules(List.of()).build();
+    }
+
+    private AlertRuleBulkResultVO bulkUpdateRules(AlertDomain domain, List<Long> ids,
+            java.util.function.Consumer<AlertRuleVO> update, String auditOperation, String auditDetail) {
+        List<Long> normalizedIds = normalizeBulkIds(ids);
+        Map<Long, AlertRuleVO> rulesById = rulesById();
+        List<Long> succeeded = new ArrayList<>();
+        Map<Long, String> failures = new LinkedHashMap<>();
+        List<AlertRuleVO> updated = new ArrayList<>();
+        for (Long id : normalizedIds) {
+            AlertRuleVO rule = rulesById.get(id);
+            if (rule == null || resolveDomain(rule) != domain) {
+                failures.put(id, "Alert rule not found");
+                continue;
+            }
+            try {
+                update.accept(rule);
+                if (!alertRepository.replaceRule(rule)) {
+                    failures.put(id, "Alert rule not found");
+                    continue;
+                }
+                auditRule(auditOperation, rule, auditDetail);
+                succeeded.add(id);
+                updated.add(rule);
+            } catch (RuntimeException failure) {
+                failures.put(id, failure.getMessage() == null ? "Update failed" : failure.getMessage());
+            }
+        }
+        return AlertRuleBulkResultVO.builder()
+                .succeededIds(succeeded).failures(failures).updatedRules(updated).build();
+    }
+
+    private AlertRuleVO findRuleInDomain(AlertDomain domain, Long id) {
+        validateRuleId(id);
+        return rulesById().values().stream()
+                .filter(rule -> Objects.equals(rule.getId(), id))
+                .filter(rule -> resolveDomain(rule) == domain)
+                .findFirst()
+                .orElseThrow(() -> ruleNotFound(id));
+    }
+
+    private Map<Long, AlertRuleVO> rulesById() {
+        Map<Long, AlertRuleVO> rulesById = new LinkedHashMap<>();
+        for (AlertRuleVO rule : alertRepository.findAllRules()) {
+            if (rule.getId() != null) {
+                rulesById.put(rule.getId(), rule);
+            }
+        }
+        return rulesById;
     }
 
     private List<Long> normalizeBulkIds(List<Long> ids) {

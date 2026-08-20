@@ -85,6 +85,43 @@ class AlertServiceTest {
     }
 
     @Test
+    void listRulesShouldSeparateBusinessAndClusterDomains() {
+        AlertRuleVO business = AlertRuleVO.builder().id(1L).name("Consumer lag").build();
+        AlertRuleVO cluster = AlertRuleVO.builder()
+                .id(2L).name("Broker unavailable").domain(AlertDomain.CLUSTER).build();
+        when(alertRepository.findAllRules()).thenReturn(List.of(business, cluster));
+
+        assertThat(alertService.listRules(AlertDomain.BUSINESS)).containsExactly(business);
+        assertThat(alertService.listRules(AlertDomain.CLUSTER)).containsExactly(cluster);
+    }
+
+    @Test
+    void clusterRuleOperationsShouldRejectBusinessRules() {
+        AlertRuleVO business = AlertRuleVO.builder().id(1L).name("Consumer lag").build();
+        when(alertRepository.findAllRules()).thenReturn(List.of(business));
+
+        assertThatThrownBy(() -> alertService.toggleRule(AlertDomain.CLUSTER, 1L, false))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("Alert rule not found: 1")
+                .satisfies(ex -> assertThat(((BusinessException) ex).getCode()).isEqualTo(404));
+
+        verify(alertRepository, never()).replaceRule(any());
+    }
+
+    @Test
+    void clusterRuleOperationsShouldUpdateClusterRulesOnly() {
+        AlertRuleVO cluster = AlertRuleVO.builder().id(2L).name("Broker unavailable")
+                .domain(AlertDomain.CLUSTER).enabled(false).build();
+        when(alertRepository.findAllRules()).thenReturn(List.of(cluster));
+        when(alertRepository.replaceRule(cluster)).thenReturn(true);
+
+        AlertRuleVO updated = alertService.toggleRule(AlertDomain.CLUSTER, 2L, true);
+
+        assertThat(updated.isEnabled()).isTrue();
+        verify(alertRepository).replaceRule(cluster);
+    }
+
+    @Test
     void exportPrometheusRulesYamlShouldReturnDefaultRulesWhenRepositoryIsEmpty() {
         when(alertRepository.findAllRules()).thenReturn(Collections.emptyList());
 

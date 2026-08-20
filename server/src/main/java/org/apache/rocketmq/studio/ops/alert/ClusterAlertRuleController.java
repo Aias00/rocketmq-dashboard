@@ -16,10 +16,10 @@
  */
 package org.apache.rocketmq.studio.ops.alert;
 
-import org.apache.rocketmq.studio.common.domain.Result;
-import org.apache.rocketmq.studio.common.exception.BusinessException;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.apache.rocketmq.studio.common.domain.Result;
+import org.apache.rocketmq.studio.common.exception.BusinessException;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -28,61 +28,55 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
+/** Domain-limited rule API for the Cluster Alerts menu. */
 @RestController
-@RequestMapping("/api/alert-rules")
+@RequestMapping("/api/cluster-alert-rules")
 @RequiredArgsConstructor
-public class AlertRuleController {
+public class ClusterAlertRuleController {
 
     private final AlertService alertService;
 
     @GetMapping
     public Result<List<AlertRuleVO>> listRules() {
-        return Result.ok(alertService.listRules(AlertDomain.BUSINESS));
-    }
-
-    @GetMapping("/export")
-    public Result<AlertRulesYamlVO> exportRules() {
-        return Result.ok(new AlertRulesYamlVO(alertService.exportPrometheusRulesYaml()));
+        return Result.ok(alertService.listRules(AlertDomain.CLUSTER));
     }
 
     @PostMapping("/create")
     public Result<AlertRuleVO> createRule(@Valid @RequestBody(required = false) AlertRuleRequestDTO rule) {
-        return Result.ok(alertService.createRule(AlertDomain.BUSINESS, requireAlertRule(rule).toAlertRuleVO()));
+        return Result.ok(alertService.createRule(AlertDomain.CLUSTER, requireRule(rule).toAlertRuleVO()));
     }
 
     @PostMapping("/update")
     public Result<AlertRuleVO> updateRule(@Valid @RequestBody(required = false) AlertRuleRequestDTO rule) {
-        AlertRuleRequestDTO request = requireAlertRule(rule);
+        AlertRuleRequestDTO request = requireRule(rule);
         if (request.getId() == null) {
             throw new BusinessException(400, "id is required");
         }
-        return Result.ok(alertService.updateRule(AlertDomain.BUSINESS, request.toAlertRuleVO()));
+        return Result.ok(alertService.updateRule(AlertDomain.CLUSTER, request.toAlertRuleVO()));
     }
 
     @PostMapping("/toggle")
     public Result<AlertRuleVO> toggleRule(@Valid @RequestBody ToggleAlertRuleDTO request) {
-        return Result.ok(alertService.toggleRule(AlertDomain.BUSINESS, request.getId(), request.getEnabled()));
+        return Result.ok(alertService.toggleRule(AlertDomain.CLUSTER, request.getId(), request.getEnabled()));
     }
 
     @PostMapping("/delete")
     public Result<Void> deleteRule(@Valid @RequestBody DeleteAlertRuleDTO request) {
-        alertService.deleteRule(AlertDomain.BUSINESS, request.getId());
+        alertService.deleteRule(AlertDomain.CLUSTER, request.getId());
         return Result.ok();
     }
 
     @PostMapping("/bulk-toggle")
-    public Result<AlertRuleBulkResultVO> bulkToggle(
-            @Valid @RequestBody BulkToggleAlertRulesDTO request) {
-        return Result.ok(alertService.bulkToggleRules(AlertDomain.BUSINESS, request.getIds(), request.getEnabled()));
+    public Result<AlertRuleBulkResultVO> bulkToggle(@Valid @RequestBody BulkToggleAlertRulesDTO request) {
+        return Result.ok(alertService.bulkToggleRules(AlertDomain.CLUSTER, request.getIds(), request.getEnabled()));
     }
 
     @PostMapping("/bulk-delete")
-    public Result<AlertRuleBulkResultVO> bulkDelete(
-            @Valid @RequestBody BulkDeleteAlertRulesDTO request) {
-        return Result.ok(alertService.bulkDeleteRules(AlertDomain.BUSINESS, request.getIds()));
+    public Result<AlertRuleBulkResultVO> bulkDelete(@Valid @RequestBody BulkDeleteAlertRulesDTO request) {
+        return Result.ok(alertService.bulkDeleteRules(AlertDomain.CLUSTER, request.getIds()));
     }
 
-    private AlertRuleRequestDTO requireAlertRule(AlertRuleRequestDTO rule) {
+    private AlertRuleRequestDTO requireRule(AlertRuleRequestDTO rule) {
         if (rule == null) {
             throw new BusinessException(400, "Alert rule request is required");
         }

@@ -102,6 +102,7 @@ public class MybatisPlusAlertRepository implements AlertRepository {
     private static AlertRuleVO toRuleVO(RmqAlertRule entity) {
         AlertRuleVO vo = new AlertRuleVO();
         vo.setId(entity.getId());
+        vo.setDomain(parseDomain(entity.getDomain()));
         vo.setName(entity.getName());
         vo.setMetric(entity.getMetric());
         vo.setOperator(entity.getOperator());
@@ -121,6 +122,7 @@ public class MybatisPlusAlertRepository implements AlertRepository {
     private static RmqAlertRule toRuleEntity(AlertRuleVO rule) {
         RmqAlertRule entity = new RmqAlertRule();
         entity.setId(rule.getId());
+        entity.setDomain((rule.getDomain() == null ? AlertDomain.BUSINESS : rule.getDomain()).name());
         entity.setName(rule.getName());
         entity.setMetric(rule.getMetric());
         entity.setOperator(rule.getOperator());
@@ -138,6 +140,17 @@ public class MybatisPlusAlertRepository implements AlertRepository {
         entity.setSeverity(rule.getSeverity());
         entity.setGmtModified(LocalDateTime.now());
         return entity;
+    }
+
+    private static AlertDomain parseDomain(String domain) {
+        if (!StringUtils.hasText(domain)) {
+            return AlertDomain.BUSINESS;
+        }
+        try {
+            return AlertDomain.valueOf(domain.trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException ignored) {
+            return AlertDomain.BUSINESS;
+        }
     }
 
     private static SystemAlertVO toAlertVO(RmqSystemAlert entity) {
