@@ -176,18 +176,34 @@ const MainLayout = () => {
             ? [{ key: '/instance/topic', icon: <ListDashes size={16} />, label: t('nav.topic') }]
             : []),
           ...(hasInstanceCapability(instanceCapabilities, 'CONSUMER_GROUP_MANAGEMENT')
-            ? [{ key: '/instance/consumer', icon: <ChatCircleText size={16} />, label: t('nav.group') }]
+            ? [
+                {
+                  key: '/instance/consumer',
+                  icon: <ChatCircleText size={16} />,
+                  label: t('nav.group'),
+                },
+              ]
             : []),
           ...(hasInstanceCapability(instanceCapabilities, 'ACL_MANAGEMENT')
             ? [{ key: '/instance/acl', icon: <Key size={16} />, label: t('nav.acl') }]
             : []),
           ...(hasInstanceCapability(instanceCapabilities, 'MESSAGE_QUERY')
-            ? [{ key: '/instance/message', icon: <MagnifyingGlass size={16} />, label: t('nav.message') }]
+            ? [
+                {
+                  key: '/instance/message',
+                  icon: <MagnifyingGlass size={16} />,
+                  label: t('nav.message'),
+                },
+              ]
             : []),
           ...(hasInstanceCapability(instanceCapabilities, 'DLQ_MANAGEMENT')
             ? [{ key: '/instance/dlq', icon: <TrashSimple size={16} />, label: t('nav.dlq') }]
             : []),
-          { key: '/instance/alerts', icon: <Warning size={16} />, label: t('nav.alertRuleAssets') },
+          {
+            key: '/ops/business-alerts',
+            icon: <Warning size={16} />,
+            label: t('nav.alertRuleAssets'),
+          },
         ],
       },
       {
@@ -239,6 +255,7 @@ const MainLayout = () => {
       '/ops/dashboard': t('nav.dashboard'),
       '/ops/grafana': t('nav.grafanaDashboards'),
       '/ops/system-alerts': t('nav.alertEvents'),
+      '/ops/business-alerts': t('nav.alertRuleAssets'),
       '/ops/alerts': t('nav.alertRules'),
       '/ops/audit': t('nav.audit'),
       '/ai': t('nav.ai'),

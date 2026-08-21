@@ -49,6 +49,7 @@ const GrafanaDashboardsPage = lazy(() => import('./pages/studio/GrafanaDashboard
 const ProducerPage = lazy(() => import('./pages/studio/Producer'));
 const OpsPage = lazy(() => import('./pages/studio/Ops'));
 const AlertRuleAssetsPage = lazy(() => import('./pages/studio/AlertRuleAssets'));
+const AlertManagementPage = lazy(() => import('./pages/studio/AlertManagement'));
 const UserManagementPage = lazy(() => import('./pages/studio/UserManagement'));
 
 type AuthGateState = 'checking' | 'allowed' | 'denied' | 'error';
@@ -185,6 +186,7 @@ function App() {
             <Route path="ops/dashboard" element={<DashboardOpsPage />} />
             <Route path="ops/grafana" element={<GrafanaDashboardsPage />} />
             <Route path="ops/alerts" element={<AlertsPage />} />
+            <Route path="ops/business-alerts" element={<AlertManagementPage />} />
             <Route path="ops/system-alerts" element={<SystemAlertsPage />} />
             <Route path="ops/audit" element={<AuditPage />} />
             <Route path="ai" element={<AiPage />} />
@@ -193,10 +195,17 @@ function App() {
             <Route path="studio/lite-topic" element={<LiteTopicPage />} />
             <Route path="studio/group-management" element={<GroupManagementPage />} />
             <Route path="studio/broker-cluster" element={<BrokerClusterPage />} />
-            <Route path="studio/alert-management" element={<Navigate to="/ops/alerts" replace />} />
+            <Route path="studio/ssl-settings" element={<SslSettingsPage />} />
+            <Route
+              path="studio/alert-management"
+              element={<Navigate to="/ops/business-alerts" replace />}
+            />
             <Route path="studio/producer" element={<ProducerPage />} />
             <Route path="studio/ops" element={<OpsPage />} />
-            <Route path="instance/alerts" element={<AlertRuleAssetsPage />} />
+            <Route
+              path="instance/alerts"
+              element={<Navigate to="/ops/business-alerts" replace />}
+            />
             <Route path="studio/users" element={<UserManagementPage />} />
             <Route path="ops/alert-rule-templates" element={<AlertRuleAssetsPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
