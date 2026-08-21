@@ -37,7 +37,7 @@ import {
 import type { ColumnsType, TableRowSelection } from 'antd/es/table/interface';
 import PageHeader from '../../components/PageHeader';
 import { useLang } from '../../i18n/LangContext';
-import type { AlertRule } from '../../api/ops';
+import type { AlertRule, AlertRuleTestResult } from '../../api/ops';
 import {
   createAlertRule,
   bulkDeleteAlertRules,
@@ -76,6 +76,7 @@ const AlertsPage = () => {
   const [editingRule, setEditingRule] = useState<AlertRule | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<AlertRuleTestResult | null>(null);
   const [actionId, setActionId] = useState<string | null>(null);
   const [selectedRuleIds, setSelectedRuleIds] = useState<Key[]>([]);
   const [bulkAction, setBulkAction] = useState<'enable' | 'disable' | 'delete' | null>(null);
@@ -365,6 +366,7 @@ const AlertsPage = () => {
       const values = (await form.validateFields()) as Partial<AlertRule>;
       setTesting(true);
       const result = await testAlertRule(values);
+      setTestResult(result);
       if (result.samples.length === 0) {
         message.warning('未采集到匹配样本，请检查实例和指标作用域');
         return;
@@ -484,6 +486,7 @@ const AlertsPage = () => {
         onCancel={() => {
           setModalVisible(false);
           setEditingRule(null);
+          setTestResult(null);
           form.resetFields();
         }}
         okText={editingRule ? t('common.edit') : t('common.create')}
@@ -497,6 +500,7 @@ const AlertsPage = () => {
               onClick={() => {
                 setModalVisible(false);
                 setEditingRule(null);
+                setTestResult(null);
                 form.resetFields();
               }}
             >
@@ -581,6 +585,49 @@ const AlertsPage = () => {
           >
             <InputNumber min={1} precision={0} style={{ width: '100%' }} />
           </Form.Item>
+
+          {testResult && testResult.samples.length > 0 && (
+            <Table
+              title={() => '规则试运行结果'}
+              rowKey={({ labels, currentValue, availability }) =>
+                `${JSON.stringify(labels)}-${currentValue}-${availability}`
+              }
+              size="small"
+              pagination={false}
+              dataSource={testResult.samples}
+              columns={[
+                {
+                  title: '标签',
+                  dataIndex: 'labels',
+                  render: (labels: Record<string, string>) =>
+                    Object.entries(labels)
+                      .map(([key, value]) => `${key}=${value}`)
+                      .join(', '),
+                },
+                {
+                  title: '采集状态',
+                  dataIndex: 'availability',
+                  render: (availability: string) => (
+                    <Tag color={availability === 'AVAILABLE' ? 'green' : 'orange'}>
+                      {availability}
+                    </Tag>
+                  ),
+                },
+                {
+                  title: '当前值',
+                  dataIndex: 'currentValue',
+                  render: (value: number | null) => value ?? '不可用',
+                },
+                {
+                  title: '阈值命中',
+                  dataIndex: 'conditionMet',
+                  render: (matched: boolean) => (
+                    <Tag color={matched ? 'red' : 'green'}>{matched ? '命中' : '未命中'}</Tag>
+                  ),
+                },
+              ]}
+            />
+          )}
 
           <Form.Item
             name="channels"
