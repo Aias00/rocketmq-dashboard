@@ -47,6 +47,15 @@ export interface CollectorStatus {
   businessCollectorCount: number;
 }
 
+export interface SystemAlertQuery {
+  level?: string;
+  domain?: 'BUSINESS' | 'CLUSTER';
+  instanceId?: string;
+  transition?: string;
+  page?: number;
+  pageSize?: number;
+}
+
 // Matches mock/audit.ts (inferred from data)
 export interface AuditRecord {
   id: number;
@@ -124,13 +133,15 @@ export async function bulkDeleteAlertRules(ids: number[]) {
 }
 
 // ─── System Alerts ──────────────────────────────────────────────
-export async function listSystemAlerts(params?: {
-  level?: string;
-  domain?: 'BUSINESS' | 'CLUSTER';
-  instanceId?: string;
-  transition?: string;
-}) {
+export async function listSystemAlerts(params?: SystemAlertQuery) {
   const res = await client.get<{ data: SystemAlert[] }>('/system-alerts', { params });
+  return res.data.data;
+}
+
+export async function listSystemAlertsPage(params: SystemAlertQuery = {}) {
+  const res = await client.get<{ data: PageResult<SystemAlert> }>('/system-alerts/page', {
+    params,
+  });
   return res.data.data;
 }
 

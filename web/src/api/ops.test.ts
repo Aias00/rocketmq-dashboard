@@ -33,6 +33,7 @@ import {
   bulkDeleteAlertRules,
   bulkToggleAlertRules,
   listSystemAlerts,
+  listSystemAlertsPage,
   acknowledgeAlert,
   clearAcknowledgedAlerts,
   listAuditRecords,
@@ -224,6 +225,26 @@ describe('Ops API - System Alerts & Audit', () => {
     });
     const result = await listSystemAlerts();
     expect(result[0].level).toBe('critical');
+  });
+
+  it('lists paged system alerts with server-side filters', async () => {
+    mock.onGet('/system-alerts/page').reply((config) => {
+      expect(config.params).toEqual({
+        domain: 'BUSINESS',
+        transition: 'FIRING',
+        page: 2,
+        pageSize: 10,
+      });
+      return [200, { code: 200, data: { items: [], total: 11, page: 2, size: 10 } }];
+    });
+
+    const result = await listSystemAlertsPage({
+      domain: 'BUSINESS',
+      transition: 'FIRING',
+      page: 2,
+      pageSize: 10,
+    });
+    expect(result.total).toBe(11);
   });
 
   it('acknowledges an alert', async () => {

@@ -25,6 +25,7 @@ import {
   listAlertRules,
   listAuditRecords,
   listSystemAlerts,
+  listSystemAlertsPage,
   toggleAlertRule,
   updateAlertRule,
 } from './opsService';
@@ -106,6 +107,15 @@ describe('ops service mock data', () => {
     const second = await listSystemAlerts();
     expect(second[0].title).toBe(originalTitle);
     expect(second[0]).not.toBe(first[0]);
+  });
+
+  it('pages mock system alert rows', async () => {
+    const full = await listSystemAlerts();
+    const result = await listSystemAlertsPage({ page: 1, pageSize: 1 });
+
+    expect(result.items).toHaveLength(1);
+    expect(result.total).toBeGreaterThanOrEqual(1);
+    expect(result.items[0]).not.toBe(full[0]);
   });
 
   it('returns copied audit records', async () => {

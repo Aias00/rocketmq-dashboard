@@ -16,7 +16,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { Card, Tag, Flex, Typography, Badge, Button, message, Select } from 'antd';
+import { Card, Tag, Flex, Typography, Badge, Button, message, Pagination, Select } from 'antd';
 import { CheckCircle, Trash } from '@phosphor-icons/react';
 import PageHeader from '../../components/PageHeader';
 import { useLang } from '../../i18n/LangContext';
@@ -24,9 +24,9 @@ import {
   acknowledgeAlert,
   clearAcknowledgedAlerts,
   getCollectorStatus,
-  listSystemAlerts,
+  listSystemAlertsPage,
 } from '../../services/opsService';
-import type { CollectorStatus, SystemAlert } from '../../api/ops';
+import type { CollectorStatus, PageResult, SystemAlert } from '../../api/ops';
 
 const { Text } = Typography;
 
@@ -47,15 +47,28 @@ const SystemAlertsPage = () => {
   const [transitionFilter, setTransitionFilter] = useState<string>('all');
   const [collectorStatus, setCollectorStatus] = useState<CollectorStatus | null>(null);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [refreshNonce, setRefreshNonce] = useState(0);
+  const pageSize = 20;
   const [acknowledgingIds, setAcknowledgingIds] = useState<Set<number>>(() => new Set());
   const [clearing, setClearing] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
 
-    void listSystemAlerts()
-      .then((data) => {
-        if (!cancelled) setAlerts(data);
+    void listSystemAlertsPage({
+      level: levelFilter === 'all' ? undefined : levelFilter,
+      domain: domainFilter === 'all' ? undefined : (domainFilter as 'BUSINESS' | 'CLUSTER'),
+      transition: transitionFilter === 'all' ? undefined : transitionFilter,
+      page,
+      pageSize,
+    })
+      .then((data: PageResult<SystemAlert>) => {
+        if (!cancelled) {
+          setAlerts(data.items);
+          setTotal(data.total);
+        }
       })
       .catch(() => {
         if (!cancelled) message.error('系统告警加载失败，请稍后重试');
@@ -72,18 +85,7 @@ const SystemAlertsPage = () => {
     return () => {
       cancelled = true;
     };
-  }, []);
-
-  const filtered =
-    levelFilter === 'all'
-      ? alerts
-      : alerts.filter((a) => normalizeAlertLevel(a.level) === levelFilter);
-  const visibleAlerts =
-    domainFilter === 'all' ? filtered : filtered.filter((alert) => alert.domain === domainFilter);
-  const transitionVisibleAlerts =
-    transitionFilter === 'all'
-      ? visibleAlerts
-      : visibleAlerts.filter((alert) => alert.transition === transitionFilter);
+  }, [domainFilter, levelFilter, page, refreshNonce, transitionFilter]);
 
   const unackCount = alerts.filter((a) => !a.acknowledged).length;
 
@@ -108,8 +110,8 @@ const SystemAlertsPage = () => {
     setClearing(true);
     try {
       await clearAcknowledgedAlerts();
-      const fresh = await listSystemAlerts();
-      setAlerts(fresh);
+      if (page === 1) setRefreshNonce((value) => value + 1);
+      else setPage(1);
       message.success(t('sysAlerts.cleared'));
     } catch {
       message.error('清理已确认告警失败，请稍后重试');
@@ -141,7 +143,10 @@ const SystemAlertsPage = () => {
             key={level}
             type={levelFilter === level ? 'primary' : 'default'}
             size="small"
-            onClick={() => setLevelFilter(level)}
+            onClick={() => {
+              setLevelFilter(level);
+              setPage(1);
+            }}
           >
             {level === 'all' ? t('common.all') : alertLevelConfig[level]?.label}
             {level !== 'all' && (
@@ -161,7 +166,10 @@ const SystemAlertsPage = () => {
           value={domainFilter}
           size="small"
           style={{ minWidth: 132 }}
-          onChange={setDomainFilter}
+          onChange={(value) => {
+            setDomainFilter(value);
+            setPage(1);
+          }}
           options={[
             { value: 'all', label: t('common.all') },
             { value: 'BUSINESS', label: '业务告警' },
@@ -172,7 +180,10 @@ const SystemAlertsPage = () => {
           value={transitionFilter}
           size="small"
           style={{ minWidth: 124 }}
-          onChange={setTransitionFilter}
+          onChange={(value) => {
+            setTransitionFilter(value);
+            setPage(1);
+          }}
           options={[
             { value: 'all', label: '全部状态' },
             { value: 'FIRING', label: '触发中' },
@@ -189,7 +200,7 @@ const SystemAlertsPage = () => {
       <Flex vertical gap={12}>
         {loading && <Card loading />}
         {!loading &&
-          transitionVisibleAlerts.map((alert) => {
+          alerts.map((alert) => {
             const normalizedLevel = normalizeAlertLevel(alert.level);
             const cfg = alertLevelConfig[normalizedLevel] ?? {
               color: '#8c8c8c',
@@ -265,7 +276,7 @@ const SystemAlertsPage = () => {
               </div>
             );
           })}
-        {!loading && transitionVisibleAlerts.length === 0 && (
+        {!loading && alerts.length === 0 && (
           <Card>
             <Flex justify="center" style={{ padding: 40 }}>
               <Text type="secondary">{t('sysAlerts.noAlerts')}</Text>
@@ -273,6 +284,16 @@ const SystemAlertsPage = () => {
           </Card>
         )}
       </Flex>
+      {total > pageSize && (
+        <Pagination
+          current={page}
+          pageSize={pageSize}
+          total={total}
+          showSizeChanger={false}
+          style={{ marginTop: 16, textAlign: 'right' }}
+          onChange={setPage}
+        />
+      )}
     </div>
   );
 };

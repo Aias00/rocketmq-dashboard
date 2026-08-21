@@ -7,6 +7,7 @@ import type {
   AlertRuleBulkResult,
   CollectorStatus,
   SystemAlert,
+  SystemAlertQuery,
   AuditQuery,
   AuditRecord,
   PageResult,
@@ -194,6 +195,29 @@ export async function bulkDeleteAlertRules(ids: number[]): Promise<AlertRuleBulk
 export async function listSystemAlerts(): Promise<SystemAlert[]> {
   if (isMockMode()) return (mockSystemAlerts as unknown as SystemAlert[]).map(copySystemAlert);
   return opsApi.listSystemAlerts();
+}
+
+export async function listSystemAlertsPage(
+  params: SystemAlertQuery = {},
+): Promise<PageResult<SystemAlert>> {
+  if (!isMockMode()) return opsApi.listSystemAlertsPage(params);
+  const page = params.page ?? 1;
+  const pageSize = params.pageSize ?? 20;
+  const normalizedLevel = params.level?.toLowerCase();
+  const normalizedTransition = params.transition?.toUpperCase();
+  const filtered = (mockSystemAlerts as unknown as SystemAlert[]).filter((alert) => {
+    if (normalizedLevel && alert.level.toLowerCase() !== normalizedLevel) return false;
+    if (params.domain && alert.domain !== params.domain) return false;
+    if (params.instanceId && alert.instanceId !== params.instanceId) return false;
+    return !normalizedTransition || alert.transition === normalizedTransition;
+  });
+  const start = (page - 1) * pageSize;
+  return {
+    items: filtered.slice(start, start + pageSize).map(copySystemAlert),
+    total: filtered.length,
+    page,
+    size: pageSize,
+  };
 }
 
 export async function getCollectorStatus(): Promise<CollectorStatus> {
