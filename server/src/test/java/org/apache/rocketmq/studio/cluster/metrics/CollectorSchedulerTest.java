@@ -19,6 +19,7 @@ package org.apache.rocketmq.studio.cluster.metrics;
 import org.apache.rocketmq.studio.instance.InstanceRepository;
 import org.apache.rocketmq.studio.instance.InstanceVO;
 import org.apache.rocketmq.studio.ops.alert.AlertDomain;
+import org.apache.rocketmq.studio.ops.alert.NativeAlertProcessor;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
@@ -46,9 +47,11 @@ class CollectorSchedulerTest {
         when(collector.supports(instance)).thenReturn(true);
         when(collector.collect(instance)).thenReturn(List.of(sample));
 
-        new CollectorScheduler(properties, instances, List.of(collector), List.of(), snapshots).collect();
+        NativeAlertProcessor processor = mock(NativeAlertProcessor.class);
+        new CollectorScheduler(properties, instances, List.of(collector), List.of(), snapshots, processor).collect();
 
         verify(snapshots).saveAll(List.of(sample));
+        verify(processor).process(List.of(sample));
     }
 
     @Test
@@ -57,7 +60,7 @@ class CollectorSchedulerTest {
         InstanceRepository instances = mock(InstanceRepository.class);
         MetricSnapshotRepository snapshots = mock(MetricSnapshotRepository.class);
 
-        new CollectorScheduler(properties, instances, List.of(), List.of(), snapshots).collect();
+        new CollectorScheduler(properties, instances, List.of(), List.of(), snapshots, mock(NativeAlertProcessor.class)).collect();
 
         verify(instances, never()).findAll();
         verify(snapshots, never()).saveAll(any());

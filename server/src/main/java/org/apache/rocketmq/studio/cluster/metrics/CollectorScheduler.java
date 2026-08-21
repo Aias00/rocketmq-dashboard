@@ -20,6 +20,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.rocketmq.studio.instance.InstanceRepository;
 import org.apache.rocketmq.studio.instance.InstanceVO;
+import org.apache.rocketmq.studio.ops.alert.NativeAlertProcessor;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -37,6 +38,7 @@ public class CollectorScheduler {
     private final List<ClusterMetricsCollector> clusterCollectors;
     private final List<BusinessMetricsCollector> businessCollectors;
     private final MetricSnapshotRepository snapshotRepository;
+    private final NativeAlertProcessor alertProcessor;
 
     @Scheduled(fixedDelayString = "${studio.alerting.collection-interval:PT30S}")
     public void collect() {
@@ -72,6 +74,7 @@ public class CollectorScheduler {
     private void persist(List<MetricSample> samples) {
         if (!samples.isEmpty()) {
             snapshotRepository.saveAll(samples);
+            alertProcessor.process(samples);
         }
     }
 }

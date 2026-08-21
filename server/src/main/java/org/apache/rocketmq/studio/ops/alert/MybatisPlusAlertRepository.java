@@ -87,6 +87,14 @@ public class MybatisPlusAlertRepository implements AlertRepository {
     }
 
     @Override
+    public SystemAlertVO saveAlert(SystemAlertVO alert) {
+        RmqSystemAlert entity = toAlertEntity(alert);
+        alertMapper.insert(entity);
+        alert.setId(entity.getId());
+        return alert;
+    }
+
+    @Override
     public boolean acknowledgeAlert(SystemAlertVO alert) {
         return alertMapper.updateById(toAlertEntity(alert)) > 0;
     }

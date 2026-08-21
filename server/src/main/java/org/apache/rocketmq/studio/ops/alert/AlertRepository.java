@@ -30,6 +30,8 @@ public interface AlertRepository {
 
     List<SystemAlertVO> findAlerts(String level);
 
+    SystemAlertVO saveAlert(SystemAlertVO alert);
+
     boolean acknowledgeAlert(SystemAlertVO alert);
 
     int deleteAcknowledgedAlerts();
