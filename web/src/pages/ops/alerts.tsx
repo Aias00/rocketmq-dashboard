@@ -45,6 +45,7 @@ import {
   deleteAlertRule,
   listAlertRules,
   toggleAlertRule,
+  testAlertRule,
   updateAlertRule,
 } from '../../services/opsService';
 <<<<<<< HEAD
@@ -74,6 +75,7 @@ const AlertsPage = () => {
   const [modalVisible, setModalVisible] = useState(false);
   const [editingRule, setEditingRule] = useState<AlertRule | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [testing, setTesting] = useState(false);
   const [actionId, setActionId] = useState<string | null>(null);
   const [selectedRuleIds, setSelectedRuleIds] = useState<Key[]>([]);
   const [bulkAction, setBulkAction] = useState<'enable' | 'disable' | 'delete' | null>(null);
@@ -358,6 +360,31 @@ const AlertsPage = () => {
     }
   };
 
+  const handleTest = async () => {
+    try {
+      const values = (await form.validateFields()) as Partial<AlertRule>;
+      setTesting(true);
+      const result = await testAlertRule(values);
+      if (result.samples.length === 0) {
+        message.warning('未采集到匹配样本，请检查实例和指标作用域');
+        return;
+      }
+      const matched = result.samples.filter((sample) => sample.conditionMet).length;
+      const valuesSummary = result.samples
+        .slice(0, 3)
+        .map(
+          (sample) => `${sample.currentValue ?? '不可用'}${sample.conditionMet ? '（命中）' : ''}`,
+        )
+        .join('，');
+      message.info(`采集到 ${result.samples.length} 个样本，${matched} 个命中：${valuesSummary}`);
+    } catch (error) {
+      if (error && typeof error === 'object' && 'errorFields' in error) return;
+      message.error('规则试运行失败，请检查实例连接和指标配置');
+    } finally {
+      setTesting(false);
+    }
+  };
+
   return (
     <div style={{ padding: 24 }}>
       {/* ─── Header ─── */}
@@ -461,6 +488,25 @@ const AlertsPage = () => {
         }}
         okText={editingRule ? t('common.edit') : t('common.create')}
         cancelText={t('common.cancel')}
+        footer={
+          <Flex justify="flex-end" gap={8}>
+            <Button onClick={() => void handleTest()} loading={testing} disabled={submitting}>
+              试运行
+            </Button>
+            <Button
+              onClick={() => {
+                setModalVisible(false);
+                setEditingRule(null);
+                form.resetFields();
+              }}
+            >
+              {t('common.cancel')}
+            </Button>
+            <Button type="primary" onClick={() => void handleSubmit()} loading={submitting}>
+              {editingRule ? t('common.edit') : t('common.create')}
+            </Button>
+          </Flex>
+        }
       >
         <Form form={form} layout="vertical">
           <Form.Item
