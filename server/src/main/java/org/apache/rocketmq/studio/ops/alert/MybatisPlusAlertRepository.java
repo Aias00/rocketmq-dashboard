@@ -17,6 +17,8 @@
 package org.apache.rocketmq.studio.ops.alert;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import org.apache.rocketmq.studio.common.domain.PageResult;
 import org.apache.rocketmq.studio.common.domain.enums.AlertLevel;
 import org.apache.rocketmq.studio.persistence.entity.RmqAlertRule;
 import org.apache.rocketmq.studio.persistence.entity.RmqSystemAlert;
@@ -84,6 +86,19 @@ public class MybatisPlusAlertRepository implements AlertRepository {
         return alertMapper.selectList(query).stream()
                 .map(MybatisPlusAlertRepository::toAlertVO)
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    public PageResult<SystemAlertVO> findAlertsPage(SystemAlertQuery query) {
+        QueryWrapper<RmqSystemAlert> conditions = new QueryWrapper<RmqSystemAlert>()
+                .eq(StringUtils.hasText(query.level()), "level", normalizeLevel(query.level()))
+                .eq(query.domain() != null, "domain", query.domain() == null ? null : query.domain().name())
+                .eq(StringUtils.hasText(query.instanceId()), "instance_id", trimToNull(query.instanceId()))
+                .eq(StringUtils.hasText(query.transition()), "transition", normalizeTransition(query.transition()))
+                .orderByDesc("time");
+        Page<RmqSystemAlert> result = alertMapper.selectPage(new Page<>(query.page(), query.pageSize()), conditions);
+        return PageResult.of(result.getRecords().stream().map(MybatisPlusAlertRepository::toAlertVO).toList(),
+                result.getTotal(), query.page(), query.pageSize());
     }
 
     @Override
@@ -211,6 +226,18 @@ public class MybatisPlusAlertRepository implements AlertRepository {
         } catch (IllegalArgumentException exception) {
             return AlertLevel.info;
         }
+    }
+
+    private static String normalizeLevel(String level) {
+        return trimToNull(level).toLowerCase(Locale.ROOT);
+    }
+
+    private static String normalizeTransition(String transition) {
+        return trimToNull(transition).toUpperCase(Locale.ROOT);
+    }
+
+    private static String trimToNull(String value) {
+        return StringUtils.hasText(value) ? value.trim() : null;
     }
 
     private static List<String> splitCsv(String value) {

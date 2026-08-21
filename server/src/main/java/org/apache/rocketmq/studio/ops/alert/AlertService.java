@@ -17,6 +17,7 @@
 package org.apache.rocketmq.studio.ops.alert;
 
 import org.apache.rocketmq.studio.common.exception.BusinessException;
+import org.apache.rocketmq.studio.common.domain.PageResult;
 import org.apache.rocketmq.studio.audit.OperationAuditService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -371,6 +372,14 @@ public class AlertService {
                 .filter(alert -> !hasText(instanceId) || instanceId.trim().equals(alert.getInstanceId()))
                 .filter(alert -> !hasText(transition) || transition.trim().equalsIgnoreCase(alert.getTransition()))
                 .toList();
+    }
+
+    public PageResult<SystemAlertVO> listAlerts(String level, AlertDomain domain, String instanceId,
+            String transition, int page, int pageSize) {
+        if (page < 1 || pageSize < 1 || pageSize > 100) {
+            throw new BusinessException(400, "Invalid page or pageSize");
+        }
+        return alertRepository.findAlertsPage(new SystemAlertQuery(level, domain, instanceId, transition, page, pageSize));
     }
 
 

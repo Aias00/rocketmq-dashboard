@@ -316,7 +316,8 @@ CREATE TABLE IF NOT EXISTS rmq_system_alert (
   PRIMARY KEY (`id`),
   INDEX idx_level (level),
   INDEX idx_acknowledged (acknowledged),
-  INDEX idx_system_alert_domain_time (domain, time)
+  INDEX idx_system_alert_domain_time (domain, time),
+  INDEX idx_system_alert_feed (domain, instance_id, transition, time)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 15. Cloud provider credentials (secret_key is base64-encoded and never seeded).

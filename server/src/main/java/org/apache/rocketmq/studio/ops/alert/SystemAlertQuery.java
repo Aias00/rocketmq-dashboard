@@ -16,25 +16,7 @@
  */
 package org.apache.rocketmq.studio.ops.alert;
 
-import org.apache.rocketmq.studio.common.domain.PageResult;
-import java.util.List;
-
-public interface AlertRepository {
-    List<AlertRuleVO> findAllRules();
-
-    AlertRuleVO saveRule(AlertRuleVO rule);
-
-    boolean replaceRule(AlertRuleVO rule);
-
-    boolean deleteRule(Long id);
-
-    List<SystemAlertVO> findAlerts(String level);
-
-    PageResult<SystemAlertVO> findAlertsPage(SystemAlertQuery query);
-
-    SystemAlertVO saveAlert(SystemAlertVO alert);
-
-    boolean acknowledgeAlert(SystemAlertVO alert);
-
-    int deleteAcknowledgedAlerts();
+/** Server-side filters for the paged alert-event feed. */
+public record SystemAlertQuery(String level, AlertDomain domain, String instanceId, String transition,
+        int page, int pageSize) {
 }

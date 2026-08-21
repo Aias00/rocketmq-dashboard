@@ -17,6 +17,7 @@
 package org.apache.rocketmq.studio.ops.alert;
 
 import org.apache.rocketmq.studio.common.domain.Result;
+import org.apache.rocketmq.studio.common.domain.PageResult;
 import org.apache.rocketmq.studio.common.exception.BusinessException;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -44,6 +45,17 @@ public class SystemAlertController {
             @RequestParam(required = false) String instanceId,
             @RequestParam(required = false) String transition) {
         return Result.ok(alertService.listAlerts(level, domain, instanceId, transition));
+    }
+
+    @GetMapping("/page")
+    public Result<PageResult<SystemAlertVO>> listAlertsPage(
+            @RequestParam(required = false) String level,
+            @RequestParam(required = false) AlertDomain domain,
+            @RequestParam(required = false) String instanceId,
+            @RequestParam(required = false) String transition,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int pageSize) {
+        return Result.ok(alertService.listAlerts(level, domain, instanceId, transition, page, pageSize));
     }
 
     @PostMapping("/acknowledge")

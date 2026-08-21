@@ -17,6 +17,7 @@
 package org.apache.rocketmq.studio.ops.alert;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.rocketmq.studio.common.domain.PageResult;
 import org.apache.rocketmq.studio.common.domain.enums.AlertLevel;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -68,6 +69,22 @@ class SystemAlertControllerTest {
                 .andExpect(jsonPath("$.data[0].acknowledged").value(false));
 
         verify(alertService).listAlerts("error", null, null, null);
+    }
+
+    @Test
+    void listAlertsPageShouldForwardFiltersAndPaging() throws Exception {
+        SystemAlertVO alert = SystemAlertVO.builder().id(2L).level(AlertLevel.warning).build();
+        when(alertService.listAlerts("warning", AlertDomain.BUSINESS, "local", "FIRING", 2, 10))
+                .thenReturn(PageResult.of(List.of(alert), 11, 2, 10));
+
+        mockMvc.perform(get("/api/system-alerts/page").param("level", "warning")
+                        .param("domain", "BUSINESS").param("instanceId", "local")
+                        .param("transition", "FIRING").param("page", "2").param("pageSize", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(11))
+                .andExpect(jsonPath("$.data.items[0].id").value(2));
+
+        verify(alertService).listAlerts("warning", AlertDomain.BUSINESS, "local", "FIRING", 2, 10);
     }
 
     @Test
