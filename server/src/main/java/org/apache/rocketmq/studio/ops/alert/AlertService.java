@@ -365,6 +365,14 @@ public class AlertService {
         return alertRepository.findAlerts(level);
     }
 
+    public List<SystemAlertVO> listAlerts(String level, AlertDomain domain, String instanceId, String transition) {
+        return listAlerts(level).stream()
+                .filter(alert -> domain == null || domain == alert.getDomain())
+                .filter(alert -> !hasText(instanceId) || instanceId.trim().equals(alert.getInstanceId()))
+                .filter(alert -> !hasText(transition) || transition.trim().equalsIgnoreCase(alert.getTransition()))
+                .toList();
+    }
+
 
     public SystemAlertVO acknowledgeAlert(Long id) {
         log.info("Acknowledging system alert id={}", id);

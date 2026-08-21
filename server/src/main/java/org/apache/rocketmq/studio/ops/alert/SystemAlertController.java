@@ -39,8 +39,11 @@ public class SystemAlertController {
 
     @GetMapping
     public Result<List<SystemAlertVO>> listAlerts(
-            @RequestParam(required = false) String level) {
-        return Result.ok(alertService.listAlerts(level));
+            @RequestParam(required = false) String level,
+            @RequestParam(required = false) AlertDomain domain,
+            @RequestParam(required = false) String instanceId,
+            @RequestParam(required = false) String transition) {
+        return Result.ok(alertService.listAlerts(level, domain, instanceId, transition));
     }
 
     @PostMapping("/acknowledge")

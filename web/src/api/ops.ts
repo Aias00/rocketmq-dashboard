@@ -29,6 +29,12 @@ export interface SystemAlert {
   description: string;
   time: string;
   acknowledged: boolean;
+  domain?: 'BUSINESS' | 'CLUSTER' | null;
+  ruleId?: number | null;
+  fingerprint?: string | null;
+  transition?: 'FIRING' | 'RESOLVED' | null;
+  instanceId?: string | null;
+  currentValue?: number | null;
 }
 
 // Matches mock/audit.ts (inferred from data)
@@ -103,8 +109,13 @@ export async function bulkDeleteAlertRules(ids: number[]) {
 }
 
 // ─── System Alerts ──────────────────────────────────────────────
-export async function listSystemAlerts() {
-  const res = await client.get<{ data: SystemAlert[] }>('/system-alerts');
+export async function listSystemAlerts(params?: {
+  level?: string;
+  domain?: 'BUSINESS' | 'CLUSTER';
+  instanceId?: string;
+  transition?: string;
+}) {
+  const res = await client.get<{ data: SystemAlert[] }>('/system-alerts', { params });
   return res.data.data;
 }
 

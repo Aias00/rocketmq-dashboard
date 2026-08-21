@@ -58,7 +58,7 @@ class SystemAlertControllerTest {
                 .title("Broker Down")
                 .acknowledged(false)
                 .build();
-        when(alertService.listAlerts("error")).thenReturn(List.of(alert));
+        when(alertService.listAlerts("error", null, null, null)).thenReturn(List.of(alert));
 
         mockMvc.perform(get("/api/system-alerts").param("level", "error"))
                 .andExpect(status().isOk())
@@ -67,7 +67,7 @@ class SystemAlertControllerTest {
                 .andExpect(jsonPath("$.data[0].level").value("error"))
                 .andExpect(jsonPath("$.data[0].acknowledged").value(false));
 
-        verify(alertService).listAlerts("error");
+        verify(alertService).listAlerts("error", null, null, null);
     }
 
     @Test

@@ -16,7 +16,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { Card, Tag, Flex, Typography, Badge, Button, message } from 'antd';
+import { Card, Tag, Flex, Typography, Badge, Button, message, Select } from 'antd';
 import { CheckCircle, Trash } from '@phosphor-icons/react';
 import PageHeader from '../../components/PageHeader';
 import { useLang } from '../../i18n/LangContext';
@@ -42,6 +42,7 @@ const SystemAlertsPage = () => {
 
   const [alerts, setAlerts] = useState<SystemAlert[]>([]);
   const [levelFilter, setLevelFilter] = useState<string>('all');
+  const [domainFilter, setDomainFilter] = useState<string>('all');
   const [loading, setLoading] = useState(true);
   const [acknowledgingIds, setAcknowledgingIds] = useState<Set<number>>(() => new Set());
   const [clearing, setClearing] = useState(false);
@@ -69,6 +70,9 @@ const SystemAlertsPage = () => {
     levelFilter === 'all'
       ? alerts
       : alerts.filter((a) => normalizeAlertLevel(a.level) === levelFilter);
+  const visibleAlerts = domainFilter === 'all'
+    ? filtered
+    : filtered.filter((alert) => alert.domain === domainFilter);
 
   const unackCount = alerts.filter((a) => !a.acknowledged).length;
 
@@ -142,12 +146,23 @@ const SystemAlertsPage = () => {
             )}
           </Button>
         ))}
+        <Select
+          value={domainFilter}
+          size="small"
+          style={{ minWidth: 132 }}
+          onChange={setDomainFilter}
+          options={[
+            { value: 'all', label: t('common.all') },
+            { value: 'BUSINESS', label: '业务告警' },
+            { value: 'CLUSTER', label: '集群告警' },
+          ]}
+        />
       </Flex>
 
       <Flex vertical gap={12}>
         {loading && <Card loading />}
         {!loading &&
-          filtered.map((alert) => {
+          visibleAlerts.map((alert) => {
             const normalizedLevel = normalizeAlertLevel(alert.level);
             const cfg = alertLevelConfig[normalizedLevel] ?? {
               color: '#8c8c8c',
@@ -187,10 +202,13 @@ const SystemAlertsPage = () => {
                     >
                       {cfg.label}
                     </Tag>
+                    {alert.domain && <Tag color={alert.domain === 'CLUSTER' ? 'geekblue' : 'green'}>{alert.domain === 'CLUSTER' ? '集群' : '业务'}</Tag>}
+                    {alert.transition && <Tag>{alert.transition}</Tag>}
                   </Flex>
                   <Text type="secondary" style={{ fontSize: 14 }}>
                     {alert.description}
                   </Text>
+                  {alert.instanceId && <Text type="secondary" style={{ display: 'block', fontSize: 12 }}>{alert.instanceId}{alert.currentValue != null ? ` · ${alert.currentValue}` : ''}</Text>}
                 </div>
                 <Flex align="center" gap={8} style={{ flexShrink: 0 }}>
                   <Text type="secondary" style={{ fontSize: 14 }}>
@@ -211,7 +229,7 @@ const SystemAlertsPage = () => {
               </div>
             );
           })}
-        {!loading && filtered.length === 0 && (
+        {!loading && visibleAlerts.length === 0 && (
           <Card>
             <Flex justify="center" style={{ padding: 40 }}>
               <Text type="secondary">{t('sysAlerts.noAlerts')}</Text>
