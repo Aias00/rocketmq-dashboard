@@ -279,6 +279,21 @@ CREATE TABLE IF NOT EXISTS rmq_metric_snapshot (
   INDEX idx_metric_snapshot_retention (`collected_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE IF NOT EXISTS rmq_alert_state (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `rule_id` bigint(20) unsigned NOT NULL,
+  `fingerprint` CHAR(64) NOT NULL,
+  `status` VARCHAR(16) NOT NULL,
+  `consecutive_hits` INT NOT NULL DEFAULT 0,
+  `current_value` DOUBLE NULL,
+  `first_pending_at` DATETIME NULL,
+  `fired_at` DATETIME NULL,
+  `resolved_at` DATETIME NULL,
+  `gmt_modified` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY uk_alert_state_rule_fingerprint (`rule_id`, `fingerprint`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- 15. 系统告警事件
 CREATE TABLE IF NOT EXISTS rmq_system_alert (
   `id`           bigint(20) unsigned NOT NULL AUTO_INCREMENT COMMENT '主键',
