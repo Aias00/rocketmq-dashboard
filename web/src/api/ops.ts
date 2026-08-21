@@ -72,31 +72,34 @@ export interface AuditQuery {
 
 // ─── Alert Rules ────────────────────────────────────────────────
 export async function listAlertRules() {
-  const res = await client.get<{ data: AlertRule[] }>('/alert-rules');
+  const res = await client.get<{ data: AlertRule[] }>('/cluster-alert-rules');
   return res.data.data;
 }
 
 export async function createAlertRule(data: Partial<AlertRule>) {
-  const res = await client.post<{ data: AlertRule }>('/alert-rules/create', data);
+  const res = await client.post<{ data: AlertRule }>('/cluster-alert-rules/create', data);
   return res.data.data;
 }
 
 export async function updateAlertRule(data: AlertRule) {
-  const res = await client.post<{ data: AlertRule }>('/alert-rules/update', data);
+  const res = await client.post<{ data: AlertRule }>('/cluster-alert-rules/update', data);
   return res.data.data;
 }
 
 export async function toggleAlertRule(id: number, enabled: boolean) {
-  const res = await client.post<{ data: AlertRule }>('/alert-rules/toggle', { id, enabled });
+  const res = await client.post<{ data: AlertRule }>('/cluster-alert-rules/toggle', {
+    id,
+    enabled,
+  });
   return res.data.data;
 }
 
 export async function deleteAlertRule(id: number) {
-  await client.post('/alert-rules/delete', { id });
+  await client.post('/cluster-alert-rules/delete', { id });
 }
 
 export async function bulkToggleAlertRules(ids: number[], enabled: boolean) {
-  const res = await client.post<{ data: AlertRuleBulkResult }>('/alert-rules/bulk-toggle', {
+  const res = await client.post<{ data: AlertRuleBulkResult }>('/cluster-alert-rules/bulk-toggle', {
     ids,
     enabled,
   });
@@ -104,7 +107,9 @@ export async function bulkToggleAlertRules(ids: number[], enabled: boolean) {
 }
 
 export async function bulkDeleteAlertRules(ids: number[]) {
-  const res = await client.post<{ data: AlertRuleBulkResult }>('/alert-rules/bulk-delete', { ids });
+  const res = await client.post<{ data: AlertRuleBulkResult }>('/cluster-alert-rules/bulk-delete', {
+    ids,
+  });
   return res.data.data;
 }
 

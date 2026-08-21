@@ -144,7 +144,7 @@ describe('Ops API - Alert Rules', () => {
         description: 'CPU alert',
       },
     ];
-    mock.onGet('/alert-rules').reply(200, { code: 200, data: rules });
+    mock.onGet('/cluster-alert-rules').reply(200, { code: 200, data: rules });
 
     const result = await listAlertRules();
     expect(result).toHaveLength(1);
@@ -152,12 +152,12 @@ describe('Ops API - Alert Rules', () => {
   });
 
   it('creates an alert rule', async () => {
-    mock.onPost('/alert-rules/create').reply(200, { code: 200 });
+    mock.onPost('/cluster-alert-rules/create').reply(200, { code: 200 });
     await createAlertRule({ name: 'TestAlert', metric: 'memory', operator: '>', threshold: 90 });
   });
 
   it('updates an alert rule', async () => {
-    mock.onPost('/alert-rules/update').reply((config) => {
+    mock.onPost('/cluster-alert-rules/update').reply((config) => {
       const body = JSON.parse(config.data);
       expect(body.id).toBe(1);
       expect(body.threshold).toBe(95);
@@ -167,7 +167,7 @@ describe('Ops API - Alert Rules', () => {
   });
 
   it('toggles an alert rule', async () => {
-    mock.onPost('/alert-rules/toggle').reply((config) => {
+    mock.onPost('/cluster-alert-rules/toggle').reply((config) => {
       const body = JSON.parse(config.data);
       expect(body.id).toBe(1);
       expect(body.enabled).toBe(false);
@@ -177,7 +177,7 @@ describe('Ops API - Alert Rules', () => {
   });
 
   it('deletes an alert rule', async () => {
-    mock.onPost('/alert-rules/delete').reply((config) => {
+    mock.onPost('/cluster-alert-rules/delete').reply((config) => {
       const body = JSON.parse(config.data);
       expect(body.id).toBe(1);
       return [200, { code: 200 }];
@@ -187,11 +187,11 @@ describe('Ops API - Alert Rules', () => {
 
   it('submits bulk alert rule operations in one request', async () => {
     const result = { succeededIds: [1], failures: { '999': 'not found' }, updatedRules: [] };
-    mock.onPost('/alert-rules/bulk-toggle').reply((config) => {
+    mock.onPost('/cluster-alert-rules/bulk-toggle').reply((config) => {
       expect(JSON.parse(config.data)).toEqual({ ids: [1, 999], enabled: false });
       return [200, { code: 200, data: result }];
     });
-    mock.onPost('/alert-rules/bulk-delete').reply(200, { code: 200, data: result });
+    mock.onPost('/cluster-alert-rules/bulk-delete').reply(200, { code: 200, data: result });
 
     await expect(bulkToggleAlertRules([1, 999], false)).resolves.toEqual(result);
     await expect(bulkDeleteAlertRules([1, 999])).resolves.toEqual(result);

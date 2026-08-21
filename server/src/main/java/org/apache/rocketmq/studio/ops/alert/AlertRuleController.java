@@ -29,7 +29,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/alert-rules")
+@RequestMapping({"/api/alert-rules", "/api/business-alert-rules"})
 @RequiredArgsConstructor
 public class AlertRuleController {
 
