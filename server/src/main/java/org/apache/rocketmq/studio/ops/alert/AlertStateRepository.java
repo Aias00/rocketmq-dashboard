@@ -22,4 +22,6 @@ public interface AlertStateRepository {
     Optional<AlertRuleState> find(AlertStateKey key);
 
     void save(AlertStateKey key, AlertRuleState state);
+
+    boolean acknowledge(AlertStateKey key);
 }

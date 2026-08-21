@@ -43,6 +43,7 @@ public class AlertService {
     private static final Pattern DURATION_PATTERN = Pattern.compile("^\\d+(ms|s|m|h|d|w|y)$");
 
     private final AlertRepository alertRepository;
+    private final AlertStateRepository alertStateRepository;
     private final AlertRuleAssetService alertRuleAssetService;
     private final OperationAuditService operationAuditService;
 
@@ -398,6 +399,9 @@ public class AlertService {
         alert.setAcknowledged(true);
         if (!alertRepository.acknowledgeAlert(alert)) {
             throw new BusinessException(404, "System alert not found: " + id);
+        }
+        if (alert.getRuleId() != null && hasText(alert.getFingerprint())) {
+            alertStateRepository.acknowledge(new AlertStateKey(alert.getRuleId(), alert.getFingerprint()));
         }
         recordAudit("ACKNOWLEDGE_SYSTEM_ALERT", "SYSTEM_ALERT", String.valueOf(alert.getId()), null,
                 "acknowledged=true");

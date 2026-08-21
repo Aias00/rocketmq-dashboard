@@ -50,12 +50,15 @@ class AlertServiceTest {
 
     @Mock
     private OperationAuditService operationAuditService;
+    @Mock
+    private AlertStateRepository alertStateRepository;
 
     private AlertService alertService;
 
     @org.junit.jupiter.api.BeforeEach
     void setUp() {
-        alertService = new AlertService(alertRepository, new AlertRuleAssetService(), operationAuditService);
+        alertService = new AlertService(alertRepository, alertStateRepository, new AlertRuleAssetService(),
+                operationAuditService);
     }
 
     @Test
@@ -847,6 +850,18 @@ class AlertServiceTest {
         verify(alertRepository).acknowledgeAlert(result);
         verify(operationAuditService).record(eq("ACKNOWLEDGE_SYSTEM_ALERT"), eq("SYSTEM_ALERT"), eq("1"),
                 eq(null), eq("acknowledged=true"), eq("SUCCESS"), eq(null));
+    }
+
+    @Test
+    void acknowledgeNativeAlertShouldAcknowledgeItsActiveRuleState() {
+        SystemAlertVO alert = SystemAlertVO.builder().id(1L).ruleId(7L).fingerprint("fingerprint")
+                .acknowledged(false).build();
+        when(alertRepository.findAlerts(null)).thenReturn(List.of(alert));
+        when(alertRepository.acknowledgeAlert(any(SystemAlertVO.class))).thenReturn(true);
+
+        alertService.acknowledgeAlert(1L);
+
+        verify(alertStateRepository).acknowledge(new AlertStateKey(7L, "fingerprint"));
     }
 
     @Test

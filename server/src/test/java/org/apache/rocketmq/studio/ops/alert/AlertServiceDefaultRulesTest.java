@@ -38,8 +38,8 @@ class AlertServiceDefaultRulesTest {
         AlertRepository repository = mock(AlertRepository.class);
         when(repository.findAllRules()).thenReturn(Collections.emptyList());
 
-        AlertService service = new AlertService(repository, new AlertRuleAssetService(),
-                Mockito.mock(OperationAuditService.class));
+        AlertService service = new AlertService(repository, Mockito.mock(AlertStateRepository.class),
+                new AlertRuleAssetService(), Mockito.mock(OperationAuditService.class));
         String yaml = service.exportPrometheusRulesYaml();
 
         int ruleCount = countRules(yaml);
@@ -51,8 +51,8 @@ class AlertServiceDefaultRulesTest {
         AlertRepository repository = mock(AlertRepository.class);
         when(repository.findAllRules()).thenReturn(List.of());
 
-        AlertService service = new AlertService(repository, new AlertRuleAssetService(),
-                Mockito.mock(OperationAuditService.class));
+        AlertService service = new AlertService(repository, Mockito.mock(AlertStateRepository.class),
+                new AlertRuleAssetService(), Mockito.mock(OperationAuditService.class));
         String yaml = service.exportPrometheusRulesYaml();
 
         assertTrue(yaml.contains("rocketmq-broker.rules"));

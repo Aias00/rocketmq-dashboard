@@ -61,6 +61,11 @@ class NativeAlertProcessorTest {
             public void save(AlertStateKey key, AlertRuleState state) {
                 saved.put(key, state);
             }
+
+            @Override
+            public boolean acknowledge(AlertStateKey key) {
+                return false;
+            }
         };
         AlertRepository alerts = mock(AlertRepository.class);
         NativeAlertProcessor processor = processor(service, states, alerts);

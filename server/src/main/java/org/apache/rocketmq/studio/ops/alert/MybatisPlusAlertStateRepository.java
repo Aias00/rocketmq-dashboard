@@ -55,6 +55,18 @@ public class MybatisPlusAlertStateRepository implements AlertStateRepository {
         }
     }
 
+    @Override
+    public boolean acknowledge(AlertStateKey key) {
+        RmqAlertState entity = mapper.selectOne(new QueryWrapper<RmqAlertState>()
+                .eq("rule_id", key.ruleId()).eq("fingerprint", key.fingerprint()).last("LIMIT 1"));
+        if (entity == null || !AlertStateStatus.FIRING.name().equals(entity.getStatus())) {
+            return false;
+        }
+        entity.setStatus(AlertStateStatus.ACKED.name());
+        entity.setGmtModified(LocalDateTime.now(ZoneOffset.UTC));
+        return mapper.updateById(entity) > 0;
+    }
+
     private static void apply(RmqAlertState entity, AlertRuleState state) {
         entity.setStatus(state.status().name());
         entity.setConsecutiveHits(state.consecutiveHits());
