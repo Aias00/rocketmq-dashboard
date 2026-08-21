@@ -16,13 +16,6 @@
  */
 package org.apache.rocketmq.studio.cluster.metrics;
 
-import lombok.Data;
-import org.springframework.boot.context.properties.ConfigurationProperties;
-
-@Data
-@ConfigurationProperties(prefix = "studio.alerting")
-public class AlertingProperties {
-    /** Native collection remains opt-in until rule evaluation and event delivery are complete. */
-    private boolean collectionEnabled = false;
-    private String collectionInterval = "PT30S";
+public record CollectorStatusVO(boolean collectionEnabled, String collectionInterval,
+        int clusterCollectorCount, int businessCollectorCount) {
 }

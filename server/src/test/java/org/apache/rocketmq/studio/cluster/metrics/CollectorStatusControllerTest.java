@@ -16,13 +16,22 @@
  */
 package org.apache.rocketmq.studio.cluster.metrics;
 
-import lombok.Data;
-import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.junit.jupiter.api.Test;
 
-@Data
-@ConfigurationProperties(prefix = "studio.alerting")
-public class AlertingProperties {
-    /** Native collection remains opt-in until rule evaluation and event delivery are complete. */
-    private boolean collectionEnabled = false;
-    private String collectionInterval = "PT30S";
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+class CollectorStatusControllerTest {
+    @Test
+    void reportsWhetherNativeCollectionIsEnabled() {
+        AlertingProperties properties = new AlertingProperties();
+        properties.setCollectionEnabled(true);
+        properties.setCollectionInterval("PT1M");
+
+        CollectorStatusVO status = new CollectorStatusController(properties, List.of(), List.of()).status().getData();
+
+        assertThat(status.collectionEnabled()).isTrue();
+        assertThat(status.collectionInterval()).isEqualTo("PT1M");
+    }
 }
