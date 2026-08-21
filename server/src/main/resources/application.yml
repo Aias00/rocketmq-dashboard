@@ -68,6 +68,11 @@ studio:
   query-history:
     retention-days: ${STUDIO_QUERY_HISTORY_RETENTION_DAYS:90}
     cleanup-interval: ${STUDIO_QUERY_HISTORY_CLEANUP_INTERVAL:PT24H}
+  alerting:
+    collection-enabled: ${STUDIO_ALERTING_COLLECTION_ENABLED:false}
+    collection-interval: ${STUDIO_ALERTING_COLLECTION_INTERVAL:PT30S}
+    snapshot-retention: ${STUDIO_ALERTING_SNAPSHOT_RETENTION:PT24H}
+    snapshot-cleanup-interval: ${STUDIO_ALERTING_SNAPSHOT_CLEANUP_INTERVAL:PT1H}
   llm:
     token: ${RMQ_LLM_TOKEN:}
     anthropic-base-url: ${RMQ_ANTHROPIC_BASE_URL:}

@@ -25,4 +25,6 @@ public class AlertingProperties {
     /** Native collection remains opt-in until rule evaluation and event delivery are complete. */
     private boolean collectionEnabled = false;
     private String collectionInterval = "PT30S";
+    /** Retain short-lived diagnostic samples without allowing the snapshot table to grow indefinitely. */
+    private String snapshotRetention = "PT24H";
 }

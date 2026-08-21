@@ -26,6 +26,8 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.time.Duration;
+import java.time.Instant;
 
 /** Runs native collectors independently for each configured instance. */
 @Slf4j
@@ -49,6 +51,15 @@ public class CollectorScheduler {
             collectClusterMetrics(instance);
             collectBusinessMetrics(instance);
         }
+    }
+
+    @Scheduled(fixedDelayString = "${studio.alerting.snapshot-cleanup-interval:PT1H}")
+    public void cleanUpSnapshots() {
+        Duration retention = Duration.parse(properties.getSnapshotRetention());
+        if (retention.isNegative() || retention.isZero()) {
+            return;
+        }
+        snapshotRepository.deleteBefore(Instant.now().minus(retention));
     }
 
     private void collectClusterMetrics(InstanceVO instance) {

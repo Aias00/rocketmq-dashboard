@@ -1,0 +1,88 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.rocketmq.studio.cluster.metrics.collectors;
+
+import org.apache.rocketmq.studio.cluster.metrics.MetricAvailability;
+import org.apache.rocketmq.studio.cluster.metrics.MetricSample;
+import org.apache.rocketmq.studio.common.domain.enums.InstanceVendor;
+import org.apache.rocketmq.studio.instance.InstanceVO;
+import org.apache.rocketmq.studio.instance.group.ConsumerGroupVO;
+import org.apache.rocketmq.studio.provider.InstanceProvider;
+import org.apache.rocketmq.studio.provider.InstanceProviderRegistry;
+import org.junit.jupiter.api.Test;
+
+import java.util.List;
+import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+class ApacheRocketMqBusinessMetricsCollectorTest {
+
+    @Test
+    void collectsOneLagSampleForEachConsumerGroup() {
+        InstanceProviderRegistry registry = mock(InstanceProviderRegistry.class);
+        InstanceProvider provider = mock(InstanceProvider.class);
+        ConsumerGroupVO orders = group("orders", "cluster-a", 42);
+        ConsumerGroupVO payments = group("payments", "cluster-a", 0);
+        when(registry.byInstanceId("local")).thenReturn(Optional.of(provider));
+        when(provider.listConsumerGroups("local", null)).thenReturn(List.of(orders, payments));
+
+        List<MetricSample> samples = new ApacheRocketMqBusinessMetricsCollector(registry).collect(apacheInstance());
+
+        assertThat(samples).hasSize(2).allSatisfy(sample -> {
+            assertThat(sample.metricKey()).isEqualTo(ApacheRocketMqBusinessMetricsCollector.CONSUMER_LAG_TOTAL);
+            assertThat(sample.availability()).isEqualTo(MetricAvailability.AVAILABLE);
+        });
+        assertThat(samples).filteredOn(sample -> "orders".equals(sample.labels().get("consumerGroup")))
+                .singleElement().satisfies(sample -> assertThat(sample.value()).isEqualTo(42D));
+    }
+
+    @Test
+    void skipsUnsupportedVendor() {
+        InstanceVO instance = apacheInstance();
+        instance.setVendor(InstanceVendor.ALIYUN);
+
+        assertThat(new ApacheRocketMqBusinessMetricsCollector(mock(InstanceProviderRegistry.class)).collect(instance))
+                .isEmpty();
+    }
+
+    @Test
+    void reportsUnavailableWhenProviderFails() {
+        InstanceProviderRegistry registry = mock(InstanceProviderRegistry.class);
+        when(registry.byInstanceId("local")).thenThrow(new IllegalStateException("offline"));
+
+        assertThat(new ApacheRocketMqBusinessMetricsCollector(registry).collect(apacheInstance())).singleElement()
+                .satisfies(sample -> {
+                    assertThat(sample.availability()).isEqualTo(MetricAvailability.UNAVAILABLE);
+                    assertThat(sample.value()).isNull();
+                });
+    }
+
+    private static ConsumerGroupVO group(String name, String clusterId, long lag) {
+        ConsumerGroupVO group = new ConsumerGroupVO();
+        group.setName(name);
+        group.setClusterId(clusterId);
+        group.setTotalLag(lag);
+        return group;
+    }
+
+    private static InstanceVO apacheInstance() {
+        return InstanceVO.builder().name("local").endpoint("localhost:9876").vendor(InstanceVendor.APACHE).build();
+    }
+}

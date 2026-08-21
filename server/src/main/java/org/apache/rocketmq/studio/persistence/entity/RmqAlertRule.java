@@ -58,6 +58,12 @@ public class RmqAlertRule {
 
     private String severity;
 
+    private String instanceId;
+
+    private String consumerGroup;
+
+    private Integer consecutiveSamples;
+
     private LocalDateTime gmtCreate;
 
     private LocalDateTime gmtModified;

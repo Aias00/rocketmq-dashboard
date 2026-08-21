@@ -65,4 +65,16 @@ class CollectorSchedulerTest {
         verify(instances, never()).findAll();
         verify(snapshots, never()).saveAll(any());
     }
+
+    @Test
+    void removesExpiredSnapshotsUsingConfiguredRetention() {
+        AlertingProperties properties = new AlertingProperties();
+        properties.setSnapshotRetention("PT2H");
+        MetricSnapshotRepository snapshots = mock(MetricSnapshotRepository.class);
+
+        new CollectorScheduler(properties, mock(InstanceRepository.class), List.of(), List.of(), snapshots,
+                mock(NativeAlertProcessor.class)).cleanUpSnapshots();
+
+        verify(snapshots).deleteBefore(any(Instant.class));
+    }
 }

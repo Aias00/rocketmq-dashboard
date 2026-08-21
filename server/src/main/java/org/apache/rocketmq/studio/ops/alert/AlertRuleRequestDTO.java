@@ -17,6 +17,7 @@
 package org.apache.rocketmq.studio.ops.alert;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Pattern;
 import lombok.Data;
 
@@ -42,6 +43,10 @@ public class AlertRuleRequestDTO {
     @Pattern(regexp = "critical|warning|info", flags = Pattern.Flag.CASE_INSENSITIVE,
             message = "severity is invalid")
     private String severity;
+    private String instanceId;
+    private String consumerGroup;
+    @Min(value = 1, message = "consecutiveSamples must be at least 1")
+    private Integer consecutiveSamples;
 
     public AlertRuleVO toAlertRuleVO() {
         return AlertRuleVO.builder()
@@ -58,6 +63,9 @@ public class AlertRuleRequestDTO {
                 .brokerName(brokerName)
                 .clusterName(clusterName)
                 .severity(severity)
+                .instanceId(instanceId)
+                .consumerGroup(consumerGroup)
+                .consecutiveSamples(consecutiveSamples == null ? 1 : consecutiveSamples)
                 .build();
     }
 

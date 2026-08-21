@@ -13,6 +13,9 @@ export interface AlertRule {
   enabled: boolean;
   lastTriggered: string | null;
   description: string;
+  instanceId?: string;
+  consumerGroup?: string;
+  consecutiveSamples?: number;
 }
 
 export interface AlertRuleBulkResult {

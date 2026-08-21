@@ -47,9 +47,9 @@ import {
   toggleAlertRule,
   updateAlertRule,
 } from '../../services/opsService';
+<<<<<<< HEAD
 import { attachThresholdUnit } from './alertRulePayload';
 import { tableScrollX } from '../../utils/table';
-
 const { TextArea } = Input;
 
 const channelColors: Record<string, string> = {
@@ -58,9 +58,13 @@ const channelColors: Record<string, string> = {
   sms: 'orange',
 };
 
-const metricOptions = ['磁盘使用率', '消费堆积量', 'TPS 异常', 'Broker 离线', 'Proxy 连接数'];
+const metricOptions = [
+  { label: 'NameServer availability', value: 'nameserver.availability' },
+  { label: 'Broker availability', value: 'broker.availability' },
+  { label: 'Broker disk usage ratio', value: 'broker.disk.usage_ratio' },
+];
 
-const durationOptions = ['1分钟', '5分钟', '15分钟', '30分钟'];
+const durationOptions = ['1m', '5m', '15m', '30m'];
 
 const AlertsPage = () => {
   const { t } = useLang();
@@ -329,7 +333,7 @@ const AlertsPage = () => {
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields();
-      const payload = attachThresholdUnit(values);
+      const payload = values as Partial<AlertRule>;
       setSubmitting(true);
       if (editingRule) {
         const updated = await updateAlertRule({ ...editingRule, ...payload });
@@ -472,10 +476,7 @@ const AlertsPage = () => {
             label={t('alerts.metric')}
             rules={[{ required: true, message: '请选择监控指标' }]}
           >
-            <Select
-              placeholder="请选择监控指标"
-              options={metricOptions.map((m) => ({ label: m, value: m }))}
-            />
+            <Select placeholder="请选择监控指标" options={metricOptions} />
           </Form.Item>
 
           <Form.Item label={t('alerts.threshold')}>
@@ -515,6 +516,24 @@ const AlertsPage = () => {
               placeholder="请选择持续时间"
               options={durationOptions.map((d) => ({ label: d, value: d }))}
             />
+          </Form.Item>
+
+          <Form.Item
+            name="instanceId"
+            label="Studio 实例"
+            rules={[{ required: true, message: '请输入 Studio 实例 ID' }]}
+            extra="原生采集规则必须绑定一个 Studio 实例。"
+          >
+            <Input placeholder="例如 local" />
+          </Form.Item>
+
+          <Form.Item
+            name="consecutiveSamples"
+            label="连续采样次数"
+            initialValue={1}
+            rules={[{ required: true, message: '请输入连续采样次数' }]}
+          >
+            <InputNumber min={1} precision={0} style={{ width: '100%' }} />
           </Form.Item>
 
           <Form.Item

@@ -258,6 +258,9 @@ CREATE TABLE IF NOT EXISTS rmq_alert_rule (
   cluster_name VARCHAR(128),
   severity VARCHAR(32),
   domain VARCHAR(16) NOT NULL DEFAULT 'BUSINESS' COMMENT 'BUSINESS or CLUSTER alert rule domain',
+  instance_id VARCHAR(128) COMMENT 'Studio instance scope required for native rule evaluation',
+  consumer_group VARCHAR(255) COMMENT 'Optional consumer group selector for business metrics',
+  consecutive_samples INT NOT NULL DEFAULT 1 COMMENT 'Consecutive native samples required before firing',
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 

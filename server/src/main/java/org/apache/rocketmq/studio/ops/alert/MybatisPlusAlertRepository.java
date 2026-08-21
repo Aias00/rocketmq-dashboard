@@ -124,6 +124,9 @@ public class MybatisPlusAlertRepository implements AlertRepository {
         vo.setBrokerName(entity.getBrokerName());
         vo.setClusterName(entity.getClusterName());
         vo.setSeverity(entity.getSeverity());
+        vo.setInstanceId(entity.getInstanceId());
+        vo.setConsumerGroup(entity.getConsumerGroup());
+        vo.setConsecutiveSamples(entity.getConsecutiveSamples() == null ? 1 : entity.getConsecutiveSamples());
         return vo;
     }
 
@@ -146,6 +149,9 @@ public class MybatisPlusAlertRepository implements AlertRepository {
         entity.setBrokerName(rule.getBrokerName());
         entity.setClusterName(rule.getClusterName());
         entity.setSeverity(rule.getSeverity());
+        entity.setInstanceId(rule.getInstanceId());
+        entity.setConsumerGroup(rule.getConsumerGroup());
+        entity.setConsecutiveSamples(Math.max(1, rule.getConsecutiveSamples()));
         entity.setGmtModified(LocalDateTime.now());
         return entity;
     }

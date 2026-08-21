@@ -47,4 +47,11 @@ public class AlertRuleVO {
     private String clusterName;
     /** Alert severity: critical, warning, info */
     private String severity;
+    /** Studio instance ID required when evaluating a rule against native metric samples. */
+    private String instanceId;
+    /** Optional consumer group selector for consumer-lag metrics. */
+    private String consumerGroup;
+    /** Number of consecutive matching native samples required before firing. */
+    @Builder.Default
+    private int consecutiveSamples = 1;
 }
