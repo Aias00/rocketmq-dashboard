@@ -24,6 +24,15 @@ export interface AlertRuleBulkResult {
   updatedRules: AlertRule[];
 }
 
+export interface AlertRuleTestResult {
+  samples: Array<{
+    labels: Record<string, string>;
+    availability: string;
+    currentValue: number | null;
+    conditionMet: boolean;
+  }>;
+}
+
 // Matches mock/dashboard.ts systemAlerts
 export interface SystemAlert {
   id: number;
@@ -129,6 +138,11 @@ export async function bulkDeleteAlertRules(ids: number[]) {
   const res = await client.post<{ data: AlertRuleBulkResult }>('/cluster-alert-rules/bulk-delete', {
     ids,
   });
+  return res.data.data;
+}
+
+export async function testAlertRule(data: Partial<AlertRule>) {
+  const res = await client.post<{ data: AlertRuleTestResult }>('/cluster-alert-rules/test', data);
   return res.data.data;
 }
 

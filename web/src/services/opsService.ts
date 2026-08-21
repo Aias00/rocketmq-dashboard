@@ -5,6 +5,7 @@ import * as opsApi from '../api/ops';
 import type {
   AlertRule,
   AlertRuleBulkResult,
+  AlertRuleTestResult,
   CollectorStatus,
   SystemAlert,
   SystemAlertQuery,
@@ -190,6 +191,11 @@ export async function bulkDeleteAlertRules(ids: number[]): Promise<AlertRuleBulk
     succeededIds.push(id);
   }
   return { succeededIds, failures, updatedRules: [] };
+}
+
+export async function testAlertRule(data: Partial<AlertRule>): Promise<AlertRuleTestResult> {
+  if (isMockMode()) return { samples: [] };
+  return opsApi.testAlertRule(data);
 }
 
 export async function listSystemAlerts(): Promise<SystemAlert[]> {
