@@ -48,7 +48,9 @@ class CollectorSchedulerTest {
         when(collector.collect(instance)).thenReturn(List.of(sample));
 
         NativeAlertProcessor processor = mock(NativeAlertProcessor.class);
-        new CollectorScheduler(properties, instances, List.of(collector), List.of(), snapshots, processor).collect();
+        AlertCollectionLease lease = mock(AlertCollectionLease.class);
+        when(lease.tryAcquire()).thenReturn(true);
+        new CollectorScheduler(properties, instances, List.of(collector), List.of(), snapshots, processor, lease).collect();
 
         verify(snapshots).saveAll(List.of(sample));
         verify(processor).process(List.of(sample));
@@ -60,7 +62,8 @@ class CollectorSchedulerTest {
         InstanceRepository instances = mock(InstanceRepository.class);
         MetricSnapshotRepository snapshots = mock(MetricSnapshotRepository.class);
 
-        new CollectorScheduler(properties, instances, List.of(), List.of(), snapshots, mock(NativeAlertProcessor.class)).collect();
+        new CollectorScheduler(properties, instances, List.of(), List.of(), snapshots, mock(NativeAlertProcessor.class),
+                mock(AlertCollectionLease.class)).collect();
 
         verify(instances, never()).findAll();
         verify(snapshots, never()).saveAll(any());
@@ -73,8 +76,22 @@ class CollectorSchedulerTest {
         MetricSnapshotRepository snapshots = mock(MetricSnapshotRepository.class);
 
         new CollectorScheduler(properties, mock(InstanceRepository.class), List.of(), List.of(), snapshots,
-                mock(NativeAlertProcessor.class)).cleanUpSnapshots();
+                mock(NativeAlertProcessor.class), mock(AlertCollectionLease.class)).cleanUpSnapshots();
 
         verify(snapshots).deleteBefore(any(Instant.class));
+    }
+
+    @Test
+    void doesNotCollectWhenAnotherReplicaHoldsTheLease() {
+        AlertingProperties properties = new AlertingProperties();
+        properties.setCollectionEnabled(true);
+        InstanceRepository instances = mock(InstanceRepository.class);
+        AlertCollectionLease lease = mock(AlertCollectionLease.class);
+        when(lease.tryAcquire()).thenReturn(false);
+
+        new CollectorScheduler(properties, instances, List.of(), List.of(), mock(MetricSnapshotRepository.class),
+                mock(NativeAlertProcessor.class), lease).collect();
+
+        verify(instances, never()).findAll();
     }
 }

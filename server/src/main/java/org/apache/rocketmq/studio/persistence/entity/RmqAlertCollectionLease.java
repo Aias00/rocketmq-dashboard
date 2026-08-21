@@ -14,22 +14,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.rocketmq.studio.cluster.metrics;
+package org.apache.rocketmq.studio.persistence.entity;
 
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
-import org.springframework.boot.context.properties.ConfigurationProperties;
+
+import java.time.LocalDateTime;
 
 @Data
-@ConfigurationProperties(prefix = "studio.alerting")
-public class AlertingProperties {
-    /** Native collection remains opt-in until rule evaluation and event delivery are complete. */
-    private boolean collectionEnabled = false;
-    private String collectionInterval = "PT30S";
-    /**
-     * A shared database lease prevents multiple Studio replicas from evaluating the same
-     * native samples and emitting duplicate alert events.
-     */
-    private String collectionLeaseDuration = "PT1M";
-    /** Retain short-lived diagnostic samples without allowing the snapshot table to grow indefinitely. */
-    private String snapshotRetention = "PT24H";
+@TableName("rmq_alert_collection_lease")
+public class RmqAlertCollectionLease {
+    @TableId(type = IdType.AUTO)
+    private Long id;
+    private String leaseName;
+    private String holderId;
+    private LocalDateTime expiresAt;
+    private LocalDateTime gmtModified;
 }

@@ -282,6 +282,16 @@ CREATE TABLE IF NOT EXISTS rmq_metric_snapshot (
   INDEX idx_metric_snapshot_retention (`collected_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE IF NOT EXISTS rmq_alert_collection_lease (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `lease_name` VARCHAR(128) NOT NULL,
+  `holder_id` VARCHAR(64) NOT NULL,
+  `expires_at` DATETIME NOT NULL,
+  `gmt_modified` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY uk_alert_collection_lease_name (`lease_name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS rmq_alert_state (
   `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
   `rule_id` bigint(20) unsigned NOT NULL,

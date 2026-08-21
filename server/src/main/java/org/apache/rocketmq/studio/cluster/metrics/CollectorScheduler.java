@@ -41,10 +41,15 @@ public class CollectorScheduler {
     private final List<BusinessMetricsCollector> businessCollectors;
     private final MetricSnapshotRepository snapshotRepository;
     private final NativeAlertProcessor alertProcessor;
+    private final AlertCollectionLease collectionLease;
 
     @Scheduled(fixedDelayString = "${studio.alerting.collection-interval:PT30S}")
     public void collect() {
         if (!properties.isCollectionEnabled()) {
+            return;
+        }
+        if (!collectionLease.tryAcquire()) {
+            log.debug("Skipping native alert collection because another Studio replica holds the lease");
             return;
         }
         for (InstanceVO instance : instanceRepository.findAll()) {

@@ -16,20 +16,6 @@
  */
 package org.apache.rocketmq.studio.cluster.metrics;
 
-import lombok.Data;
-import org.springframework.boot.context.properties.ConfigurationProperties;
-
-@Data
-@ConfigurationProperties(prefix = "studio.alerting")
-public class AlertingProperties {
-    /** Native collection remains opt-in until rule evaluation and event delivery are complete. */
-    private boolean collectionEnabled = false;
-    private String collectionInterval = "PT30S";
-    /**
-     * A shared database lease prevents multiple Studio replicas from evaluating the same
-     * native samples and emitting duplicate alert events.
-     */
-    private String collectionLeaseDuration = "PT1M";
-    /** Retain short-lived diagnostic samples without allowing the snapshot table to grow indefinitely. */
-    private String snapshotRetention = "PT24H";
+public interface AlertCollectionLease {
+    boolean tryAcquire();
 }
