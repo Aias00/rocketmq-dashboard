@@ -106,6 +106,7 @@ public class AlertService {
             throw new BusinessException(400, "Alert rule name is required");
         }
         rule.setName(rule.getName().trim());
+        NativeAlertRulePolicy.validate(rule);
         log.info("Creating alert rule: {}", rule.getName());
         AlertRuleVO saved = alertRepository.saveRule(rule);
         auditRule("CREATE_ALERT_RULE", saved, null);
@@ -133,6 +134,7 @@ public class AlertService {
         Long id = rule.getId();
         log.info("Updating alert rule: {}", id);
         validateRuleId(id);
+        NativeAlertRulePolicy.validate(rule);
         if (!alertRepository.replaceRule(rule)) {
             throw ruleNotFound(id);
         }

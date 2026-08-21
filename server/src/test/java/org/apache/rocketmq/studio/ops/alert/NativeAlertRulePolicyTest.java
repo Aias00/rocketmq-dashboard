@@ -1,0 +1,55 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.rocketmq.studio.ops.alert;
+
+import org.apache.rocketmq.studio.common.exception.BusinessException;
+import org.junit.jupiter.api.Test;
+
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+class NativeAlertRulePolicyTest {
+
+    @Test
+    void acceptsScopedBusinessRule() {
+        assertThatCode(() -> NativeAlertRulePolicy.validate(rule(AlertDomain.BUSINESS, "consumer.lag.total")
+                .instanceId("local").consumerGroup("orders").consecutiveSamples(2).build()))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void rejectsNativeRuleWithoutInstanceScope() {
+        assertThatThrownBy(() -> NativeAlertRulePolicy.validate(rule(AlertDomain.CLUSTER, "broker.availability")
+                .build())).isInstanceOf(BusinessException.class).hasMessageContaining("instanceId");
+    }
+
+    @Test
+    void rejectsNativeMetricInWrongDomain() {
+        assertThatThrownBy(() -> NativeAlertRulePolicy.validate(rule(AlertDomain.CLUSTER, "consumer.lag.total")
+                .instanceId("local").build())).isInstanceOf(BusinessException.class).hasMessageContaining("BUSINESS");
+    }
+
+    @Test
+    void leavesLegacyPrometheusRulesCompatible() {
+        assertThatCode(() -> NativeAlertRulePolicy.validate(rule(AlertDomain.BUSINESS,
+                "rocketmq_consumer_lag_messages").build())).doesNotThrowAnyException();
+    }
+
+    private static AlertRuleVO.AlertRuleVOBuilder rule(AlertDomain domain, String metric) {
+        return AlertRuleVO.builder().domain(domain).name("Test rule").metric(metric).consecutiveSamples(1);
+    }
+}
