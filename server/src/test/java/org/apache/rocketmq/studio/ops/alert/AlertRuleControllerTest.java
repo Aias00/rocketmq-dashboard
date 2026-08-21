@@ -51,6 +51,9 @@ class AlertRuleControllerTest {
     @MockBean
     private AlertService alertService;
 
+    @MockBean
+    private NativeAlertRuleTestService nativeAlertRuleTestService;
+
     @Test
     void listRulesShouldReturnRules() throws Exception {
         AlertRuleVO rule = AlertRuleVO.builder()

@@ -35,6 +35,7 @@ import java.util.List;
 public class ClusterAlertRuleController {
 
     private final AlertService alertService;
+    private final NativeAlertRuleTestService nativeAlertRuleTestService;
 
     @GetMapping
     public Result<List<AlertRuleVO>> listRules() {
@@ -53,6 +54,13 @@ public class ClusterAlertRuleController {
             throw new BusinessException(400, "id is required");
         }
         return Result.ok(alertService.updateRule(AlertDomain.CLUSTER, request.toAlertRuleVO()));
+    }
+
+    @PostMapping("/test")
+    public Result<AlertRuleTestResultVO> testRule(@Valid @RequestBody(required = false) AlertRuleRequestDTO rule) {
+        AlertRuleVO candidate = requireRule(rule).toAlertRuleVO();
+        candidate.setDomain(AlertDomain.CLUSTER);
+        return Result.ok(nativeAlertRuleTestService.test(candidate));
     }
 
     @PostMapping("/toggle")

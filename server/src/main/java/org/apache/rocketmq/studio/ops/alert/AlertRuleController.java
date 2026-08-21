@@ -34,6 +34,7 @@ import java.util.List;
 public class AlertRuleController {
 
     private final AlertService alertService;
+    private final NativeAlertRuleTestService nativeAlertRuleTestService;
 
     @GetMapping
     public Result<List<AlertRuleVO>> listRules() {
@@ -57,6 +58,13 @@ public class AlertRuleController {
             throw new BusinessException(400, "id is required");
         }
         return Result.ok(alertService.updateRule(AlertDomain.BUSINESS, request.toAlertRuleVO()));
+    }
+
+    @PostMapping("/test")
+    public Result<AlertRuleTestResultVO> testRule(@Valid @RequestBody(required = false) AlertRuleRequestDTO rule) {
+        AlertRuleVO candidate = requireAlertRule(rule).toAlertRuleVO();
+        candidate.setDomain(AlertDomain.BUSINESS);
+        return Result.ok(nativeAlertRuleTestService.test(candidate));
     }
 
     @PostMapping("/toggle")
