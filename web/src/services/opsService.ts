@@ -5,6 +5,7 @@ import * as opsApi from '../api/ops';
 import type {
   AlertRule,
   AlertRuleBulkResult,
+  CollectorStatus,
   SystemAlert,
   AuditQuery,
   AuditRecord,
@@ -193,6 +194,18 @@ export async function bulkDeleteAlertRules(ids: number[]): Promise<AlertRuleBulk
 export async function listSystemAlerts(): Promise<SystemAlert[]> {
   if (isMockMode()) return (mockSystemAlerts as unknown as SystemAlert[]).map(copySystemAlert);
   return opsApi.listSystemAlerts();
+}
+
+export async function getCollectorStatus(): Promise<CollectorStatus> {
+  if (isMockMode()) {
+    return {
+      collectionEnabled: false,
+      collectionInterval: 'PT30S',
+      clusterCollectorCount: 0,
+      businessCollectorCount: 0,
+    };
+  }
+  return opsApi.getCollectorStatus();
 }
 
 export async function acknowledgeAlert(id: number): Promise<void> {

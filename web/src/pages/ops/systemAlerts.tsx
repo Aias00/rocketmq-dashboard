@@ -23,9 +23,10 @@ import { useLang } from '../../i18n/LangContext';
 import {
   acknowledgeAlert,
   clearAcknowledgedAlerts,
+  getCollectorStatus,
   listSystemAlerts,
 } from '../../services/opsService';
-import type { SystemAlert } from '../../api/ops';
+import type { CollectorStatus, SystemAlert } from '../../api/ops';
 
 const { Text } = Typography;
 
@@ -43,6 +44,8 @@ const SystemAlertsPage = () => {
   const [alerts, setAlerts] = useState<SystemAlert[]>([]);
   const [levelFilter, setLevelFilter] = useState<string>('all');
   const [domainFilter, setDomainFilter] = useState<string>('all');
+  const [transitionFilter, setTransitionFilter] = useState<string>('all');
+  const [collectorStatus, setCollectorStatus] = useState<CollectorStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [acknowledgingIds, setAcknowledgingIds] = useState<Set<number>>(() => new Set());
   const [clearing, setClearing] = useState(false);
@@ -60,6 +63,11 @@ const SystemAlertsPage = () => {
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
+    void getCollectorStatus()
+      .then((status) => {
+        if (!cancelled) setCollectorStatus(status);
+      })
+      .catch(() => undefined);
 
     return () => {
       cancelled = true;
@@ -70,9 +78,12 @@ const SystemAlertsPage = () => {
     levelFilter === 'all'
       ? alerts
       : alerts.filter((a) => normalizeAlertLevel(a.level) === levelFilter);
-  const visibleAlerts = domainFilter === 'all'
-    ? filtered
-    : filtered.filter((alert) => alert.domain === domainFilter);
+  const visibleAlerts =
+    domainFilter === 'all' ? filtered : filtered.filter((alert) => alert.domain === domainFilter);
+  const transitionVisibleAlerts =
+    transitionFilter === 'all'
+      ? visibleAlerts
+      : visibleAlerts.filter((alert) => alert.transition === transitionFilter);
 
   const unackCount = alerts.filter((a) => !a.acknowledged).length;
 
@@ -157,12 +168,28 @@ const SystemAlertsPage = () => {
             { value: 'CLUSTER', label: '集群告警' },
           ]}
         />
+        <Select
+          value={transitionFilter}
+          size="small"
+          style={{ minWidth: 124 }}
+          onChange={setTransitionFilter}
+          options={[
+            { value: 'all', label: '全部状态' },
+            { value: 'FIRING', label: '触发中' },
+            { value: 'RESOLVED', label: '已恢复' },
+          ]}
+        />
+        {collectorStatus && (
+          <Tag color={collectorStatus.collectionEnabled ? 'success' : 'default'}>
+            {collectorStatus.collectionEnabled ? '原生采集已启用' : '原生采集未启用'}
+          </Tag>
+        )}
       </Flex>
 
       <Flex vertical gap={12}>
         {loading && <Card loading />}
         {!loading &&
-          visibleAlerts.map((alert) => {
+          transitionVisibleAlerts.map((alert) => {
             const normalizedLevel = normalizeAlertLevel(alert.level);
             const cfg = alertLevelConfig[normalizedLevel] ?? {
               color: '#8c8c8c',
@@ -202,13 +229,22 @@ const SystemAlertsPage = () => {
                     >
                       {cfg.label}
                     </Tag>
-                    {alert.domain && <Tag color={alert.domain === 'CLUSTER' ? 'geekblue' : 'green'}>{alert.domain === 'CLUSTER' ? '集群' : '业务'}</Tag>}
+                    {alert.domain && (
+                      <Tag color={alert.domain === 'CLUSTER' ? 'geekblue' : 'green'}>
+                        {alert.domain === 'CLUSTER' ? '集群' : '业务'}
+                      </Tag>
+                    )}
                     {alert.transition && <Tag>{alert.transition}</Tag>}
                   </Flex>
                   <Text type="secondary" style={{ fontSize: 14 }}>
                     {alert.description}
                   </Text>
-                  {alert.instanceId && <Text type="secondary" style={{ display: 'block', fontSize: 12 }}>{alert.instanceId}{alert.currentValue != null ? ` · ${alert.currentValue}` : ''}</Text>}
+                  {alert.instanceId && (
+                    <Text type="secondary" style={{ display: 'block', fontSize: 12 }}>
+                      {alert.instanceId}
+                      {alert.currentValue != null ? ` · ${alert.currentValue}` : ''}
+                    </Text>
+                  )}
                 </div>
                 <Flex align="center" gap={8} style={{ flexShrink: 0 }}>
                   <Text type="secondary" style={{ fontSize: 14 }}>
@@ -229,7 +265,7 @@ const SystemAlertsPage = () => {
               </div>
             );
           })}
-        {!loading && visibleAlerts.length === 0 && (
+        {!loading && transitionVisibleAlerts.length === 0 && (
           <Card>
             <Flex justify="center" style={{ padding: 40 }}>
               <Text type="secondary">{t('sysAlerts.noAlerts')}</Text>

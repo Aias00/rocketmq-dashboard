@@ -37,6 +37,13 @@ export interface SystemAlert {
   currentValue?: number | null;
 }
 
+export interface CollectorStatus {
+  collectionEnabled: boolean;
+  collectionInterval: string;
+  clusterCollectorCount: number;
+  businessCollectorCount: number;
+}
+
 // Matches mock/audit.ts (inferred from data)
 export interface AuditRecord {
   id: number;
@@ -121,6 +128,11 @@ export async function listSystemAlerts(params?: {
   transition?: string;
 }) {
   const res = await client.get<{ data: SystemAlert[] }>('/system-alerts', { params });
+  return res.data.data;
+}
+
+export async function getCollectorStatus() {
+  const res = await client.get<{ data: CollectorStatus }>('/alert-collector-status');
   return res.data.data;
 }
 
