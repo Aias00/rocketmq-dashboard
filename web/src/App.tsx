@@ -49,7 +49,6 @@ const GrafanaDashboardsPage = lazy(() => import('./pages/studio/GrafanaDashboard
 const ProducerPage = lazy(() => import('./pages/studio/Producer'));
 const OpsPage = lazy(() => import('./pages/studio/Ops'));
 const AlertRuleAssetsPage = lazy(() => import('./pages/studio/AlertRuleAssets'));
-const AlertManagementPage = lazy(() => import('./pages/studio/AlertManagement'));
 const UserManagementPage = lazy(() => import('./pages/studio/UserManagement'));
 
 type AuthGateState = 'checking' | 'allowed' | 'denied' | 'error';
@@ -186,7 +185,7 @@ function App() {
             <Route path="ops/dashboard" element={<DashboardOpsPage />} />
             <Route path="ops/grafana" element={<GrafanaDashboardsPage />} />
             <Route path="ops/alerts" element={<AlertsPage />} />
-            <Route path="ops/business-alerts" element={<AlertManagementPage />} />
+            <Route path="ops/business-alerts" element={<AlertsPage domain="BUSINESS" />} />
             <Route path="ops/system-alerts" element={<SystemAlertsPage />} />
             <Route path="ops/audit" element={<AuditPage />} />
             <Route path="ai" element={<AiPage />} />
