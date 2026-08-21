@@ -21,6 +21,7 @@ import org.apache.rocketmq.studio.cluster.metrics.MetricSample;
 import org.apache.rocketmq.studio.common.domain.enums.InstanceVendor;
 import org.apache.rocketmq.studio.instance.InstanceVO;
 import org.apache.rocketmq.studio.instance.group.ConsumerGroupVO;
+import org.apache.rocketmq.studio.instance.group.QueueProgressVO;
 import org.apache.rocketmq.studio.provider.InstanceProvider;
 import org.apache.rocketmq.studio.provider.InstanceProviderRegistry;
 import org.junit.jupiter.api.Test;
@@ -42,15 +43,24 @@ class ApacheRocketMqBusinessMetricsCollectorTest {
         ConsumerGroupVO payments = group("payments", "cluster-a", 0);
         when(registry.byInstanceId("local")).thenReturn(Optional.of(provider));
         when(provider.listConsumerGroups("local", null)).thenReturn(List.of(orders, payments));
+        when(provider.getGroupProgress("local", "orders")).thenReturn(List.of(QueueProgressVO.builder()
+                .diffTotal(17).build(), QueueProgressVO.builder().diffTotal(42).build()));
+        when(provider.getGroupProgress("local", "payments")).thenReturn(List.of(QueueProgressVO.builder()
+                .diffTotal(0).build()));
 
         List<MetricSample> samples = new ApacheRocketMqBusinessMetricsCollector(registry).collect(apacheInstance());
 
-        assertThat(samples).hasSize(2).allSatisfy(sample -> {
-            assertThat(sample.metricKey()).isEqualTo(ApacheRocketMqBusinessMetricsCollector.CONSUMER_LAG_TOTAL);
+        assertThat(samples).hasSize(4).allSatisfy(sample -> {
             assertThat(sample.availability()).isEqualTo(MetricAvailability.AVAILABLE);
         });
-        assertThat(samples).filteredOn(sample -> "orders".equals(sample.labels().get("consumerGroup")))
+        assertThat(samples).filteredOn(sample -> sample.metricKey().equals(
+                ApacheRocketMqBusinessMetricsCollector.CONSUMER_LAG_TOTAL)
+                && "orders".equals(sample.labels().get("consumerGroup")))
                 .singleElement().satisfies(sample -> assertThat(sample.value()).isEqualTo(42D));
+        assertThat(samples).filteredOn(sample -> sample.metricKey().equals(
+                ApacheRocketMqBusinessMetricsCollector.CONSUMER_LAG_MAX_QUEUE)
+                && "orders".equals(sample.labels().get("consumerGroup"))).singleElement()
+                .satisfies(sample -> assertThat(sample.value()).isEqualTo(42D));
     }
 
     @Test
@@ -67,8 +77,8 @@ class ApacheRocketMqBusinessMetricsCollectorTest {
         InstanceProviderRegistry registry = mock(InstanceProviderRegistry.class);
         when(registry.byInstanceId("local")).thenThrow(new IllegalStateException("offline"));
 
-        assertThat(new ApacheRocketMqBusinessMetricsCollector(registry).collect(apacheInstance())).singleElement()
-                .satisfies(sample -> {
+        assertThat(new ApacheRocketMqBusinessMetricsCollector(registry).collect(apacheInstance())).hasSize(2)
+                .allSatisfy(sample -> {
                     assertThat(sample.availability()).isEqualTo(MetricAvailability.UNAVAILABLE);
                     assertThat(sample.value()).isNull();
                 });

@@ -24,12 +24,14 @@ import org.apache.rocketmq.studio.cluster.metrics.MetricSample;
 import org.apache.rocketmq.studio.common.domain.enums.InstanceVendor;
 import org.apache.rocketmq.studio.instance.InstanceVO;
 import org.apache.rocketmq.studio.instance.group.ConsumerGroupVO;
+import org.apache.rocketmq.studio.instance.group.QueueProgressVO;
 import org.apache.rocketmq.studio.provider.InstanceProvider;
 import org.apache.rocketmq.studio.provider.InstanceProviderRegistry;
 import org.apache.rocketmq.studio.ops.alert.AlertDomain;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -39,6 +41,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class ApacheRocketMqBusinessMetricsCollector implements BusinessMetricsCollector {
     public static final String CONSUMER_LAG_TOTAL = "consumer.lag.total";
+    public static final String CONSUMER_LAG_MAX_QUEUE = "consumer.lag.max_queue";
 
     private final InstanceProviderRegistry providerRegistry;
 
@@ -55,19 +58,46 @@ public class ApacheRocketMqBusinessMetricsCollector implements BusinessMetricsCo
         Instant collectedAt = Instant.now();
         try {
             InstanceProvider provider = providerRegistry.byInstanceId(instance.getName()).orElseThrow();
-            return provider.listConsumerGroups(instance.getName(), null).stream()
-                    .filter(group -> group.getName() != null && !group.getName().isBlank())
-                    .map(group -> sample(instance, group, collectedAt)).toList();
+            List<MetricSample> samples = new ArrayList<>();
+            for (ConsumerGroupVO group : provider.listConsumerGroups(instance.getName(), null)) {
+                if (group.getName() == null || group.getName().isBlank()) {
+                    continue;
+                }
+                samples.add(totalLagSample(instance, group, collectedAt));
+                samples.add(maxQueueLagSample(provider, instance, group, collectedAt));
+            }
+            return samples;
         } catch (RuntimeException error) {
             log.warn("Failed to collect consumer lag for instance {}: {}", instance.getName(), error.getMessage());
-            return List.of(new MetricSample(CONSUMER_LAG_TOTAL, AlertDomain.BUSINESS, instance.getName(), null,
-                    Map.of(), null, MetricAvailability.UNAVAILABLE, collectedAt));
+            return List.of(unavailable(CONSUMER_LAG_TOTAL, instance, Map.of(), collectedAt),
+                    unavailable(CONSUMER_LAG_MAX_QUEUE, instance, Map.of(), collectedAt));
         }
     }
 
-    private static MetricSample sample(InstanceVO instance, ConsumerGroupVO group, Instant collectedAt) {
+    private static MetricSample totalLagSample(InstanceVO instance, ConsumerGroupVO group, Instant collectedAt) {
         return new MetricSample(CONSUMER_LAG_TOTAL, AlertDomain.BUSINESS, instance.getName(), group.getClusterId(),
                 Map.of("consumerGroup", group.getName()), (double) Math.max(0, group.getTotalLag()),
                 MetricAvailability.AVAILABLE, collectedAt);
+    }
+
+    private static MetricSample maxQueueLagSample(InstanceProvider provider, InstanceVO instance,
+            ConsumerGroupVO group, Instant collectedAt) {
+        Map<String, String> labels = Map.of("consumerGroup", group.getName());
+        try {
+            long maxLag = provider.getGroupProgress(instance.getName(), group.getName()).stream()
+                    .mapToLong(QueueProgressVO::getDiffTotal).map(value -> Math.max(0, value)).max().orElse(0);
+            return new MetricSample(CONSUMER_LAG_MAX_QUEUE, AlertDomain.BUSINESS, instance.getName(),
+                    group.getClusterId(), labels, (double) maxLag, MetricAvailability.AVAILABLE, collectedAt);
+        } catch (RuntimeException error) {
+            log.warn("Failed to collect queue lag for group {} on instance {}: {}", group.getName(),
+                    instance.getName(), error.getMessage());
+            return unavailable(CONSUMER_LAG_MAX_QUEUE, instance, labels, collectedAt);
+        }
+    }
+
+    private static MetricSample unavailable(String metric, InstanceVO instance, Map<String, String> labels,
+            Instant collectedAt) {
+        return new MetricSample(metric, AlertDomain.BUSINESS, instance.getName(), null, labels, null,
+                MetricAvailability.UNAVAILABLE, collectedAt);
     }
 }
