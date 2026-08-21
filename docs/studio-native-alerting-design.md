@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed design for RocketMQ Studio alerting. This design does not require Prometheus or Alertmanager for rule evaluation, event creation, or notification delivery.
+Implementation in progress. Rule domain isolation and the native Apache cluster metric contract are in place; snapshots, scheduling, evaluation, event lifecycle, and notification delivery remain pending. This design does not require Prometheus or Alertmanager for rule evaluation, event creation, or notification delivery.
 
 ## Goals
 
