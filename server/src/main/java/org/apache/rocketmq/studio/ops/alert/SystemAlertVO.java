@@ -35,4 +35,10 @@ public class SystemAlertVO {
     private String description;
     private LocalDateTime time;
     private boolean acknowledged;
+    private AlertDomain domain;
+    private Long ruleId;
+    private String fingerprint;
+    private String transition;
+    private String instanceId;
+    private Double currentValue;
 }

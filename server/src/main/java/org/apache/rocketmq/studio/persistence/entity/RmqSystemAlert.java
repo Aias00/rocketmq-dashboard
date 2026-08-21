@@ -40,6 +40,18 @@ public class RmqSystemAlert {
 
     private Boolean acknowledged;
 
+    private String domain;
+
+    private Long ruleId;
+
+    private String fingerprint;
+
+    private String transition;
+
+    private String instanceId;
+
+    private Double currentValue;
+
     private LocalDateTime gmtCreate;
 
     private LocalDateTime gmtModified;

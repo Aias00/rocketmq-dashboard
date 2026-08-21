@@ -304,9 +304,16 @@ CREATE TABLE IF NOT EXISTS rmq_system_alert (
   description TEXT,
   time DATETIME,
   acknowledged TINYINT(1) DEFAULT 0,
+  domain VARCHAR(16),
+  rule_id bigint(20) unsigned,
+  fingerprint CHAR(64),
+  transition VARCHAR(16),
+  instance_id VARCHAR(128),
+  current_value DOUBLE,
   PRIMARY KEY (`id`),
   INDEX idx_level (level),
-  INDEX idx_acknowledged (acknowledged)
+  INDEX idx_acknowledged (acknowledged),
+  INDEX idx_system_alert_domain_time (domain, time)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 15. Cloud provider credentials (secret_key is base64-encoded and never seeded).

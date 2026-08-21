@@ -110,7 +110,7 @@ public class MybatisPlusAlertRepository implements AlertRepository {
     private static AlertRuleVO toRuleVO(RmqAlertRule entity) {
         AlertRuleVO vo = new AlertRuleVO();
         vo.setId(entity.getId());
-        vo.setDomain(parseDomain(entity.getDomain()));
+        vo.setDomain(StringUtils.hasText(entity.getDomain()) ? parseDomain(entity.getDomain()) : null);
         vo.setName(entity.getName());
         vo.setMetric(entity.getMetric());
         vo.setOperator(entity.getOperator());
@@ -169,6 +169,12 @@ public class MybatisPlusAlertRepository implements AlertRepository {
         vo.setDescription(entity.getDescription());
         vo.setTime(entity.getTime());
         vo.setAcknowledged(Boolean.TRUE.equals(entity.getAcknowledged()));
+        vo.setDomain(parseDomain(entity.getDomain()));
+        vo.setRuleId(entity.getRuleId());
+        vo.setFingerprint(entity.getFingerprint());
+        vo.setTransition(entity.getTransition());
+        vo.setInstanceId(entity.getInstanceId());
+        vo.setCurrentValue(entity.getCurrentValue());
         return vo;
     }
 
@@ -180,6 +186,12 @@ public class MybatisPlusAlertRepository implements AlertRepository {
         entity.setDescription(alert.getDescription());
         entity.setTime(alert.getTime());
         entity.setAcknowledged(alert.isAcknowledged());
+        entity.setDomain(alert.getDomain() == null ? null : alert.getDomain().name());
+        entity.setRuleId(alert.getRuleId());
+        entity.setFingerprint(alert.getFingerprint());
+        entity.setTransition(alert.getTransition());
+        entity.setInstanceId(alert.getInstanceId());
+        entity.setCurrentValue(alert.getCurrentValue());
         entity.setGmtModified(LocalDateTime.now());
         return entity;
     }

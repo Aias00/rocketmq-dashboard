@@ -54,7 +54,9 @@ public class NativeAlertProcessor {
                     alertRepository.saveAlert(SystemAlertVO.builder().level(level(rule.getSeverity()))
                             .title(rule.getName()).description(update.transition() + " " + sample.metricKey()
                                     + " on " + sample.instanceId()).time(LocalDateTime.ofInstant(sample.collectedAt(), ZoneOffset.UTC))
-                            .acknowledged(false).build());
+                            .acknowledged(false).domain(sample.domain()).ruleId(rule.getId())
+                            .fingerprint(key.fingerprint()).transition(update.transition().name())
+                            .instanceId(sample.instanceId()).currentValue(update.state().currentValue()).build());
                 }
             }
         }
