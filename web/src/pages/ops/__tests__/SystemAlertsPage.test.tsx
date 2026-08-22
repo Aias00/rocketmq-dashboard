@@ -215,8 +215,8 @@ describe('SystemAlertsPage', () => {
           domain: 'BUSINESS',
           ruleId: 42,
           labels: { brokerName: 'broker-a', topic: 'orders' },
-          startsAt: '2026-08-11T01:00',
-          endsAt: '2026-08-11T02:00',
+          startsAt: new Date('2026-08-11T01:00:00').toISOString(),
+          endsAt: new Date('2026-08-11T02:00:00').toISOString(),
         }),
       );
     });

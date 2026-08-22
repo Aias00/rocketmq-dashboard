@@ -19,7 +19,7 @@ package org.apache.rocketmq.studio.ops.alert;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.Map;
 
 @Data
@@ -30,8 +30,8 @@ public class CreateAlertSilenceDTO {
     /** Optional exact-match labels, such as brokerName, topic, or consumerGroup. */
     private Map<String, String> labels;
     @NotNull(message = "startsAt is required")
-    private LocalDateTime startsAt;
+    private OffsetDateTime startsAt;
     @NotNull(message = "endsAt is required")
-    private LocalDateTime endsAt;
+    private OffsetDateTime endsAt;
     private String reason;
 }

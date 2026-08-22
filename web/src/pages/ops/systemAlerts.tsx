@@ -71,6 +71,8 @@ const parseSilenceLabels = (value?: string): Record<string, string> | undefined 
   return labels;
 };
 
+const localDateTimeToUtc = (value: string) => new Date(`${value}:00`).toISOString();
+
 const SystemAlertsPage = () => {
   const { t } = useLang();
   const userId = useAuthStore((state) => state.userId);
@@ -222,8 +224,8 @@ const SystemAlertsPage = () => {
     try {
       const request: CreateAlertSilence = {
         instanceId: values.instanceId,
-        startsAt: values.startsAt,
-        endsAt: values.endsAt,
+        startsAt: localDateTimeToUtc(values.startsAt),
+        endsAt: localDateTimeToUtc(values.endsAt),
         reason: values.reason,
         ruleId: values.ruleId ? Number(values.ruleId) : undefined,
         domain: values.domain || undefined,

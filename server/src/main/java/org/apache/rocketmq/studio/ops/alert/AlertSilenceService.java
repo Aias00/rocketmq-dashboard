@@ -23,6 +23,7 @@ import org.apache.rocketmq.studio.common.exception.BusinessException;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -41,7 +42,7 @@ public class AlertSilenceService {
         if (request == null || request.getStartsAt() == null || request.getEndsAt() == null) {
             throw new BusinessException(400, "Silence start and end times are required");
         }
-        if (!request.getEndsAt().isAfter(request.getStartsAt())) {
+        if (!request.getEndsAt().toInstant().isAfter(request.getStartsAt().toInstant())) {
             throw new BusinessException(400, "Silence end time must be after start time");
         }
         if (request.getReason() != null && request.getReason().length() > 512) {
@@ -50,7 +51,8 @@ public class AlertSilenceService {
         AlertSilenceVO silence = AlertSilenceVO.builder().domain(request.getDomain())
                 .ruleId(request.getRuleId()).instanceId(trimToNull(request.getInstanceId()))
                 .labels(normalizeLabels(request.getLabels()))
-                .startsAt(request.getStartsAt()).endsAt(request.getEndsAt())
+                .startsAt(LocalDateTime.ofInstant(request.getStartsAt().toInstant(), ZoneOffset.UTC))
+                .endsAt(LocalDateTime.ofInstant(request.getEndsAt().toInstant(), ZoneOffset.UTC))
                 .reason(trimToNull(request.getReason()))
                 .createdBy(AuthenticatedUserContext.currentUsernameOrSystem()).build();
         AlertSilenceVO saved = repository.save(silence);

@@ -25,6 +25,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 
@@ -55,14 +56,15 @@ class AlertSilenceServiceTest {
         request.setDomain(AlertDomain.BUSINESS);
         request.setRuleId(3L);
         request.setInstanceId(" local ");
-        request.setStartsAt(start);
-        request.setEndsAt(end);
+        request.setStartsAt(start.atOffset(ZoneOffset.UTC));
+        request.setEndsAt(end.atOffset(ZoneOffset.UTC));
         request.setReason("maintenance");
         AlertSilenceVO created = service.create(request);
 
         ArgumentCaptor<AlertSilenceVO> captured = ArgumentCaptor.forClass(AlertSilenceVO.class);
         org.mockito.Mockito.verify(repository).save(captured.capture());
         assertThat(captured.getValue().getInstanceId()).isEqualTo("local");
+        assertThat(captured.getValue().getStartsAt()).isEqualTo(start);
         assertThat(created.getId()).isEqualTo(7L);
         when(repository.findAll()).thenReturn(List.of(created));
 
@@ -76,12 +78,27 @@ class AlertSilenceServiceTest {
     void rejectsEmptyOrReversedTimeWindow() {
         AlertSilenceService service = new AlertSilenceService(repository, operationAuditService);
         CreateAlertSilenceDTO request = new CreateAlertSilenceDTO();
-        request.setStartsAt(LocalDateTime.of(2026, 8, 22, 10, 0));
+        request.setStartsAt(LocalDateTime.of(2026, 8, 22, 10, 0).atOffset(ZoneOffset.UTC));
         request.setEndsAt(request.getStartsAt());
 
         assertThatThrownBy(() -> service.create(request))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("Silence end time must be after start time");
+    }
+
+    @Test
+    void normalizesOffsetInputToUtcBeforePersistence() {
+        AlertSilenceService service = new AlertSilenceService(repository, operationAuditService);
+        CreateAlertSilenceDTO request = new CreateAlertSilenceDTO();
+        request.setStartsAt(java.time.OffsetDateTime.parse("2026-08-22T09:00:00-07:00"));
+        request.setEndsAt(java.time.OffsetDateTime.parse("2026-08-22T10:00:00-07:00"));
+        when(repository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        service.create(request);
+
+        org.mockito.Mockito.verify(repository).save(org.mockito.ArgumentMatchers.argThat(silence ->
+                LocalDateTime.of(2026, 8, 22, 16, 0).equals(silence.getStartsAt())
+                        && LocalDateTime.of(2026, 8, 22, 17, 0).equals(silence.getEndsAt())));
     }
 
     @Test
