@@ -73,7 +73,7 @@ public class ApacheRocketMqProxyMetricsCollector implements ClusterMetricsCollec
             return samples;
         } catch (RuntimeException error) {
             log.warn("Failed to discover proxies for instance {}: {}", instance.getName(), error.getMessage());
-            return List.of();
+            return List.of(unavailable(instance, null, Map.of("proxyAddr", "unknown"), collectedAt));
         }
     }
 

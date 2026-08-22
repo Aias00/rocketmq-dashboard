@@ -32,6 +32,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.doThrow;
 
 class ApacheRocketMqProxyMetricsCollectorTest {
 
@@ -77,6 +78,22 @@ class ApacheRocketMqProxyMetricsCollectorTest {
             assertThat(sample.clusterId()).isEqualTo("cluster-a");
             assertThat(sample.availability()).isEqualTo(MetricAvailability.UNAVAILABLE);
             assertThat(sample.value()).isNull();
+        });
+    }
+
+    @Test
+    void recordsUnavailableSampleWhenProxyDiscoveryFails() {
+        ClusterService clusterService = mock(ClusterService.class);
+        InstanceVO instance = InstanceVO.builder().name("local").endpoint("localhost:9876").build();
+        doThrow(new IllegalStateException("nameserver unavailable")).when(clusterService).listClusters("local");
+
+        List<MetricSample> samples = new ApacheRocketMqProxyMetricsCollector(clusterService,
+                mock(ProxyHealthProbe.class)).collect(instance);
+
+        assertThat(samples).singleElement().satisfies(sample -> {
+            assertThat(sample.metricKey()).isEqualTo("proxy.availability");
+            assertThat(sample.availability()).isEqualTo(MetricAvailability.UNAVAILABLE);
+            assertThat(sample.labels()).containsEntry("proxyAddr", "unknown");
         });
     }
 }
