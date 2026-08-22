@@ -31,6 +31,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -126,6 +127,17 @@ class MybatisPlusAlertRepositoryTest {
         }
 
         verify(alertMapper).selectList(argThat(MybatisPlusAlertRepositoryTest::hasInfoLevelParameter));
+    }
+
+    @Test
+    void saveAlertShouldPersistCanonicalScopeLabels() {
+        SystemAlertVO alert = SystemAlertVO.builder().level(org.apache.rocketmq.studio.common.domain.enums.AlertLevel.warning)
+                .labels(Map.of("topic", "orders", "brokerName", "broker-a")).build();
+
+        repository.saveAlert(alert);
+
+        verify(alertMapper).insert(argThat((RmqSystemAlert entity) -> entity != null
+                && "{\"brokerName\":\"broker-a\",\"topic\":\"orders\"}".equals(entity.getLabelsJson())));
     }
 
     private static boolean hasInfoLevelParameter(Wrapper<RmqSystemAlert> query) {

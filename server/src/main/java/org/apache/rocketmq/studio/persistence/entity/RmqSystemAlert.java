@@ -52,6 +52,8 @@ public class RmqSystemAlert {
 
     private Double currentValue;
 
+    private String labelsJson;
+
     private LocalDateTime gmtCreate;
 
     private LocalDateTime gmtModified;

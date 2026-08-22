@@ -18,6 +18,8 @@ package org.apache.rocketmq.studio.ops.alert;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.rocketmq.studio.common.domain.PageResult;
 import org.apache.rocketmq.studio.common.domain.enums.AlertLevel;
 import org.apache.rocketmq.studio.persistence.entity.RmqAlertRule;
@@ -33,6 +35,8 @@ import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.stream.Collectors;
 
 /**
@@ -41,6 +45,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Repository
 public class MybatisPlusAlertRepository implements AlertRepository {
+
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private final RmqAlertRuleMapper ruleMapper;
     private final RmqSystemAlertMapper alertMapper;
@@ -198,6 +204,7 @@ public class MybatisPlusAlertRepository implements AlertRepository {
         vo.setTransition(entity.getTransition());
         vo.setInstanceId(entity.getInstanceId());
         vo.setCurrentValue(entity.getCurrentValue());
+        vo.setLabels(readLabels(entity.getLabelsJson()));
         return vo;
     }
 
@@ -215,6 +222,7 @@ public class MybatisPlusAlertRepository implements AlertRepository {
         entity.setTransition(alert.getTransition());
         entity.setInstanceId(alert.getInstanceId());
         entity.setCurrentValue(alert.getCurrentValue());
+        entity.setLabelsJson(writeLabels(alert.getLabels()));
         entity.setGmtModified(LocalDateTime.now());
         return entity;
     }
@@ -255,5 +263,27 @@ public class MybatisPlusAlertRepository implements AlertRepository {
                 .map(String::trim)
                 .distinct()
                 .toList();
+    }
+
+    private static String writeLabels(Map<String, String> labels) {
+        if (labels == null || labels.isEmpty()) {
+            return null;
+        }
+        try {
+            return OBJECT_MAPPER.writeValueAsString(new TreeMap<>(labels));
+        } catch (Exception error) {
+            throw new IllegalArgumentException("Unable to serialize alert labels", error);
+        }
+    }
+
+    private static Map<String, String> readLabels(String labelsJson) {
+        if (!StringUtils.hasText(labelsJson)) {
+            return Map.of();
+        }
+        try {
+            return OBJECT_MAPPER.readValue(labelsJson, new TypeReference<>() { });
+        } catch (Exception error) {
+            throw new IllegalStateException("Unable to read alert labels", error);
+        }
     }
 }

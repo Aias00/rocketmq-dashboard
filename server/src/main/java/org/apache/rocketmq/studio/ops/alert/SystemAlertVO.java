@@ -23,6 +23,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 
 @Data
 @Builder
@@ -41,4 +42,6 @@ public class SystemAlertVO {
     private String transition;
     private String instanceId;
     private Double currentValue;
+    @Builder.Default
+    private Map<String, String> labels = Map.of();
 }

@@ -149,7 +149,7 @@ public class NotificationOutboxService {
             SystemAlertVO alert = loadAlert(row.getAlertId());
             LocalDateTime silenceEndsAt = silenceService.activeUntil(
                     AlertRuleVO.builder().id(alert.getRuleId()).domain(alert.getDomain()).build(),
-                    alert.getInstanceId(), Map.of(), now);
+                    alert.getInstanceId(), alert.getLabels(), now);
             if (silenceEndsAt != null) {
                 deferUntilSilenceEnds(row, silenceEndsAt);
                 return;
@@ -209,7 +209,8 @@ public class NotificationOutboxService {
         SimpleMailMessage message = new SimpleMailMessage();
         message.setTo(parseRecipients(settings.getEmailRecipients()));
         message.setSubject("[RocketMQ Studio] " + alert.getTitle());
-        message.setText("[" + alert.getLevel() + "] " + alert.getTitle() + " - " + alert.getDescription());
+        message.setText("[" + alert.getLevel() + "] " + alert.getTitle() + " - " + alert.getDescription()
+                + formatLabels(alert));
         sender.send(message);
     }
 
@@ -230,12 +231,27 @@ public class NotificationOutboxService {
     }
 
     private Map<String, Object> payload(SystemAlertVO alert, String channel) {
-        String content = "[" + alert.getLevel() + "] " + alert.getTitle() + " - " + alert.getDescription();
+        String content = "[" + alert.getLevel() + "] " + alert.getTitle() + " - " + alert.getDescription()
+                + formatLabels(alert);
         if ("dingtalk".equals(channel)) {
             return Map.of("msgtype", "text", "text", Map.of("content", content));
         }
-        return Map.of("title", alert.getTitle(), "description", alert.getDescription(), "level", alert.getLevel(),
-                "transition", alert.getTransition(), "instanceId", alert.getInstanceId());
+        Map<String, Object> payload = new java.util.LinkedHashMap<>();
+        payload.put("title", alert.getTitle());
+        payload.put("description", alert.getDescription());
+        payload.put("level", alert.getLevel());
+        payload.put("transition", alert.getTransition());
+        payload.put("instanceId", alert.getInstanceId());
+        payload.put("labels", alert.getLabels() == null ? Map.of() : alert.getLabels());
+        return payload;
+    }
+
+    private static String formatLabels(SystemAlertVO alert) {
+        if (alert.getLabels() == null || alert.getLabels().isEmpty()) {
+            return "";
+        }
+        return "\nLabels: " + alert.getLabels().entrySet().stream().sorted(Map.Entry.comparingByKey())
+                .map(entry -> entry.getKey() + "=" + entry.getValue()).collect(java.util.stream.Collectors.joining(", "));
     }
 
     private void retry(RmqAlertNotificationOutbox row, LocalDateTime now, String error) {

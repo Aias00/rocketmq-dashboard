@@ -392,6 +392,15 @@ const SystemAlertsPage = () => {
                       {alert.currentValue != null ? ` · ${alert.currentValue}` : ''}
                     </Text>
                   )}
+                  {alert.labels && Object.keys(alert.labels).length > 0 && (
+                    <Flex gap={4} wrap="wrap" style={{ marginTop: 6 }}>
+                      {Object.entries(alert.labels).map(([key, value]) => (
+                        <Tag key={key}>
+                          {key}={value}
+                        </Tag>
+                      ))}
+                    </Flex>
+                  )}
                   {loadingDeliveries.has(alert.id) && <Spin size="small" />}
                   {deliveries[alert.id] && (
                     <Flex gap={6} wrap="wrap" style={{ marginTop: 6 }}>

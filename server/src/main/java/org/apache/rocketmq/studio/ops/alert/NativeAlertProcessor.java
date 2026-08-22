@@ -24,6 +24,8 @@ import org.springframework.stereotype.Component;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 
 /** Applies native samples to persisted rule state and emits only lifecycle transitions. */
 @Component
@@ -61,7 +63,8 @@ public class NativeAlertProcessor {
                                     + " on " + sample.instanceId()).time(LocalDateTime.ofInstant(sample.collectedAt(), ZoneOffset.UTC))
                             .acknowledged(false).domain(sample.domain()).ruleId(rule.getId())
                             .fingerprint(key.fingerprint()).transition(update.transition().name())
-                            .instanceId(sample.instanceId()).currentValue(update.state().currentValue()).build());
+                            .instanceId(sample.instanceId()).currentValue(update.state().currentValue())
+                            .labels(Map.copyOf(new TreeMap<>(sample.labels()))).build());
                     notificationOutboxService.enqueue(event, rule, sample.labels());
                 }
             }

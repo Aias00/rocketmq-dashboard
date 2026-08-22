@@ -358,6 +358,7 @@ CREATE TABLE IF NOT EXISTS rmq_system_alert (
   transition VARCHAR(16),
   instance_id VARCHAR(128),
   current_value DOUBLE,
+  labels_json TEXT,
   PRIMARY KEY (`id`),
   INDEX idx_level (level),
   INDEX idx_acknowledged (acknowledged),

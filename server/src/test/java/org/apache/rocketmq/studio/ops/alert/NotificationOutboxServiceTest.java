@@ -104,13 +104,15 @@ class NotificationOutboxServiceTest {
                 any(LocalDateTime.class))).thenReturn(1);
         when(mapper.update(any(), any())).thenReturn(1);
         when(alerts.findAlerts(null)).thenReturn(List.of(SystemAlertVO.builder().id(9L)
-                .level(AlertLevel.warning).title("Lag").description("high").instanceId("local").build()));
+                .level(AlertLevel.warning).title("Lag").description("high").instanceId("local")
+                .labels(java.util.Map.of("topic", "orders")).build()));
         when(settings.loadGeneralSettings()).thenReturn(GeneralSettingsVO.builder()
                 .dingtalkWebhook("https://example.com/hook").build());
         server.expect(once(), requestTo("https://example.com/hook"))
                 .andExpect(method(org.springframework.http.HttpMethod.POST))
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("Lag")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("orders")))
                 .andRespond(withSuccess());
 
         new NotificationOutboxService(mapper, settings, silences, alerts, audit, client).dispatch();

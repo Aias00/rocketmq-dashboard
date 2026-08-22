@@ -57,6 +57,7 @@ export interface SystemAlert {
   transition?: 'FIRING' | 'RESOLVED' | null;
   instanceId?: string | null;
   currentValue?: number | null;
+  labels?: Record<string, string>;
 }
 
 export interface CollectorStatus {
