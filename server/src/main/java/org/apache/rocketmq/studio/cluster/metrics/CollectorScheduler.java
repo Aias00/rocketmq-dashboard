@@ -89,6 +89,11 @@ public class CollectorScheduler {
 
     private void persist(List<MetricSample> samples) {
         if (!samples.isEmpty()) {
+            // Refresh immediately before persisting so a slow remote collection cannot write after lease loss.
+            if (!collectionLease.tryAcquire()) {
+                log.debug("Discarding native metric samples because the collection lease was lost");
+                return;
+            }
             snapshotRepository.saveAll(samples);
             alertProcessor.process(samples);
         }

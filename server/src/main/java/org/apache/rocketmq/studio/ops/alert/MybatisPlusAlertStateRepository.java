@@ -20,6 +20,7 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import lombok.RequiredArgsConstructor;
 import org.apache.rocketmq.studio.persistence.entity.RmqAlertState;
 import org.apache.rocketmq.studio.persistence.mapper.RmqAlertStateMapper;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
@@ -40,7 +41,7 @@ public class MybatisPlusAlertStateRepository implements AlertStateRepository {
     }
 
     @Override
-    public void save(AlertStateKey key, AlertRuleState state) {
+    public boolean save(AlertStateKey key, AlertRuleState state) {
         RmqAlertState entity = mapper.selectOne(new QueryWrapper<RmqAlertState>()
                 .eq("rule_id", key.ruleId()).eq("fingerprint", key.fingerprint()).last("LIMIT 1"));
         if (entity == null) {
@@ -49,12 +50,16 @@ public class MybatisPlusAlertStateRepository implements AlertStateRepository {
             entity.setFingerprint(key.fingerprint());
             entity.setVersion(0);
             apply(entity, state);
-            mapper.insert(entity);
+            try {
+                return mapper.insert(entity) == 1;
+            } catch (DuplicateKeyException ignored) {
+                return false;
+            }
         } else {
             int version = entity.getVersion() == null ? 0 : entity.getVersion();
             apply(entity, state);
             // A concurrent acknowledgement wins over this sample. The next collection cycle reloads the state.
-            mapper.updateIfVersion(entity, version);
+            return mapper.updateIfVersion(entity, version) == 1;
         }
     }
 

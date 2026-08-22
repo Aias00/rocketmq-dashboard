@@ -94,4 +94,27 @@ class CollectorSchedulerTest {
 
         verify(instances, never()).findAll();
     }
+
+    @Test
+    void discardsCollectedSamplesWhenTheLeaseExpiresBeforePersistence() {
+        AlertingProperties properties = new AlertingProperties();
+        properties.setCollectionEnabled(true);
+        InstanceRepository instances = mock(InstanceRepository.class);
+        ClusterMetricsCollector collector = mock(ClusterMetricsCollector.class);
+        MetricSnapshotRepository snapshots = mock(MetricSnapshotRepository.class);
+        NativeAlertProcessor processor = mock(NativeAlertProcessor.class);
+        AlertCollectionLease lease = mock(AlertCollectionLease.class);
+        InstanceVO instance = InstanceVO.builder().name("local").endpoint("localhost:9876").build();
+        MetricSample sample = new MetricSample("nameserver.availability", AlertDomain.CLUSTER, "local", null,
+                null, 1D, MetricAvailability.AVAILABLE, Instant.now());
+        when(instances.findAll()).thenReturn(List.of(instance));
+        when(collector.supports(instance)).thenReturn(true);
+        when(collector.collect(instance)).thenReturn(List.of(sample));
+        when(lease.tryAcquire()).thenReturn(true, false);
+
+        new CollectorScheduler(properties, instances, List.of(collector), List.of(), snapshots, processor, lease).collect();
+
+        verify(snapshots, never()).saveAll(any());
+        verify(processor, never()).process(any());
+    }
 }

@@ -21,7 +21,11 @@ import java.util.Optional;
 public interface AlertStateRepository {
     Optional<AlertRuleState> find(AlertStateKey key);
 
-    void save(AlertStateKey key, AlertRuleState state);
+    /**
+     * Persists the next state and returns whether this evaluator won the state transition.
+     * Callers must only emit lifecycle events after a successful write.
+     */
+    boolean save(AlertStateKey key, AlertRuleState state);
 
     boolean acknowledge(AlertStateKey key);
 }

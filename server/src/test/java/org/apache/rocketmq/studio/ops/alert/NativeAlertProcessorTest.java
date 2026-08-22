@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -60,8 +61,9 @@ class NativeAlertProcessorTest {
             }
 
             @Override
-            public void save(AlertStateKey key, AlertRuleState state) {
+            public boolean save(AlertStateKey key, AlertRuleState state) {
                 saved.put(key, state);
+                return true;
             }
 
             @Override
@@ -94,6 +96,20 @@ class NativeAlertProcessorTest {
                 .process(List.of(sample("orders"), sample("payments")));
 
         verify(service, times(1)).listRules(AlertDomain.BUSINESS);
+    }
+
+    @Test
+    void doesNotEmitLifecycleEventsWhenAnotherEvaluatorWinsTheStateWrite() {
+        AlertService service = mock(AlertService.class);
+        when(service.listRules(AlertDomain.BUSINESS)).thenReturn(List.of(rule("local", "orders", 1)));
+        AlertStateRepository states = mock(AlertStateRepository.class);
+        when(states.find(any(AlertStateKey.class))).thenReturn(Optional.empty());
+        when(states.save(any(AlertStateKey.class), any(AlertRuleState.class))).thenReturn(false);
+        AlertRepository alerts = mock(AlertRepository.class);
+
+        processor(service, states, alerts).process(List.of(sample("orders")));
+
+        verifyNoInteractions(alerts);
     }
 
     private static NativeAlertProcessor processor(AlertService service, AlertStateRepository states,
