@@ -17,6 +17,9 @@ import org.apache.rocketmq.studio.persistence.mapper.RmqAlertNotificationOutboxM
 import org.apache.rocketmq.studio.settings.GeneralSettingsVO;
 import org.apache.rocketmq.studio.settings.SettingsRepository;
 import org.springframework.http.ResponseEntity;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.mail.SimpleMailMessage;
+import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -28,6 +31,10 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.ArrayList;
+import java.util.function.Supplier;
+import jakarta.mail.internet.AddressException;
+import jakarta.mail.internet.InternetAddress;
 
 /** Persists notification work so collection never blocks on remote webhook availability. */
 @Slf4j
@@ -42,22 +49,40 @@ public class NotificationOutboxService {
     private final AlertRepository alertRepository;
     private final OperationAuditService operationAuditService;
     private final RestTemplate restTemplate;
+    private final Supplier<JavaMailSender> mailSender;
+
+    NotificationOutboxService(RmqAlertNotificationOutboxMapper mapper, SettingsRepository settingsRepository,
+            AlertSilenceService silenceService, AlertRepository alertRepository,
+            OperationAuditService operationAuditService) {
+        this(mapper, settingsRepository, silenceService, alertRepository, operationAuditService, newClient(),
+                () -> null);
+    }
 
     public NotificationOutboxService(RmqAlertNotificationOutboxMapper mapper, SettingsRepository settingsRepository,
             AlertSilenceService silenceService, AlertRepository alertRepository,
-            OperationAuditService operationAuditService) {
-        this(mapper, settingsRepository, silenceService, alertRepository, operationAuditService, newClient());
+            OperationAuditService operationAuditService, ObjectProvider<JavaMailSender> mailSender) {
+        this(mapper, settingsRepository, silenceService, alertRepository, operationAuditService, newClient(),
+                mailSender::getIfAvailable);
     }
 
     NotificationOutboxService(RmqAlertNotificationOutboxMapper mapper, SettingsRepository settingsRepository,
             AlertSilenceService silenceService, AlertRepository alertRepository,
             OperationAuditService operationAuditService, RestTemplate restTemplate) {
+        this(mapper, settingsRepository, silenceService, alertRepository, operationAuditService, restTemplate,
+                () -> null);
+    }
+
+    NotificationOutboxService(RmqAlertNotificationOutboxMapper mapper, SettingsRepository settingsRepository,
+            AlertSilenceService silenceService, AlertRepository alertRepository,
+            OperationAuditService operationAuditService, RestTemplate restTemplate,
+            Supplier<JavaMailSender> mailSender) {
         this.mapper = mapper;
         this.settingsRepository = settingsRepository;
         this.silenceService = silenceService;
         this.alertRepository = alertRepository;
         this.operationAuditService = operationAuditService;
         this.restTemplate = restTemplate;
+        this.mailSender = mailSender;
     }
 
     public void enqueue(SystemAlertVO alert, AlertRuleVO rule) {
@@ -77,7 +102,7 @@ public class NotificationOutboxService {
                     .map(value -> value.trim().toLowerCase()).forEach(channels::add);
         }
         for (String channel : channels) {
-            if (!"dingtalk".equals(channel) && !"sms".equals(channel)) {
+            if (!"dingtalk".equals(channel) && !"sms".equals(channel) && !"email".equals(channel)) {
                 continue;
             }
             RmqAlertNotificationOutbox row = new RmqAlertNotificationOutbox();
@@ -122,14 +147,11 @@ public class NotificationOutboxService {
     private void send(RmqAlertNotificationOutbox row, LocalDateTime now) {
         try {
             SystemAlertVO alert = loadAlert(row.getAlertId());
-            String webhook = webhook(row.getChannel());
-            if (!StringUtils.hasText(webhook)) {
-                throw new IllegalStateException("No configured " + row.getChannel() + " webhook");
-            }
-            UrlHostGuard.check(webhook, false);
-            ResponseEntity<Void> response = restTemplate.postForEntity(webhook, payload(alert, row.getChannel()), Void.class);
-            if (!response.getStatusCode().is2xxSuccessful()) {
-                throw new IllegalStateException("Webhook returned " + response.getStatusCode());
+            GeneralSettingsVO settings = settingsRepository.loadGeneralSettings();
+            if ("email".equals(row.getChannel())) {
+                sendEmail(settings, alert);
+            } else {
+                sendWebhook(settings, alert, row.getChannel());
             }
             mapper.update(null, new UpdateWrapper<RmqAlertNotificationOutbox>().eq("id", row.getId())
                     .set("status", NotificationOutboxStatus.DELIVERED.name()).set("delivered_at", now)
@@ -140,15 +162,57 @@ public class NotificationOutboxService {
         }
     }
 
+    private void sendWebhook(GeneralSettingsVO settings, SystemAlertVO alert, String channel) {
+        String webhook = webhook(settings, channel);
+        if (!StringUtils.hasText(webhook)) {
+            throw new IllegalStateException("No configured " + channel + " webhook");
+        }
+        UrlHostGuard.check(webhook, false);
+        ResponseEntity<Void> response = restTemplate.postForEntity(webhook, payload(alert, channel), Void.class);
+        if (!response.getStatusCode().is2xxSuccessful()) {
+            throw new IllegalStateException("Webhook returned " + response.getStatusCode());
+        }
+    }
+
     private SystemAlertVO loadAlert(Long id) {
         return alertRepository.findAlerts(null).stream().filter(alert -> id.equals(alert.getId())).findFirst()
                 .orElseThrow(() -> new IllegalStateException("Alert event no longer exists: " + id));
     }
 
-    private String webhook(String channel) {
-        GeneralSettingsVO settings = settingsRepository.loadGeneralSettings();
+    private String webhook(GeneralSettingsVO settings, String channel) {
         return settings == null ? null : ("dingtalk".equals(channel)
                 ? settings.getDingtalkWebhook() : settings.getSmsWebhook());
+    }
+
+    private void sendEmail(GeneralSettingsVO settings, SystemAlertVO alert) throws AddressException {
+        if (settings == null || !StringUtils.hasText(settings.getEmailRecipients())) {
+            throw new IllegalStateException("No configured email recipients");
+        }
+        JavaMailSender sender = mailSender.get();
+        if (sender == null) {
+            throw new IllegalStateException("SMTP is not configured");
+        }
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setTo(parseRecipients(settings.getEmailRecipients()));
+        message.setSubject("[RocketMQ Studio] " + alert.getTitle());
+        message.setText("[" + alert.getLevel() + "] " + alert.getTitle() + " - " + alert.getDescription());
+        sender.send(message);
+    }
+
+    private static String[] parseRecipients(String raw) throws AddressException {
+        List<String> recipients = new ArrayList<>();
+        for (String value : raw.split("[,;]")) {
+            String recipient = value.trim();
+            if (!recipient.isEmpty()) {
+                InternetAddress address = new InternetAddress(recipient, true);
+                address.validate();
+                recipients.add(address.getAddress());
+            }
+        }
+        if (recipients.isEmpty()) {
+            throw new AddressException("No valid email recipients");
+        }
+        return recipients.toArray(String[]::new);
     }
 
     private Map<String, Object> payload(SystemAlertVO alert, String channel) {

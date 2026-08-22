@@ -268,7 +268,7 @@ export const GeneralSettingsTab = () => {
           <Form.Item
             label="邮件收件人"
             name="emailRecipients"
-            extra="多个地址用英文逗号分隔；邮件发送通道后续接入"
+            extra="多个地址用英文逗号分隔；需同时配置 SMTP 环境变量"
           >
             <Input.TextArea rows={2} placeholder="ops@example.com, oncall@example.com" />
           </Form.Item>

@@ -4,8 +4,9 @@
 
 Implementation in progress. Native Apache collection, snapshots, scheduling, evaluation, event lifecycle,
 acknowledgement, multi-replica collection lease, rule test-runs, label-scoped silence management, and
-webhook outbox delivery are in place. Provider capability catalogs, email delivery, and non-Apache collectors
-remain pending. This design does not require Prometheus or Alertmanager for rule evaluation or event creation.
+webhook and SMTP email outbox delivery are in place. Provider capability catalogs are available for Apache;
+non-Apache collectors remain pending. This design does not require Prometheus or Alertmanager for rule evaluation
+or event creation.
 
 ## Goals
 
@@ -248,6 +249,11 @@ Only the active lease holder collects and evaluates. Notification outbox rows us
 
 The first supported notification channels are Webhook, DingTalk, and Email. A real event creates one or more outbox rows based on its notification policy.
 
+Email delivery uses Spring's standard SMTP configuration. Configure `STUDIO_ALERTING_SMTP_HOST`,
+`STUDIO_ALERTING_SMTP_PORT`, `STUDIO_ALERTING_SMTP_USERNAME`, `STUDIO_ALERTING_SMTP_PASSWORD`,
+`STUDIO_ALERTING_SMTP_AUTH`, and `STUDIO_ALERTING_SMTP_STARTTLS`; recipient addresses are configured in
+General Settings. Missing SMTP configuration leaves the outbox row retryable and records the delivery failure.
+
 ```text
 PENDING -> SENDING -> DELIVERED
                   -> RETRY_WAIT -> FAILED
@@ -307,9 +313,8 @@ An event row displays its domain badge, current value, threshold, resource ident
 1. Introduce the metric contract, catalog, Apache collectors, snapshots, and single-node scheduler.
 2. Implement rule evaluation, state transitions, Alert Events lifecycle, acknowledgement, and three initial rules: Broker unavailable, Broker disk pressure, Consumer lag.
 3. Implement Webhook, DingTalk, and Email through the outbox worker, plus cooldown and delivery history.
-4. Add silences, multi-replica lease handling, rule test-run, and capability-aware forms. Rule/instance
-   silences, multi-replica lease handling, and rule test-runs are complete; label-scoped silences and
-   capability-aware forms remain pending.
+4. Add silences, multi-replica lease handling, rule test-run, and capability-aware forms. These are complete,
+   including label-scoped silences and instance-specific metric capability forms.
 5. Add Proxy and cloud collectors, additional business rules, and optional Prometheus YAML export compatibility.
 
 ## Acceptance Criteria

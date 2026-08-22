@@ -14,10 +14,13 @@ import org.apache.rocketmq.studio.settings.GeneralSettingsVO;
 import org.apache.rocketmq.studio.settings.SettingsRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
+import org.springframework.mail.SimpleMailMessage;
+import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -45,11 +48,11 @@ class NotificationOutboxServiceTest {
 
         when(silences.isActive(rule, "local", alert.getTime())).thenReturn(false);
         service.enqueue(alert, rule);
-        verify(mapper, org.mockito.Mockito.times(2)).insert(any(RmqAlertNotificationOutbox.class));
+        verify(mapper, org.mockito.Mockito.times(3)).insert(any(RmqAlertNotificationOutbox.class));
 
         when(silences.isActive(rule, "local", alert.getTime())).thenReturn(true);
         service.enqueue(alert, rule);
-        verify(mapper, org.mockito.Mockito.times(2)).insert(any(RmqAlertNotificationOutbox.class));
+        verify(mapper, org.mockito.Mockito.times(3)).insert(any(RmqAlertNotificationOutbox.class));
     }
 
     @Test
@@ -108,5 +111,35 @@ class NotificationOutboxServiceTest {
         verify(mapper, org.mockito.Mockito.times(2)).update(any(), argThat(wrapper -> wrapper != null));
         verify(audit).record("RETRY_ALERT_NOTIFICATION", "ALERT_NOTIFICATION", "8", null,
                 "alertId=9, channel=dingtalk", "RETRYING", "No configured dingtalk webhook");
+    }
+
+    @Test
+    void dispatchesEmailDeliveryToConfiguredRecipients() {
+        RmqAlertNotificationOutboxMapper mapper = mock(RmqAlertNotificationOutboxMapper.class);
+        SettingsRepository settings = mock(SettingsRepository.class);
+        AlertRepository alerts = mock(AlertRepository.class);
+        OperationAuditService audit = mock(OperationAuditService.class);
+        JavaMailSender mailSender = mock(JavaMailSender.class);
+        RmqAlertNotificationOutbox row = new RmqAlertNotificationOutbox();
+        row.setId(8L);
+        row.setAlertId(9L);
+        row.setChannel("email");
+        row.setStatus("PENDING");
+        row.setAttemptCount(0);
+        when(mapper.selectList(any())).thenReturn(List.of(row));
+        when(mapper.update(any(), any())).thenReturn(1);
+        when(alerts.findAlerts(null)).thenReturn(List.of(SystemAlertVO.builder().id(9L)
+                .level(AlertLevel.warning).title("Lag").description("high").instanceId("local").build()));
+        when(settings.loadGeneralSettings()).thenReturn(GeneralSettingsVO.builder()
+                .emailRecipients("ops@example.com, oncall@example.com").build());
+
+        new NotificationOutboxService(mapper, settings, mock(AlertSilenceService.class), alerts, audit,
+                new RestTemplate(), () -> mailSender).dispatch();
+
+        verify(mailSender).send(argThat((SimpleMailMessage message) -> message.getTo() != null
+                && Arrays.equals(message.getTo(), new String[] {"ops@example.com", "oncall@example.com"})
+                && "[RocketMQ Studio] Lag".equals(message.getSubject())));
+        verify(audit).record("DELIVER_ALERT_NOTIFICATION", "ALERT_NOTIFICATION", "8", null,
+                "alertId=9, channel=email", "SUCCESS", null);
     }
 }

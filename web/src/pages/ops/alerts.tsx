@@ -738,6 +738,7 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
             <Checkbox.Group
               options={[
                 { label: 'DingTalk', value: 'dingtalk' },
+                { label: 'Email', value: 'email' },
                 { label: 'SMS', value: 'sms' },
               ]}
             />

@@ -11,6 +11,14 @@ spring:
     username: ${SPRING_DATASOURCE_USERNAME:root}
     password: ${SPRING_DATASOURCE_PASSWORD:studio123}
     driver-class-name: com.mysql.cj.jdbc.Driver
+  mail:
+    host: ${STUDIO_ALERTING_SMTP_HOST:}
+    port: ${STUDIO_ALERTING_SMTP_PORT:587}
+    username: ${STUDIO_ALERTING_SMTP_USERNAME:}
+    password: ${STUDIO_ALERTING_SMTP_PASSWORD:}
+    properties:
+      mail.smtp.auth: ${STUDIO_ALERTING_SMTP_AUTH:true}
+      mail.smtp.starttls.enable: ${STUDIO_ALERTING_SMTP_STARTTLS:true}
 
 mybatis-plus:
   configuration:
