@@ -29,8 +29,8 @@ class NativeAlertMetricCatalogServiceTest {
         NativeAlertMetricCatalogService service = new NativeAlertMetricCatalogService(repository);
 
         assertThat(service.list("apache", AlertDomain.BUSINESS)).extracting(NativeAlertMetricInfo::key)
-                .containsExactly("consumer.lag.total", "consumer.lag.max_queue", "topic.backlog.total",
-                        "dlq.message.count");
+                .containsExactly("consumer.lag.total", "consumer.lag.max_queue", "consumer.delay.seconds",
+                        "topic.backlog.total", "dlq.message.count");
         assertThat(service.list("apache", AlertDomain.CLUSTER)).extracting(NativeAlertMetricInfo::key)
                 .contains("broker.jvm.heap.usage_ratio", "broker.send_queue.usage_ratio", "proxy.availability");
         assertThat(service.list("aliyun", AlertDomain.BUSINESS)).extracting(NativeAlertMetricInfo::key)

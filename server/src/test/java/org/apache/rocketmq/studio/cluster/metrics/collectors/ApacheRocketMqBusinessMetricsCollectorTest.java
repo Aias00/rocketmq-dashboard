@@ -52,7 +52,7 @@ class ApacheRocketMqBusinessMetricsCollectorTest {
 
         List<MetricSample> samples = new ApacheRocketMqBusinessMetricsCollector(registry).collect(apacheInstance());
 
-        assertThat(samples).hasSize(6).allSatisfy(sample -> {
+        assertThat(samples).hasSize(8).allSatisfy(sample -> {
             assertThat(sample.availability()).isEqualTo(MetricAvailability.AVAILABLE);
         });
         assertThat(samples).filteredOn(sample -> sample.metricKey().equals(
@@ -63,6 +63,10 @@ class ApacheRocketMqBusinessMetricsCollectorTest {
                 ApacheRocketMqBusinessMetricsCollector.CONSUMER_LAG_MAX_QUEUE)
                 && "orders".equals(sample.labels().get("consumerGroup"))).singleElement()
                 .satisfies(sample -> assertThat(sample.value()).isEqualTo(42D));
+        assertThat(samples).filteredOn(sample -> sample.metricKey().equals(
+                ApacheRocketMqBusinessMetricsCollector.CONSUMER_DELAY_SECONDS)
+                && "orders".equals(sample.labels().get("consumerGroup"))).singleElement()
+                .satisfies(sample -> assertThat(sample.value()).isEqualTo(30D));
         assertThat(samples).filteredOn(sample -> sample.metricKey().equals(
                 ApacheRocketMqBusinessMetricsCollector.TOPIC_BACKLOG_TOTAL)
                 && "orders-topic".equals(sample.labels().get("topic"))).singleElement()
@@ -96,11 +100,30 @@ class ApacheRocketMqBusinessMetricsCollectorTest {
         InstanceProviderRegistry registry = mock(InstanceProviderRegistry.class);
         when(registry.byInstanceId("local")).thenThrow(new IllegalStateException("offline"));
 
-        assertThat(new ApacheRocketMqBusinessMetricsCollector(registry).collect(apacheInstance())).hasSize(3)
+        assertThat(new ApacheRocketMqBusinessMetricsCollector(registry).collect(apacheInstance())).hasSize(4)
                 .allSatisfy(sample -> {
                     assertThat(sample.availability()).isEqualTo(MetricAvailability.UNAVAILABLE);
                     assertThat(sample.value()).isNull();
                 });
+    }
+
+    @Test
+    void doesNotTurnMissingGroupStatsIntoZeroLag() {
+        InstanceProviderRegistry registry = mock(InstanceProviderRegistry.class);
+        InstanceProvider provider = mock(InstanceProvider.class);
+        ConsumerGroupVO group = new ConsumerGroupVO();
+        group.setName("orders");
+        group.setClusterId("cluster-a");
+        when(registry.byInstanceId("local")).thenReturn(Optional.of(provider));
+        when(provider.listConsumerGroups("local", null)).thenReturn(List.of(group));
+
+        List<MetricSample> samples = new ApacheRocketMqBusinessMetricsCollector(registry).collect(apacheInstance());
+
+        assertThat(samples).hasSize(4).allSatisfy(sample -> {
+            assertThat(sample.availability()).isEqualTo(MetricAvailability.UNAVAILABLE);
+            assertThat(sample.value()).isNull();
+            assertThat(sample.labels()).containsEntry("consumerGroup", "orders");
+        });
     }
 
     private static ConsumerGroupVO group(String name, String clusterId, long lag) {
@@ -108,6 +131,9 @@ class ApacheRocketMqBusinessMetricsCollectorTest {
         group.setName(name);
         group.setClusterId(clusterId);
         group.setTotalLag(lag);
+        group.setConsumeStatsAvailable(true);
+        group.setConsumptionTimestampAvailable(true);
+        group.setDelaySeconds(30);
         return group;
     }
 

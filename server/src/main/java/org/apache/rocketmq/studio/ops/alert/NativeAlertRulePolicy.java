@@ -34,10 +34,12 @@ final class NativeAlertRulePolicy {
             Map.entry("broker.send_queue.usage_ratio", AlertDomain.CLUSTER),
             Map.entry("consumer.lag.total", AlertDomain.BUSINESS),
             Map.entry("consumer.lag.max_queue", AlertDomain.BUSINESS),
+            Map.entry("consumer.delay.seconds", AlertDomain.BUSINESS),
             Map.entry("topic.backlog.total", AlertDomain.BUSINESS),
             Map.entry("dlq.message.count", AlertDomain.BUSINESS));
     private static final Set<String> GROUP_SCOPED_METRICS = Set.of(
-            "consumer.lag.total", "consumer.lag.max_queue", "topic.backlog.total", "dlq.message.count");
+            "consumer.lag.total", "consumer.lag.max_queue", "consumer.delay.seconds", "topic.backlog.total",
+            "dlq.message.count");
     private static final Set<String> TOPIC_SCOPED_METRICS = Set.of("topic.backlog.total");
     private static final Set<String> AVAILABILITY_METRICS = Set.of(
             "nameserver.availability", "broker.availability", "proxy.availability", "cloud.instance.availability");

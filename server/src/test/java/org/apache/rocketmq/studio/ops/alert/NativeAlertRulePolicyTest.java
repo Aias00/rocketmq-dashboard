@@ -32,6 +32,12 @@ class NativeAlertRulePolicyTest {
     }
 
     @Test
+    void acceptsConsumerDelayForAConsumerGroup() {
+        assertThatCode(() -> NativeAlertRulePolicy.validate(rule(AlertDomain.BUSINESS, "consumer.delay.seconds")
+                .instanceId("local").consumerGroup("orders").build())).doesNotThrowAnyException();
+    }
+
+    @Test
     void acceptsTopicSelectorOnlyForTopicBacklog() {
         assertThatCode(() -> NativeAlertRulePolicy.validate(rule(AlertDomain.BUSINESS, "topic.backlog.total")
                 .instanceId("local").consumerGroup("orders").topic("orders-topic").build()))

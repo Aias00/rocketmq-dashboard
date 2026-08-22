@@ -131,7 +131,7 @@ record MetricSample(
 | Cluster | `cloud.instance.availability` | Managed cloud instance | Aliyun/Tencent control-plane instance status |
 | Business | `consumer.lag.total` | Consumer Group / Topic | Consumer progress (Apache, Aliyun, Tencent) |
 | Business | `consumer.lag.max_queue` | Consumer Group / Queue | Consumer progress (Apache, Aliyun, Tencent) |
-| Business | `consumer.delay.seconds` | Consumer Group | Message store time and offset data |
+| Business | `consumer.delay.seconds` | Consumer Group | Apache broker consume stats; emitted only when a consumption timestamp is available |
 | Business | `topic.backlog.total` | Topic / Consumer Group | Topic and consumer offsets; each sample is scoped to one Topic and consumer group to avoid cross-group double counting |
 | Business | `dlq.message.count` | Consumer Group / DLQ | DLQ provider |
 | Business | `producer.send.failure_ratio` | Topic / producer flow | Provider runtime data where supported |
@@ -317,7 +317,7 @@ An event row displays its domain badge, current value, threshold, resource ident
 4. Add silences, multi-replica lease handling, rule test-run, and capability-aware forms. These are complete,
    including label-scoped silences and instance-specific metric capability forms.
 5. Add Proxy and cloud collectors, additional business rules, and optional Prometheus YAML export compatibility.
-   Proxy availability, Aliyun/Tencent consumer-lag and topic-backlog, and managed cloud-instance lifecycle collection are complete;
+   Proxy availability, Apache consumer delay, Aliyun/Tencent consumer-lag and topic-backlog, and managed cloud-instance lifecycle collection are complete;
    broker-level cloud health metrics and Prometheus YAML compatibility remain future work.
 
 ## Acceptance Criteria
