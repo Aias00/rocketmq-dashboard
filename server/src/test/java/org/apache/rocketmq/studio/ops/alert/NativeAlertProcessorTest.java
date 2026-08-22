@@ -85,7 +85,8 @@ class NativeAlertProcessorTest {
 
     private static NativeAlertProcessor processor(AlertService service, AlertStateRepository states,
             AlertRepository alerts) {
-        return new NativeAlertProcessor(service, new AlertRuleEvaluator(), new AlertStateMachine(), states, alerts);
+        return new NativeAlertProcessor(service, new AlertRuleEvaluator(), new AlertStateMachine(), states, alerts,
+                mock(NotificationOutboxService.class));
     }
 
     private static AlertRuleVO rule(String instanceId, String group, int consecutiveSamples) {

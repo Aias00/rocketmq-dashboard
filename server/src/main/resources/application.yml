@@ -73,6 +73,7 @@ studio:
     collection-interval: ${STUDIO_ALERTING_COLLECTION_INTERVAL:PT30S}
     snapshot-retention: ${STUDIO_ALERTING_SNAPSHOT_RETENTION:PT24H}
     snapshot-cleanup-interval: ${STUDIO_ALERTING_SNAPSHOT_CLEANUP_INTERVAL:PT1H}
+    notification-dispatch-interval: ${STUDIO_ALERTING_NOTIFICATION_DISPATCH_INTERVAL:PT10S}
   llm:
     token: ${RMQ_LLM_TOKEN:}
     anthropic-base-url: ${RMQ_ANTHROPIC_BASE_URL:}

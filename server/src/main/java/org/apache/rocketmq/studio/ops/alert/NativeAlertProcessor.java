@@ -35,6 +35,7 @@ public class NativeAlertProcessor {
     private final AlertStateMachine stateMachine;
     private final AlertStateRepository stateRepository;
     private final AlertRepository alertRepository;
+    private final NotificationOutboxService notificationOutboxService;
 
     public void process(List<MetricSample> samples) {
         for (MetricSample sample : samples) {
@@ -55,12 +56,13 @@ public class NativeAlertProcessor {
                         Math.max(1, rule.getConsecutiveSamples()), sample.collectedAt());
                 stateRepository.save(key, update.state());
                 if (update.transition() == AlertStateTransition.FIRING || update.transition() == AlertStateTransition.RESOLVED) {
-                    alertRepository.saveAlert(SystemAlertVO.builder().level(level(rule.getSeverity()))
+                    SystemAlertVO event = alertRepository.saveAlert(SystemAlertVO.builder().level(level(rule.getSeverity()))
                             .title(rule.getName()).description(update.transition() + " " + sample.metricKey()
                                     + " on " + sample.instanceId()).time(LocalDateTime.ofInstant(sample.collectedAt(), ZoneOffset.UTC))
                             .acknowledged(false).domain(sample.domain()).ruleId(rule.getId())
                             .fingerprint(key.fingerprint()).transition(update.transition().name())
                             .instanceId(sample.instanceId()).currentValue(update.state().currentValue()).build());
+                    notificationOutboxService.enqueue(event, rule);
                 }
             }
         }
