@@ -125,7 +125,7 @@ record MetricSample(
 | Cluster | `nameserver.availability` | NameServer | NameServer connection check |
 | Cluster | `broker.disk.usage_ratio` | Broker | Broker runtime/config data |
 | Cluster | `broker.jvm.heap.usage_ratio` | Broker | Broker runtime data |
-| Cluster | `broker.threadpool.reject.count` | Broker | Broker runtime data |
+| Cluster | `broker.send_queue.usage_ratio` | Broker | Broker runtime send queue size/capacity |
 | Cluster | `proxy.availability` | Proxy | Proxy health endpoint |
 | Business | `consumer.lag.total` | Consumer Group / Topic | Consumer progress |
 | Business | `consumer.lag.max_queue` | Consumer Group / Queue | Consumer progress |

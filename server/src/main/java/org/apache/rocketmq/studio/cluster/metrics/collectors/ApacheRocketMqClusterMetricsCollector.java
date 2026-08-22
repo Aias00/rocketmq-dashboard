@@ -47,6 +47,7 @@ public class ApacheRocketMqClusterMetricsCollector implements ClusterMetricsColl
     static final String BROKER_AVAILABILITY = "broker.availability";
     static final String BROKER_DISK_USAGE_RATIO = "broker.disk.usage_ratio";
     static final String BROKER_JVM_HEAP_USAGE_RATIO = "broker.jvm.heap.usage_ratio";
+    static final String BROKER_SEND_QUEUE_USAGE_RATIO = "broker.send_queue.usage_ratio";
 
     private final RuntimeAdminClientResolver adminClientResolver;
 
@@ -114,6 +115,10 @@ public class ApacheRocketMqClusterMetricsCollector implements ClusterMetricsColl
             parseHeapUsage(runtime.getTable().get("jvmMemoryHeapUsed"), runtime.getTable().get("jvmMemoryHeapMax"))
                     .ifPresent(value -> samples.add(available(BROKER_JVM_HEAP_USAGE_RATIO, instance, clusterId,
                             labels, value, collectedAt)));
+            parseUsageRatio(runtime.getTable().get("sendThreadPoolQueueSize"),
+                    runtime.getTable().get("sendThreadPoolQueueCapacity"))
+                    .ifPresent(value -> samples.add(available(BROKER_SEND_QUEUE_USAGE_RATIO, instance, clusterId,
+                            labels, value, collectedAt)));
         } catch (Exception error) {
             log.warn("Failed to collect runtime metrics for broker {} on instance {}: {}", brokerName,
                     instance.getName(), error.getMessage());
@@ -137,13 +142,18 @@ public class ApacheRocketMqClusterMetricsCollector implements ClusterMetricsColl
     }
 
     private static java.util.Optional<Double> parseHeapUsage(String usedRaw, String maxRaw) {
+        return parseUsageRatio(usedRaw, maxRaw);
+    }
+
+    private static java.util.Optional<Double> parseUsageRatio(String usedRaw, String capacityRaw) {
         try {
             double used = Double.parseDouble(usedRaw);
-            double max = Double.parseDouble(maxRaw);
-            if (!Double.isFinite(used) || !Double.isFinite(max) || used < 0 || max <= 0 || used > max) {
+            double capacity = Double.parseDouble(capacityRaw);
+            if (!Double.isFinite(used) || !Double.isFinite(capacity) || used < 0 || capacity <= 0
+                    || used > capacity) {
                 return java.util.Optional.empty();
             }
-            return java.util.Optional.of(used / max);
+            return java.util.Optional.of(used / capacity);
         } catch (RuntimeException ignored) {
             return java.util.Optional.empty();
         }

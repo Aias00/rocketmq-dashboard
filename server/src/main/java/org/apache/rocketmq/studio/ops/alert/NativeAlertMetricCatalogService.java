@@ -22,12 +22,14 @@ import java.util.Set;
 public class NativeAlertMetricCatalogService {
     private static final Set<String> NATIVE_METRICS = Set.of("nameserver.availability", "broker.availability",
             "broker.disk.usage_ratio", "broker.jvm.heap.usage_ratio", "consumer.lag.total",
+            "broker.send_queue.usage_ratio",
             "consumer.lag.max_queue", "dlq.message.count");
     private static final List<NativeAlertMetricInfo> CLUSTER_APACHE = List.of(
             new NativeAlertMetricInfo("nameserver.availability", "NameServer availability", "", false),
             new NativeAlertMetricInfo("broker.availability", "Broker availability", "", false),
             new NativeAlertMetricInfo("broker.disk.usage_ratio", "Broker disk usage ratio", "ratio", false),
-            new NativeAlertMetricInfo("broker.jvm.heap.usage_ratio", "Broker JVM heap usage ratio", "ratio", false));
+            new NativeAlertMetricInfo("broker.jvm.heap.usage_ratio", "Broker JVM heap usage ratio", "ratio", false),
+            new NativeAlertMetricInfo("broker.send_queue.usage_ratio", "Broker send queue usage ratio", "ratio", false));
     private static final List<NativeAlertMetricInfo> BUSINESS_APACHE = List.of(
             new NativeAlertMetricInfo("consumer.lag.total", "Consumer lag total", "messages", true),
             new NativeAlertMetricInfo("consumer.lag.max_queue", "Consumer lag max queue", "messages", true),

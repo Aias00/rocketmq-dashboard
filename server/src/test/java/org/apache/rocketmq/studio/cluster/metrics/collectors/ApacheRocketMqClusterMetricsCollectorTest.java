@@ -50,7 +50,8 @@ class ApacheRocketMqClusterMetricsCollectorTest {
                 new HashMap<>(Map.of(0L, "broker-a:10911")))));
         KVTable runtime = new KVTable();
         runtime.setTable(new HashMap<>(Map.of("commitLogDiskRatio", "75", "jvmMemoryHeapUsed", "768",
-                "jvmMemoryHeapMax", "1024")));
+                "jvmMemoryHeapMax", "1024", "sendThreadPoolQueueSize", "250",
+                "sendThreadPoolQueueCapacity", "1000")));
         when(admin.examineBrokerClusterInfo()).thenReturn(topology);
         when(admin.fetchBrokerRuntimeStats("broker-a:10911")).thenReturn(runtime);
         when(resolver.execute(eq(instance), any(MqAdminExtFactory.AdminAction.class)))
@@ -61,7 +62,7 @@ class ApacheRocketMqClusterMetricsCollectorTest {
 
         assertThat(samples).extracting(MetricSample::metricKey)
                 .containsExactlyInAnyOrder("nameserver.availability", "broker.availability", "broker.disk.usage_ratio",
-                        "broker.jvm.heap.usage_ratio");
+                        "broker.jvm.heap.usage_ratio", "broker.send_queue.usage_ratio");
         assertThat(samples).filteredOn(sample -> sample.metricKey().equals("broker.disk.usage_ratio"))
                 .singleElement().satisfies(sample -> {
                     assertThat(sample.value()).isEqualTo(0.75D);
@@ -70,6 +71,8 @@ class ApacheRocketMqClusterMetricsCollectorTest {
                 });
         assertThat(samples).filteredOn(sample -> sample.metricKey().equals("broker.jvm.heap.usage_ratio"))
                 .singleElement().extracting(MetricSample::value).isEqualTo(0.75D);
+        assertThat(samples).filteredOn(sample -> sample.metricKey().equals("broker.send_queue.usage_ratio"))
+                .singleElement().extracting(MetricSample::value).isEqualTo(0.25D);
     }
 
     @Test
