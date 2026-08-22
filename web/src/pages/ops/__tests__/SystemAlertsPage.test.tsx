@@ -6,11 +6,16 @@
  */
 
 import { App } from 'antd';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LangProvider } from '../../../i18n/LangContext';
-import { acknowledgeAlert, listSystemAlertsPage } from '../../../services/opsService';
+import {
+  acknowledgeAlert,
+  createAlertSilence,
+  listAlertSilences,
+  listSystemAlertsPage,
+} from '../../../services/opsService';
 import SystemAlertsPage from '../systemAlerts';
 
 vi.mock('../../../services/opsService', () => ({
@@ -18,6 +23,10 @@ vi.mock('../../../services/opsService', () => ({
   clearAcknowledgedAlerts: vi.fn(),
   listSystemAlertsPage: vi.fn(),
   getCollectorStatus: vi.fn().mockResolvedValue({ collectionEnabled: false }),
+  listAlertDeliveries: vi.fn().mockResolvedValue([]),
+  listAlertSilences: vi.fn(),
+  createAlertSilence: vi.fn(),
+  deleteAlertSilence: vi.fn(),
 }));
 
 beforeAll(() => {
@@ -71,6 +80,7 @@ describe('SystemAlertsPage', () => {
       page: 1,
       size: 20,
     });
+    vi.mocked(listAlertSilences).mockResolvedValue([]);
   });
 
   it('renders an alert with an unknown backend level', async () => {
@@ -166,6 +176,47 @@ describe('SystemAlertsPage', () => {
       expect(acknowledgeAlert).toHaveBeenCalledWith(2);
       expect(acknowledgeButtons[0]).toHaveClass('ant-btn-loading');
       expect(acknowledgeButtons[1]).toHaveClass('ant-btn-loading');
+    });
+  });
+
+  it('shows maintenance windows and creates a scoped silence', async () => {
+    vi.mocked(listAlertSilences).mockResolvedValue([
+      {
+        id: 9,
+        domain: 'CLUSTER',
+        instanceId: 'local',
+        startsAt: '2026-08-10T01:00',
+        endsAt: '2026-08-10T02:00',
+        createdBy: 'admin',
+      },
+    ]);
+    vi.mocked(createAlertSilence).mockResolvedValue({
+      id: 10,
+      domain: 'BUSINESS',
+      startsAt: '2026-08-11T01:00',
+      endsAt: '2026-08-11T02:00',
+      createdBy: 'admin',
+    });
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: '维护窗口' }));
+    expect(await screen.findByText(/CLUSTER.*local/)).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText('规则 ID'), '42');
+    fireEvent.change(screen.getByLabelText('开始时间'), { target: { value: '2026-08-11T01:00' } });
+    fireEvent.change(screen.getByLabelText('结束时间'), { target: { value: '2026-08-11T02:00' } });
+    await user.click(screen.getByRole('button', { name: /创\s*建/ }));
+
+    await waitFor(() => {
+      expect(createAlertSilence).toHaveBeenCalledWith(
+        expect.objectContaining({
+          domain: 'BUSINESS',
+          ruleId: 42,
+          startsAt: '2026-08-11T01:00',
+          endsAt: '2026-08-11T02:00',
+        }),
+      );
     });
   });
 });

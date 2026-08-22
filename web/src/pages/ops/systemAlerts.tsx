@@ -27,18 +27,32 @@ import {
   Pagination,
   Select,
   Spin,
+  Modal,
+  Form,
+  Input,
 } from 'antd';
 import { CheckCircle, Trash } from '@phosphor-icons/react';
 import PageHeader from '../../components/PageHeader';
 import { useLang } from '../../i18n/LangContext';
+import useAuthStore from '../../stores/authStore';
 import {
   acknowledgeAlert,
   clearAcknowledgedAlerts,
   getCollectorStatus,
   listAlertDeliveries,
   listSystemAlertsPage,
+  createAlertSilence,
+  deleteAlertSilence,
+  listAlertSilences,
 } from '../../services/opsService';
-import type { CollectorStatus, NotificationDelivery, PageResult, SystemAlert } from '../../api/ops';
+import type {
+  AlertSilence,
+  CollectorStatus,
+  CreateAlertSilence,
+  NotificationDelivery,
+  PageResult,
+  SystemAlert,
+} from '../../api/ops';
 
 const { Text } = Typography;
 
@@ -46,6 +60,9 @@ const normalizeAlertLevel = (level?: string | null) => (level ?? '').toLowerCase
 
 const SystemAlertsPage = () => {
   const { t } = useLang();
+  const userId = useAuthStore((state) => state.userId);
+  const admin = useAuthStore((state) => state.admin);
+  const canManageSilences = !userId || admin === true;
 
   const alertLevelConfig: Record<string, { color: string; bg: string; label: string }> = {
     error: { color: '#ff4d4f', bg: '#fff2f0', label: t('sysAlerts.severe') },
@@ -67,6 +84,12 @@ const SystemAlertsPage = () => {
   const [clearing, setClearing] = useState(false);
   const [deliveries, setDeliveries] = useState<Record<number, NotificationDelivery[]>>({});
   const [loadingDeliveries, setLoadingDeliveries] = useState<Set<number>>(() => new Set());
+  const [silencesVisible, setSilencesVisible] = useState(false);
+  const [silences, setSilences] = useState<AlertSilence[]>([]);
+  const [loadingSilences, setLoadingSilences] = useState(false);
+  const [savingSilence, setSavingSilence] = useState(false);
+  const [deletingSilenceId, setDeletingSilenceId] = useState<number | null>(null);
+  const [silenceForm] = Form.useForm();
 
   useEffect(() => {
     let cancelled = false;
@@ -151,20 +174,84 @@ const SystemAlertsPage = () => {
     }
   };
 
+  const loadSilences = async () => {
+    setLoadingSilences(true);
+    try {
+      setSilences(await listAlertSilences());
+    } catch {
+      message.error('维护窗口加载失败，请稍后重试');
+    } finally {
+      setLoadingSilences(false);
+    }
+  };
+
+  const openSilences = () => {
+    setSilencesVisible(true);
+    void loadSilences();
+  };
+
+  const createSilence = async () => {
+    let values: {
+      domain?: 'BUSINESS' | 'CLUSTER';
+      ruleId?: string;
+      instanceId?: string;
+      startsAt: string;
+      endsAt: string;
+      reason?: string;
+    };
+    try {
+      values = await silenceForm.validateFields();
+    } catch {
+      return;
+    }
+    setSavingSilence(true);
+    try {
+      const request: CreateAlertSilence = {
+        ...values,
+        ruleId: values.ruleId ? Number(values.ruleId) : undefined,
+        domain: values.domain || undefined,
+      };
+      await createAlertSilence(request);
+      silenceForm.resetFields();
+      await loadSilences();
+      message.success('维护窗口已创建');
+    } catch {
+      message.error('维护窗口创建失败，请检查时间范围');
+    } finally {
+      setSavingSilence(false);
+    }
+  };
+
+  const deleteSilence = async (id: number) => {
+    setDeletingSilenceId(id);
+    try {
+      await deleteAlertSilence(id);
+      await loadSilences();
+      message.success('维护窗口已结束');
+    } catch {
+      message.error('维护窗口结束失败，请稍后重试');
+    } finally {
+      setDeletingSilenceId(null);
+    }
+  };
+
   return (
     <div style={{ padding: 24 }}>
       <PageHeader
         title={t('sysAlerts.title')}
         subtitle={t('sysAlerts.subtitle', { n: unackCount })}
         extra={
-          <Button
-            icon={<Trash size={14} />}
-            onClick={handleClearAcked}
-            disabled={!alerts.some((a) => a.acknowledged)}
-            loading={clearing}
-          >
-            {t('sysAlerts.clearAcked')}
-          </Button>
+          <Flex gap={8}>
+            <Button onClick={openSilences}>维护窗口</Button>
+            <Button
+              icon={<Trash size={14} />}
+              onClick={handleClearAcked}
+              disabled={!alerts.some((a) => a.acknowledged)}
+              loading={clearing}
+            >
+              {t('sysAlerts.clearAcked')}
+            </Button>
+          </Flex>
         }
       />
 
@@ -351,6 +438,86 @@ const SystemAlertsPage = () => {
           onChange={setPage}
         />
       )}
+      <Modal
+        title="维护窗口"
+        open={silencesVisible}
+        onCancel={() => setSilencesVisible(false)}
+        onOk={() => void createSilence()}
+        okText="创建"
+        okButtonProps={{ style: { display: canManageSilences ? undefined : 'none' } }}
+        confirmLoading={savingSilence}
+        width={680}
+      >
+        {canManageSilences && (
+          <Form form={silenceForm} layout="vertical" initialValues={{ domain: 'BUSINESS' }}>
+            <Flex gap={8}>
+              <Form.Item name="domain" label="告警域" style={{ flex: 1 }}>
+                <Select
+                  options={[
+                    { value: 'BUSINESS', label: '业务告警' },
+                    { value: 'CLUSTER', label: '集群告警' },
+                  ]}
+                />
+              </Form.Item>
+              <Form.Item
+                name="ruleId"
+                label="规则 ID"
+                style={{ flex: 1 }}
+                rules={[{ pattern: /^\d+$/, message: '请输入有效的规则 ID' }]}
+              >
+                <Input inputMode="numeric" />
+              </Form.Item>
+              <Form.Item name="instanceId" label="实例 ID" style={{ flex: 1 }}>
+                <Input />
+              </Form.Item>
+            </Flex>
+            <Flex gap={8}>
+              <Form.Item
+                name="startsAt"
+                label="开始时间"
+                rules={[{ required: true, message: '请选择开始时间' }]}
+                style={{ flex: 1 }}
+              >
+                <Input type="datetime-local" />
+              </Form.Item>
+              <Form.Item
+                name="endsAt"
+                label="结束时间"
+                rules={[{ required: true, message: '请选择结束时间' }]}
+                style={{ flex: 1 }}
+              >
+                <Input type="datetime-local" />
+              </Form.Item>
+            </Flex>
+            <Form.Item name="reason" label="原因">
+              <Input maxLength={512} />
+            </Form.Item>
+          </Form>
+        )}
+        <Spin spinning={loadingSilences}>
+          <Flex vertical gap={6}>
+            {silences.length === 0 && <Text type="secondary">当前没有维护窗口</Text>}
+            {silences.map((silence) => (
+              <Flex key={silence.id} justify="space-between" align="center" gap={8}>
+                <Text>
+                  {silence.domain ?? '全部'} · {silence.instanceId ?? '全部实例'} ·{' '}
+                  {silence.startsAt} - {silence.endsAt}
+                </Text>
+                {canManageSilences && (
+                  <Button
+                    size="small"
+                    danger
+                    loading={deletingSilenceId === silence.id}
+                    onClick={() => void deleteSilence(silence.id)}
+                  >
+                    结束
+                  </Button>
+                )}
+              </Flex>
+            ))}
+          </Flex>
+        </Spin>
+      </Modal>
     </div>
   );
 };
