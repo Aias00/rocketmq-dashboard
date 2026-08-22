@@ -28,6 +28,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class ApacheRocketMqDlqMetricsCollectorTest {
@@ -70,6 +71,17 @@ class ApacheRocketMqDlqMetricsCollectorTest {
         instance.setVendor(InstanceVendor.TENCENT);
 
         assertThat(new ApacheRocketMqDlqMetricsCollector(mock(DLQProvider.class)).collect(instance)).isEmpty();
+    }
+
+    @Test
+    void supportsLegacyInstancesWithoutAnExplicitVendor() {
+        DLQProvider provider = mock(DLQProvider.class);
+        when(provider.listDLQGroups("local")).thenReturn(List.of());
+        InstanceVO legacyInstance = apacheInstance();
+        legacyInstance.setVendor(null);
+
+        assertThat(new ApacheRocketMqDlqMetricsCollector(provider).collect(legacyInstance)).isEmpty();
+        verify(provider).listDLQGroups("local");
     }
 
     private static InstanceVO apacheInstance() {

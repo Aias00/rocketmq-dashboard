@@ -31,6 +31,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class ApacheRocketMqBusinessMetricsCollectorTest {
@@ -70,6 +71,19 @@ class ApacheRocketMqBusinessMetricsCollectorTest {
 
         assertThat(new ApacheRocketMqBusinessMetricsCollector(mock(InstanceProviderRegistry.class)).collect(instance))
                 .isEmpty();
+    }
+
+    @Test
+    void supportsLegacyInstancesWithoutAnExplicitVendor() {
+        InstanceProviderRegistry registry = mock(InstanceProviderRegistry.class);
+        InstanceProvider provider = mock(InstanceProvider.class);
+        when(registry.byInstanceId("local")).thenReturn(Optional.of(provider));
+        when(provider.listConsumerGroups("local", null)).thenReturn(List.of());
+        InstanceVO legacyInstance = apacheInstance();
+        legacyInstance.setVendor(null);
+
+        assertThat(new ApacheRocketMqBusinessMetricsCollector(registry).collect(legacyInstance)).isEmpty();
+        verify(provider).listConsumerGroups("local", null);
     }
 
     @Test

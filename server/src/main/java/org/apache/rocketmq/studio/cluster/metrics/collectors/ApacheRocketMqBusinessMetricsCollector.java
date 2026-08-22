@@ -47,7 +47,8 @@ public class ApacheRocketMqBusinessMetricsCollector implements BusinessMetricsCo
 
     @Override
     public boolean supports(InstanceVO instance) {
-        return instance != null && instance.getVendor() == InstanceVendor.APACHE && instance.getName() != null;
+        return instance != null && (instance.getVendor() == null || instance.getVendor() == InstanceVendor.APACHE)
+                && instance.getName() != null;
     }
 
     @Override
