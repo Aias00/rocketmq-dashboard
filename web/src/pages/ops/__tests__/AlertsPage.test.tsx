@@ -19,7 +19,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { App } from 'antd';
-import type { AlertRule } from '../../../api/ops';
+import type { AlertRule, NativeAlertMetricInfo } from '../../../api/ops';
 import { LangProvider } from '../../../i18n/LangContext';
 import AlertsPage from '../alerts';
 import { listInstances } from '../../../services/instanceService';
@@ -234,6 +234,77 @@ describe('AlertsPage', () => {
     await user.click(getSelectOption('local'));
 
     await waitFor(() => expect(listNativeAlertMetrics).toHaveBeenCalledWith('local', 'BUSINESS'));
+  });
+
+  it('keeps metrics from the most recently selected instance', async () => {
+    let resolveLocal: (metrics: NativeAlertMetricInfo[]) => void;
+    let resolveRemote: (metrics: NativeAlertMetricInfo[]) => void;
+    const localMetrics = new Promise<NativeAlertMetricInfo[]>((resolve) => {
+      resolveLocal = resolve;
+    });
+    const remoteMetrics = new Promise<NativeAlertMetricInfo[]>((resolve) => {
+      resolveRemote = resolve;
+    });
+    vi.mocked(listInstances).mockResolvedValue([
+      {
+        id: 1,
+        name: 'local',
+        remark: null,
+        type: 'DIRECT',
+        endpoint: 'localhost:9876',
+        vendor: 'APACHE',
+        topicCount: 0,
+        consumerGroupCount: 0,
+        gmtCreate: '',
+        gmtModified: '',
+      },
+      {
+        id: 2,
+        name: 'remote',
+        remark: null,
+        type: 'DIRECT',
+        endpoint: 'remote:9876',
+        vendor: 'APACHE',
+        topicCount: 0,
+        consumerGroupCount: 0,
+        gmtCreate: '',
+        gmtModified: '',
+      },
+    ]);
+    vi.mocked(listNativeAlertMetrics).mockImplementation((instanceId) =>
+      instanceId === 'local' ? localMetrics : remoteMetrics,
+    );
+    const user = userEvent.setup();
+    renderPage('BUSINESS');
+
+    await user.click(await screen.findByRole('button', { name: '新建规则' }));
+    await user.click(screen.getByRole('combobox', { name: 'Studio 实例' }));
+    await screen.findByRole('option', { name: 'local' });
+    await user.click(getSelectOption('local'));
+    await user.click(screen.getByRole('combobox', { name: 'Studio 实例' }));
+    await screen.findByRole('option', { name: 'remote' });
+    await user.click(getSelectOption('remote'));
+
+    resolveRemote!([
+      {
+        key: 'consumer.lag.total',
+        label: 'Remote consumer lag',
+        thresholdUnit: 'messages',
+        supportsConsumerGroup: true,
+      },
+    ]);
+    await user.click(screen.getByRole('combobox', { name: '监控指标' }));
+    expect(await screen.findByText('Remote consumer lag')).toBeInTheDocument();
+
+    resolveLocal!([
+      {
+        key: 'dlq.message.count',
+        label: 'Local DLQ count',
+        thresholdUnit: 'messages',
+        supportsConsumerGroup: true,
+      },
+    ]);
+    await waitFor(() => expect(screen.queryByText('Local DLQ count')).not.toBeInTheDocument());
   });
 
   it('keeps only failed alert rules selected after a partial bulk failure', async () => {

@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-import { useEffect, useState, type Key } from 'react';
+import { useEffect, useRef, useState, type Key } from 'react';
 import { Plus, Pencil, Trash } from '@phosphor-icons/react';
 import {
   Button,
@@ -84,6 +84,7 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
   const [selectedInstanceId, setSelectedInstanceId] = useState<string>();
   const [metricLoading, setMetricLoading] = useState(false);
   const [instances, setInstances] = useState<Instance[]>([]);
+  const metricRequestVersion = useRef(0);
 
   const channelLabels: Record<string, string> = {
     dingtalk: 'DingTalk',
@@ -130,8 +131,10 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
 
   const openCreateModal = () => {
     setEditingRule(null);
+    metricRequestVersion.current += 1;
     setSelectedInstanceId(undefined);
     setMetricOptions([]);
+    setMetricLoading(false);
     setTestResult(null);
     form.resetFields();
     setModalVisible(true);
@@ -139,17 +142,21 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
 
   const loadMetricCapabilities = async (instanceId?: string) => {
     if (!instanceId?.trim()) return;
+    const requestVersion = ++metricRequestVersion.current;
     setMetricLoading(true);
     setMetricOptions([]);
     try {
       const metrics = await listNativeAlertMetrics(instanceId.trim(), domain);
+      if (requestVersion !== metricRequestVersion.current) return;
       setMetricOptions(metrics.map((metric) => ({ label: metric.label, value: metric.key })));
       form.setFieldValue('metric', undefined);
       if (metrics.length === 0) message.warning('该实例暂不支持原生告警指标');
     } catch {
-      message.error('告警指标能力加载失败，请检查 Studio 实例');
+      if (requestVersion === metricRequestVersion.current) {
+        message.error('告警指标能力加载失败，请检查 Studio 实例');
+      }
     } finally {
-      setMetricLoading(false);
+      if (requestVersion === metricRequestVersion.current) setMetricLoading(false);
     }
   };
 
@@ -526,9 +533,13 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
         onOk={handleSubmit}
         confirmLoading={submitting}
         onCancel={() => {
+          metricRequestVersion.current += 1;
           setModalVisible(false);
           setEditingRule(null);
           setTestResult(null);
+          setSelectedInstanceId(undefined);
+          setMetricOptions([]);
+          setMetricLoading(false);
           form.resetFields();
         }}
         okText={editingRule ? t('common.edit') : t('common.create')}
@@ -540,9 +551,13 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
             </Button>
             <Button
               onClick={() => {
+                metricRequestVersion.current += 1;
                 setModalVisible(false);
                 setEditingRule(null);
                 setTestResult(null);
+                setSelectedInstanceId(undefined);
+                setMetricOptions([]);
+                setMetricLoading(false);
                 form.resetFields();
               }}
             >
