@@ -162,6 +162,7 @@ describe('AlertsPage', () => {
     const user = userEvent.setup();
     renderPage('BUSINESS');
 
+    expect(await screen.findByRole('heading', { name: '业务告警' })).toBeInTheDocument();
     await screen.findByText('Broker disk usage');
     expect(listAlertRules).toHaveBeenCalledWith('BUSINESS');
     await user.click(screen.getByRole('button', { name: '新建规则' }));

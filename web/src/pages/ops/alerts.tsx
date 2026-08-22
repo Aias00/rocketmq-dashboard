@@ -412,8 +412,8 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
     <div style={{ padding: 24 }}>
       {/* ─── Header ─── */}
       <PageHeader
-        title={t('alerts.title')}
-        subtitle={t('alerts.subtitle')}
+        title={t(domain === 'BUSINESS' ? 'alerts.businessTitle' : 'alerts.title')}
+        subtitle={t(domain === 'BUSINESS' ? 'alerts.businessSubtitle' : 'alerts.subtitle')}
         extra={
           <Flex gap={16}>
             <Flex align="center" gap={4}>

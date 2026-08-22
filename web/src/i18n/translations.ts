@@ -227,6 +227,11 @@ const translations: Record<string, Record<Lang, string>> = {
     zh: '配置集群监控告警规则与通知渠道',
     en: 'Configure cluster monitoring alert rules and notification channels',
   },
+  'alerts.businessTitle': { zh: '业务告警', en: 'Business Alerts' },
+  'alerts.businessSubtitle': {
+    zh: '配置消费积压和死信队列等业务告警规则与通知渠道',
+    en: 'Configure business-flow alert rules for consumer lag, DLQ, and notification channels',
+  },
   'alerts.totalRules': { zh: '规则总数', en: 'Total Rules' },
   'alerts.enabled': { zh: '已启用', en: 'Enabled' },
   'alerts.triggered24h': { zh: '24h 触发', en: 'Triggered (24h)' },
