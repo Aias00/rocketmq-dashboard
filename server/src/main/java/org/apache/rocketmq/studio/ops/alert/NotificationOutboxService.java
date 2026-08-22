@@ -8,7 +8,6 @@ package org.apache.rocketmq.studio.ops.alert;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.rocketmq.studio.common.util.NoRedirectClientHttpRequestFactory;
 import org.apache.rocketmq.studio.common.util.UrlHostGuard;
@@ -32,7 +31,6 @@ import java.util.Set;
 /** Persists notification work so collection never blocks on remote webhook availability. */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class NotificationOutboxService {
     private static final int MAX_ATTEMPTS = 5;
     private static final int BATCH_SIZE = 20;
@@ -41,7 +39,21 @@ public class NotificationOutboxService {
     private final SettingsRepository settingsRepository;
     private final AlertSilenceService silenceService;
     private final AlertRepository alertRepository;
-    private final RestTemplate restTemplate = newClient();
+    private final RestTemplate restTemplate;
+
+    public NotificationOutboxService(RmqAlertNotificationOutboxMapper mapper, SettingsRepository settingsRepository,
+            AlertSilenceService silenceService, AlertRepository alertRepository) {
+        this(mapper, settingsRepository, silenceService, alertRepository, newClient());
+    }
+
+    NotificationOutboxService(RmqAlertNotificationOutboxMapper mapper, SettingsRepository settingsRepository,
+            AlertSilenceService silenceService, AlertRepository alertRepository, RestTemplate restTemplate) {
+        this.mapper = mapper;
+        this.settingsRepository = settingsRepository;
+        this.silenceService = silenceService;
+        this.alertRepository = alertRepository;
+        this.restTemplate = restTemplate;
+    }
 
     public void enqueue(SystemAlertVO alert, AlertRuleVO rule) {
         if (alert.getId() == null || silenceService.isActive(rule, alert.getInstanceId(), alert.getTime())) {
