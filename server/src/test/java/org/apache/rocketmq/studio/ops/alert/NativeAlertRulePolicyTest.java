@@ -44,6 +44,12 @@ class NativeAlertRulePolicyTest {
     }
 
     @Test
+    void acceptsProxyAvailabilityAsAClusterMetric() {
+        assertThatCode(() -> NativeAlertRulePolicy.validate(rule(AlertDomain.CLUSTER, "proxy.availability")
+                .instanceId("local").build())).doesNotThrowAnyException();
+    }
+
+    @Test
     void leavesLegacyPrometheusRulesCompatible() {
         assertThatCode(() -> NativeAlertRulePolicy.validate(rule(AlertDomain.BUSINESS,
                 "rocketmq_consumer_lag_messages").build())).doesNotThrowAnyException();
