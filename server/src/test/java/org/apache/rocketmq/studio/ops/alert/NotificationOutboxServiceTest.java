@@ -20,6 +20,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -80,5 +81,25 @@ class NotificationOutboxServiceTest {
 
         server.verify();
         verify(mapper, org.mockito.Mockito.times(2)).update(any(), any());
+    }
+
+    @Test
+    void retriesAClaimedDeliveryWhenNoWebhookIsConfigured() {
+        RmqAlertNotificationOutboxMapper mapper = mock(RmqAlertNotificationOutboxMapper.class);
+        RmqAlertNotificationOutbox row = new RmqAlertNotificationOutbox();
+        row.setId(8L);
+        row.setAlertId(9L);
+        row.setChannel("dingtalk");
+        row.setStatus("PENDING");
+        row.setAttemptCount(0);
+        when(mapper.selectList(any())).thenReturn(List.of(row));
+        when(mapper.update(any(), any())).thenReturn(1);
+        AlertRepository alerts = mock(AlertRepository.class);
+        when(alerts.findAlerts(null)).thenReturn(List.of(SystemAlertVO.builder().id(9L).build()));
+
+        new NotificationOutboxService(mapper, mock(SettingsRepository.class), mock(AlertSilenceService.class), alerts)
+                .dispatch();
+
+        verify(mapper, org.mockito.Mockito.times(2)).update(any(), argThat(wrapper -> wrapper != null));
     }
 }
