@@ -34,7 +34,8 @@ class NativeAlertMetricCatalogServiceTest {
                 .contains("broker.jvm.heap.usage_ratio", "broker.send_queue.usage_ratio", "proxy.availability");
         assertThat(service.list("aliyun", AlertDomain.BUSINESS)).extracting(NativeAlertMetricInfo::key)
                 .containsExactly("consumer.lag.total", "consumer.lag.max_queue");
-        assertThat(service.list("aliyun", AlertDomain.CLUSTER)).isEmpty();
+        assertThat(service.list("aliyun", AlertDomain.CLUSTER)).extracting(NativeAlertMetricInfo::key)
+                .containsExactly("cloud.instance.availability");
         assertThatThrownBy(() -> service.validate(AlertRuleVO.builder().domain(AlertDomain.CLUSTER)
                 .instanceId("aliyun").metric("broker.availability").build()))
                 .hasMessageContaining("not supported");

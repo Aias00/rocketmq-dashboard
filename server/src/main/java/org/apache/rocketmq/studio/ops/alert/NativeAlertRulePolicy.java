@@ -28,6 +28,7 @@ final class NativeAlertRulePolicy {
             "nameserver.availability", AlertDomain.CLUSTER,
             "broker.availability", AlertDomain.CLUSTER,
             "proxy.availability", AlertDomain.CLUSTER,
+            "cloud.instance.availability", AlertDomain.CLUSTER,
             "broker.disk.usage_ratio", AlertDomain.CLUSTER,
             "broker.jvm.heap.usage_ratio", AlertDomain.CLUSTER,
             "broker.send_queue.usage_ratio", AlertDomain.CLUSTER,
@@ -37,7 +38,7 @@ final class NativeAlertRulePolicy {
     private static final Set<String> GROUP_SCOPED_METRICS = Set.of(
             "consumer.lag.total", "consumer.lag.max_queue", "dlq.message.count");
     private static final Set<String> AVAILABILITY_METRICS = Set.of(
-            "nameserver.availability", "broker.availability", "proxy.availability");
+            "nameserver.availability", "broker.availability", "proxy.availability", "cloud.instance.availability");
 
     private NativeAlertRulePolicy() {
     }

@@ -21,7 +21,7 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class NativeAlertMetricCatalogService {
     private static final Set<String> NATIVE_METRICS = Set.of("nameserver.availability", "broker.availability",
-            "proxy.availability",
+            "proxy.availability", "cloud.instance.availability",
             "broker.disk.usage_ratio", "broker.jvm.heap.usage_ratio", "consumer.lag.total",
             "broker.send_queue.usage_ratio",
             "consumer.lag.max_queue", "dlq.message.count");
@@ -39,6 +39,8 @@ public class NativeAlertMetricCatalogService {
     private static final List<NativeAlertMetricInfo> BUSINESS_CLOUD = List.of(
             new NativeAlertMetricInfo("consumer.lag.total", "Consumer lag total", "messages", true),
             new NativeAlertMetricInfo("consumer.lag.max_queue", "Consumer lag max queue", "messages", true));
+    private static final List<NativeAlertMetricInfo> CLUSTER_CLOUD = List.of(
+            new NativeAlertMetricInfo("cloud.instance.availability", "Cloud instance availability", "", false));
 
     private final InstanceRepository instanceRepository;
 
@@ -54,6 +56,10 @@ public class NativeAlertMetricCatalogService {
         if (domain == AlertDomain.BUSINESS && (instance.getVendor() == InstanceVendor.ALIYUN
                 || instance.getVendor() == InstanceVendor.TENCENT)) {
             return BUSINESS_CLOUD;
+        }
+        if (domain == AlertDomain.CLUSTER && (instance.getVendor() == InstanceVendor.ALIYUN
+                || instance.getVendor() == InstanceVendor.TENCENT)) {
+            return CLUSTER_CLOUD;
         }
         return List.of();
     }

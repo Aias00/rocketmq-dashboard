@@ -5,8 +5,8 @@
 Implementation in progress. Native Apache collection (including NameServer, Broker, and Proxy availability), snapshots, scheduling, evaluation, event lifecycle,
 acknowledgement, multi-replica collection lease, rule test-runs, label-scoped silence management, and
 webhook and SMTP email outbox delivery are in place. Provider capability catalogs are available for Apache,
-Aliyun, and Tencent; cloud consumer-lag collection is available while cloud cluster-health collectors remain
-pending. This design does not require Prometheus or Alertmanager for rule evaluation or event creation.
+Aliyun, and Tencent; cloud consumer-lag and managed-instance lifecycle collection are available. This design does
+not require Prometheus or Alertmanager for rule evaluation or event creation.
 
 ## Goals
 
@@ -128,6 +128,7 @@ record MetricSample(
 | Cluster | `broker.jvm.heap.usage_ratio` | Broker | Broker runtime data |
 | Cluster | `broker.send_queue.usage_ratio` | Broker | Broker runtime send queue size/capacity |
 | Cluster | `proxy.availability` | Proxy | TCP probe of the gRPC listener discovered for the selected instance |
+| Cluster | `cloud.instance.availability` | Managed cloud instance | Aliyun/Tencent control-plane instance status |
 | Business | `consumer.lag.total` | Consumer Group / Topic | Consumer progress (Apache, Aliyun, Tencent) |
 | Business | `consumer.lag.max_queue` | Consumer Group / Queue | Consumer progress (Apache, Aliyun, Tencent) |
 | Business | `consumer.delay.seconds` | Consumer Group | Message store time and offset data |
@@ -316,8 +317,8 @@ An event row displays its domain badge, current value, threshold, resource ident
 4. Add silences, multi-replica lease handling, rule test-run, and capability-aware forms. These are complete,
    including label-scoped silences and instance-specific metric capability forms.
 5. Add Proxy and cloud collectors, additional business rules, and optional Prometheus YAML export compatibility.
-   Proxy availability and Aliyun/Tencent consumer-lag collection are complete; cloud cluster-health metrics and
-   Prometheus YAML compatibility remain future work.
+   Proxy availability, Aliyun/Tencent consumer-lag, and managed cloud-instance lifecycle collection are complete;
+   broker-level cloud health metrics and Prometheus YAML compatibility remain future work.
 
 ## Acceptance Criteria
 
