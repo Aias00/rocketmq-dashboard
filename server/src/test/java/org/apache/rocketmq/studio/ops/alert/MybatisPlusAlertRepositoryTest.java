@@ -18,6 +18,7 @@ package org.apache.rocketmq.studio.ops.alert;
 
 import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.apache.rocketmq.studio.persistence.entity.RmqAlertRule;
 import org.apache.rocketmq.studio.persistence.entity.RmqSystemAlert;
 import org.apache.rocketmq.studio.persistence.mapper.RmqAlertRuleMapper;
@@ -32,6 +33,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -138,6 +140,40 @@ class MybatisPlusAlertRepositoryTest {
 
         verify(alertMapper).insert(argThat((RmqSystemAlert entity) -> entity != null
                 && "{\"brokerName\":\"broker-a\",\"topic\":\"orders\"}".equals(entity.getLabelsJson())));
+    }
+
+    @Test
+    void findAlertsPageShouldApplyScopeLabelAndTimeFilters() {
+        when(alertMapper.selectPage(any(Page.class), any())).thenReturn(new Page<RmqSystemAlert>(1, 20));
+        LocalDateTime from = LocalDateTime.of(2026, 8, 1, 0, 0);
+        LocalDateTime to = LocalDateTime.of(2026, 8, 2, 0, 0);
+
+        repository.findAlertsPage(new SystemAlertQuery(null, null, "local", null,
+                "brokerName", "broker-a", from, to, 1, 20));
+
+        verify(alertMapper).selectPage(any(Page.class), argThat(MybatisPlusAlertRepositoryTest::hasScopeLabelAndTimeFilters));
+    }
+
+    @Test
+    void findAlertsPageShouldAllowOmittedOptionalFilters() {
+        when(alertMapper.selectPage(any(Page.class), any())).thenReturn(new Page<RmqSystemAlert>(1, 20));
+
+        repository.findAlertsPage(new SystemAlertQuery(null, null, null, null,
+                null, null, null, null, 1, 20));
+
+        verify(alertMapper).selectPage(any(Page.class), any());
+    }
+
+    private static boolean hasScopeLabelAndTimeFilters(Wrapper<RmqSystemAlert> query) {
+        if (!(query instanceof QueryWrapper<?> queryWrapper)) {
+            return false;
+        }
+        String sql = queryWrapper.getCustomSqlSegment();
+        return sql.contains("JSON_CONTAINS(labels_json, JSON_OBJECT")
+                && queryWrapper.getParamNameValuePairs().containsValue("brokerName")
+                && queryWrapper.getParamNameValuePairs().containsValue("broker-a")
+                && queryWrapper.getParamNameValuePairs().containsValue(LocalDateTime.of(2026, 8, 1, 0, 0))
+                && queryWrapper.getParamNameValuePairs().containsValue(LocalDateTime.of(2026, 8, 2, 0, 0));
     }
 
     private static boolean hasInfoLevelParameter(Wrapper<RmqSystemAlert> query) {

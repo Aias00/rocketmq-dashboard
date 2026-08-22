@@ -89,6 +89,10 @@ const SystemAlertsPage = () => {
   const [levelFilter, setLevelFilter] = useState<string>('all');
   const [domainFilter, setDomainFilter] = useState<string>('all');
   const [transitionFilter, setTransitionFilter] = useState<string>('all');
+  const [instanceFilter, setInstanceFilter] = useState('');
+  const [labelFilter, setLabelFilter] = useState('');
+  const [fromFilter, setFromFilter] = useState('');
+  const [toFilter, setToFilter] = useState('');
   const [collectorStatus, setCollectorStatus] = useState<CollectorStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -108,11 +112,19 @@ const SystemAlertsPage = () => {
 
   useEffect(() => {
     let cancelled = false;
+    const labelSeparator = labelFilter.indexOf('=');
+    const labelKey = labelSeparator > 0 ? labelFilter.slice(0, labelSeparator).trim() : undefined;
+    const labelValue = labelKey ? labelFilter.slice(labelSeparator + 1).trim() : undefined;
 
     void listSystemAlertsPage({
       level: levelFilter === 'all' ? undefined : levelFilter,
       domain: domainFilter === 'all' ? undefined : (domainFilter as 'BUSINESS' | 'CLUSTER'),
       transition: transitionFilter === 'all' ? undefined : transitionFilter,
+      instanceId: instanceFilter.trim() || undefined,
+      labelKey: labelKey && labelValue ? labelKey : undefined,
+      labelValue: labelKey && labelValue ? labelValue : undefined,
+      from: fromFilter || undefined,
+      to: toFilter || undefined,
       page,
       pageSize,
     })
@@ -137,7 +149,17 @@ const SystemAlertsPage = () => {
     return () => {
       cancelled = true;
     };
-  }, [domainFilter, levelFilter, page, refreshNonce, transitionFilter]);
+  }, [
+    domainFilter,
+    fromFilter,
+    instanceFilter,
+    labelFilter,
+    levelFilter,
+    page,
+    refreshNonce,
+    toFilter,
+    transitionFilter,
+  ]);
 
   const unackCount = alerts.filter((a) => !a.acknowledged).length;
 
@@ -313,6 +335,50 @@ const SystemAlertsPage = () => {
             { value: 'BUSINESS', label: '业务告警' },
             { value: 'CLUSTER', label: '集群告警' },
           ]}
+        />
+        <Input
+          aria-label="实例 ID 筛选"
+          size="small"
+          placeholder="实例 ID"
+          style={{ width: 150 }}
+          value={instanceFilter}
+          onChange={(event) => {
+            setInstanceFilter(event.target.value);
+            setPage(1);
+          }}
+        />
+        <Input
+          aria-label="资源标签筛选"
+          size="small"
+          placeholder="标签 key=value"
+          style={{ width: 190 }}
+          value={labelFilter}
+          onChange={(event) => {
+            setLabelFilter(event.target.value);
+            setPage(1);
+          }}
+        />
+        <Input
+          aria-label="开始时间筛选"
+          type="datetime-local"
+          size="small"
+          style={{ width: 190 }}
+          value={fromFilter}
+          onChange={(event) => {
+            setFromFilter(event.target.value);
+            setPage(1);
+          }}
+        />
+        <Input
+          aria-label="结束时间筛选"
+          type="datetime-local"
+          size="small"
+          style={{ width: 190 }}
+          value={toFilter}
+          onChange={(event) => {
+            setToFilter(event.target.value);
+            setPage(1);
+          }}
         />
         <Select
           value={transitionFilter}

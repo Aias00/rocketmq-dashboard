@@ -28,6 +28,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -54,9 +55,14 @@ public class SystemAlertController {
             @RequestParam(required = false) AlertDomain domain,
             @RequestParam(required = false) String instanceId,
             @RequestParam(required = false) String transition,
+            @RequestParam(required = false) String labelKey,
+            @RequestParam(required = false) String labelValue,
+            @RequestParam(required = false) LocalDateTime from,
+            @RequestParam(required = false) LocalDateTime to,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int pageSize) {
-        return Result.ok(alertService.listAlerts(level, domain, instanceId, transition, page, pageSize));
+        return Result.ok(alertService.listAlerts(level, domain, instanceId, transition,
+                labelKey, labelValue, from, to, page, pageSize));
     }
 
     @GetMapping("/{id}/deliveries")

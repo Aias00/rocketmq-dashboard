@@ -108,6 +108,10 @@ public class MybatisPlusAlertRepository implements AlertRepository {
                 .eq(query.domain() != null, "domain", query.domain() == null ? null : query.domain().name())
                 .eq(StringUtils.hasText(query.instanceId()), "instance_id", trimToNull(query.instanceId()))
                 .eq(StringUtils.hasText(query.transition()), "transition", normalizeTransition(query.transition()))
+                .apply(StringUtils.hasText(query.labelKey()),
+                        "JSON_CONTAINS(labels_json, JSON_OBJECT({0}, {1}))", query.labelKey(), query.labelValue())
+                .ge(query.from() != null, "time", query.from())
+                .le(query.to() != null, "time", query.to())
                 .orderByDesc("time");
         Page<RmqSystemAlert> result = alertMapper.selectPage(new Page<>(query.page(), query.pageSize()), conditions);
         return PageResult.of(result.getRecords().stream().map(MybatisPlusAlertRepository::toAlertVO).toList(),
@@ -254,11 +258,13 @@ public class MybatisPlusAlertRepository implements AlertRepository {
     }
 
     private static String normalizeLevel(String level) {
-        return trimToNull(level).toLowerCase(Locale.ROOT);
+        String normalized = trimToNull(level);
+        return normalized == null ? null : normalized.toLowerCase(Locale.ROOT);
     }
 
     private static String normalizeTransition(String transition) {
-        return trimToNull(transition).toUpperCase(Locale.ROOT);
+        String normalized = trimToNull(transition);
+        return normalized == null ? null : normalized.toUpperCase(Locale.ROOT);
     }
 
     private static String trimToNull(String value) {

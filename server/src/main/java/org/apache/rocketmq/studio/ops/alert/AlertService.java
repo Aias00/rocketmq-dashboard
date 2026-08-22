@@ -382,10 +382,24 @@ public class AlertService {
 
     public PageResult<SystemAlertVO> listAlerts(String level, AlertDomain domain, String instanceId,
             String transition, int page, int pageSize) {
+        return listAlerts(level, domain, instanceId, transition, null, null, null, null, page, pageSize);
+    }
+
+    public PageResult<SystemAlertVO> listAlerts(String level, AlertDomain domain, String instanceId,
+            String transition, String labelKey, String labelValue, LocalDateTime from, LocalDateTime to,
+            int page, int pageSize) {
         if (page < 1 || pageSize < 1 || pageSize > 100) {
             throw new BusinessException(400, "Invalid page or pageSize");
         }
-        return alertRepository.findAlertsPage(new SystemAlertQuery(level, domain, instanceId, transition, page, pageSize));
+        if (from != null && to != null && from.isAfter(to)) {
+            throw new BusinessException(400, "from must not be after to");
+        }
+        if (hasText(labelKey) != hasText(labelValue)) {
+            throw new BusinessException(400, "labelKey and labelValue must be provided together");
+        }
+        return alertRepository.findAlertsPage(new SystemAlertQuery(level, domain, instanceId, transition,
+                hasText(labelKey) ? labelKey.trim() : null, hasText(labelValue) ? labelValue.trim() : null,
+                from, to, page, pageSize));
     }
 
 

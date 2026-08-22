@@ -161,6 +161,33 @@ describe('SystemAlertsPage', () => {
     });
   });
 
+  it('forwards instance, resource label, and time filters to the event feed', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByText('Broker unavailable');
+
+    await user.type(screen.getByLabelText('实例 ID 筛选'), 'local');
+    await user.type(screen.getByLabelText('资源标签筛选'), 'brokerName=broker-a');
+    fireEvent.change(screen.getByLabelText('开始时间筛选'), {
+      target: { value: '2026-08-01T00:00' },
+    });
+    fireEvent.change(screen.getByLabelText('结束时间筛选'), {
+      target: { value: '2026-08-02T00:00' },
+    });
+
+    await waitFor(() => {
+      expect(listSystemAlertsPage).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          instanceId: 'local',
+          labelKey: 'brokerName',
+          labelValue: 'broker-a',
+          from: '2026-08-01T00:00',
+          to: '2026-08-02T00:00',
+        }),
+      );
+    });
+  });
+
   it('does not offer acknowledgement for resolved alert history', async () => {
     vi.mocked(listSystemAlertsPage).mockResolvedValue({
       items: [

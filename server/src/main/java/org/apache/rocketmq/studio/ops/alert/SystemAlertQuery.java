@@ -16,7 +16,9 @@
  */
 package org.apache.rocketmq.studio.ops.alert;
 
+import java.time.LocalDateTime;
+
 /** Server-side filters for the paged alert-event feed. */
 public record SystemAlertQuery(String level, AlertDomain domain, String instanceId, String transition,
-        int page, int pageSize) {
+        String labelKey, String labelValue, LocalDateTime from, LocalDateTime to, int page, int pageSize) {
 }

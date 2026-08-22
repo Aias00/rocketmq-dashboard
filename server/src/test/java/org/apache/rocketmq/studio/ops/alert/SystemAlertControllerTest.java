@@ -29,6 +29,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
 import java.util.Map;
+import java.time.LocalDateTime;
 
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -77,17 +78,23 @@ class SystemAlertControllerTest {
     @Test
     void listAlertsPageShouldForwardFiltersAndPaging() throws Exception {
         SystemAlertVO alert = SystemAlertVO.builder().id(2L).level(AlertLevel.warning).build();
-        when(alertService.listAlerts("warning", AlertDomain.BUSINESS, "local", "FIRING", 2, 10))
+        LocalDateTime from = LocalDateTime.of(2026, 8, 1, 0, 0);
+        LocalDateTime to = LocalDateTime.of(2026, 8, 2, 0, 0);
+        when(alertService.listAlerts("warning", AlertDomain.BUSINESS, "local", "FIRING",
+                "brokerName", "broker-a", from, to, 2, 10))
                 .thenReturn(PageResult.of(List.of(alert), 11, 2, 10));
 
         mockMvc.perform(get("/api/system-alerts/page").param("level", "warning")
                         .param("domain", "BUSINESS").param("instanceId", "local")
-                        .param("transition", "FIRING").param("page", "2").param("pageSize", "10"))
+                        .param("transition", "FIRING").param("labelKey", "brokerName")
+                        .param("labelValue", "broker-a").param("from", "2026-08-01T00:00")
+                        .param("to", "2026-08-02T00:00").param("page", "2").param("pageSize", "10"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.total").value(11))
                 .andExpect(jsonPath("$.data.items[0].id").value(2));
 
-        verify(alertService).listAlerts("warning", AlertDomain.BUSINESS, "local", "FIRING", 2, 10);
+        verify(alertService).listAlerts("warning", AlertDomain.BUSINESS, "local", "FIRING",
+                "brokerName", "broker-a", from, to, 2, 10);
     }
 
     @Test

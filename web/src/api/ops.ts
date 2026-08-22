@@ -76,6 +76,10 @@ export interface SystemAlertQuery {
   domain?: 'BUSINESS' | 'CLUSTER';
   instanceId?: string;
   transition?: string;
+  labelKey?: string;
+  labelValue?: string;
+  from?: string;
+  to?: string;
   page?: number;
   pageSize?: number;
 }

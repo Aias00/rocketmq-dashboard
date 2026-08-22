@@ -291,7 +291,12 @@ export async function listSystemAlertsPage(
     if (normalizedLevel && alert.level.toLowerCase() !== normalizedLevel) return false;
     if (params.domain && alert.domain !== params.domain) return false;
     if (params.instanceId && alert.instanceId !== params.instanceId) return false;
-    return !normalizedTransition || alert.transition === normalizedTransition;
+    if (normalizedTransition && alert.transition !== normalizedTransition) return false;
+    if (params.labelKey && alert.labels?.[params.labelKey] !== params.labelValue) return false;
+    const alertTime = new Date(alert.time).getTime();
+    if (params.from && alertTime < new Date(params.from).getTime()) return false;
+    if (params.to && alertTime > new Date(params.to).getTime()) return false;
+    return true;
   });
   const start = (page - 1) * pageSize;
   return {
