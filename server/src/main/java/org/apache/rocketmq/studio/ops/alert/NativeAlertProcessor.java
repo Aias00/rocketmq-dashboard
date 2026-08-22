@@ -26,6 +26,7 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.EnumMap;
 
 /** Applies native samples to persisted rule state and emits only lifecycle transitions. */
 @Component
@@ -39,8 +40,9 @@ public class NativeAlertProcessor {
     private final NotificationOutboxService notificationOutboxService;
 
     public void process(List<MetricSample> samples) {
+        Map<AlertDomain, List<AlertRuleVO>> rulesByDomain = new EnumMap<>(AlertDomain.class);
         for (MetricSample sample : samples) {
-            for (AlertRuleVO rule : alertService.listRules(sample.domain())) {
+            for (AlertRuleVO rule : rulesByDomain.computeIfAbsent(sample.domain(), alertService::listRules)) {
                 if (rule.getId() == null) {
                     continue;
                 }

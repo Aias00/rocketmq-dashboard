@@ -22,6 +22,7 @@ import org.springframework.web.client.RestTemplate;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
@@ -72,7 +73,7 @@ class NotificationOutboxServiceTest {
         when(mapper.claimForDispatch(any(), any(LocalDateTime.class), any(LocalDateTime.class),
                 any(LocalDateTime.class))).thenReturn(1);
         LocalDateTime silenceEndsAt = LocalDateTime.now().plusHours(1);
-        when(alerts.findAlerts(null)).thenReturn(List.of(SystemAlertVO.builder().id(9L).ruleId(4L)
+        when(alerts.findAlertById(9L)).thenReturn(Optional.of(SystemAlertVO.builder().id(9L).ruleId(4L)
                 .domain(AlertDomain.BUSINESS).instanceId("local").build()));
         when(silences.activeUntil(any(AlertRuleVO.class), org.mockito.ArgumentMatchers.eq("local"),
                 org.mockito.ArgumentMatchers.eq(java.util.Map.of()), any(LocalDateTime.class))).thenReturn(silenceEndsAt);
@@ -103,7 +104,7 @@ class NotificationOutboxServiceTest {
         when(mapper.claimForDispatch(any(), any(LocalDateTime.class), any(LocalDateTime.class),
                 any(LocalDateTime.class))).thenReturn(1);
         when(mapper.update(any(), any())).thenReturn(1);
-        when(alerts.findAlerts(null)).thenReturn(List.of(SystemAlertVO.builder().id(9L)
+        when(alerts.findAlertById(9L)).thenReturn(Optional.of(SystemAlertVO.builder().id(9L)
                 .level(AlertLevel.warning).title("Lag").description("high").instanceId("local")
                 .labels(java.util.Map.of("topic", "orders")).build()));
         when(settings.loadGeneralSettings()).thenReturn(GeneralSettingsVO.builder()
@@ -139,7 +140,7 @@ class NotificationOutboxServiceTest {
         when(mapper.update(any(), any())).thenReturn(1);
         AlertRepository alerts = mock(AlertRepository.class);
         OperationAuditService audit = mock(OperationAuditService.class);
-        when(alerts.findAlerts(null)).thenReturn(List.of(SystemAlertVO.builder().id(9L).build()));
+        when(alerts.findAlertById(9L)).thenReturn(Optional.of(SystemAlertVO.builder().id(9L).build()));
 
         new NotificationOutboxService(mapper, mock(SettingsRepository.class), mock(AlertSilenceService.class), alerts,
                 audit).dispatch();
@@ -167,7 +168,7 @@ class NotificationOutboxServiceTest {
         when(mapper.claimForDispatch(any(), any(LocalDateTime.class), any(LocalDateTime.class),
                 any(LocalDateTime.class))).thenReturn(1);
         when(mapper.update(any(), any())).thenReturn(1);
-        when(alerts.findAlerts(null)).thenReturn(List.of(SystemAlertVO.builder().id(9L)
+        when(alerts.findAlertById(9L)).thenReturn(Optional.of(SystemAlertVO.builder().id(9L)
                 .level(AlertLevel.warning).title("Lag").description("high").instanceId("local").build()));
         when(settings.loadGeneralSettings()).thenReturn(GeneralSettingsVO.builder()
                 .emailRecipients("ops@example.com, oncall@example.com").build());

@@ -31,6 +31,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -841,7 +842,7 @@ class AlertServiceTest {
     void acknowledgeAlertShouldSetAcknowledgedTrue() {
         SystemAlertVO existing = SystemAlertVO.builder().id(1L).level(AlertLevel.error)
                 .title("Broker Down").acknowledged(false).build();
-        when(alertRepository.findAlerts(null)).thenReturn(List.of(existing));
+        when(alertRepository.findAlertById(1L)).thenReturn(Optional.of(existing));
         when(alertRepository.acknowledgeAlert(any(SystemAlertVO.class))).thenReturn(true);
 
         SystemAlertVO result = alertService.acknowledgeAlert(1L);
@@ -856,7 +857,7 @@ class AlertServiceTest {
     void acknowledgeNativeAlertShouldAcknowledgeItsActiveRuleState() {
         SystemAlertVO alert = SystemAlertVO.builder().id(1L).ruleId(7L).fingerprint("fingerprint")
                 .acknowledged(false).build();
-        when(alertRepository.findAlerts(null)).thenReturn(List.of(alert));
+        when(alertRepository.findAlertById(1L)).thenReturn(Optional.of(alert));
         when(alertRepository.acknowledgeAlert(any(SystemAlertVO.class))).thenReturn(true);
 
         alertService.acknowledgeAlert(1L);
@@ -871,12 +872,12 @@ class AlertServiceTest {
                 .hasMessage("System alert ID is required")
                 .satisfies(ex -> assertThat(((BusinessException) ex).getCode()).isEqualTo(400));
 
-        verify(alertRepository, never()).findAlerts(any());
+        verify(alertRepository, never()).findAlertById(any());
     }
 
     @Test
     void acknowledgeAlertShouldIgnorePersistedAlertsWithNullIds() {
-        when(alertRepository.findAlerts(null)).thenReturn(List.of(SystemAlertVO.builder().title("corrupt").build()));
+        when(alertRepository.findAlertById(999L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> alertService.acknowledgeAlert(999L))
                 .isInstanceOf(BusinessException.class)
@@ -885,7 +886,7 @@ class AlertServiceTest {
 
     @Test
     void acknowledgeAlertShouldThrowWhenAlertNotFound() {
-        when(alertRepository.findAlerts(null)).thenReturn(Collections.emptyList());
+        when(alertRepository.findAlertById(999L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> alertService.acknowledgeAlert(999L))
                 .isInstanceOf(BusinessException.class)
@@ -896,7 +897,7 @@ class AlertServiceTest {
     void acknowledgeAlertShouldRejectConcurrentRemoval() {
         SystemAlertVO existing = SystemAlertVO.builder().id(1L).level(AlertLevel.error)
                 .title("Broker Down").acknowledged(false).build();
-        when(alertRepository.findAlerts(null)).thenReturn(List.of(existing));
+        when(alertRepository.findAlertById(1L)).thenReturn(Optional.of(existing));
         when(alertRepository.acknowledgeAlert(any(SystemAlertVO.class))).thenReturn(false);
 
         assertThatThrownBy(() -> alertService.acknowledgeAlert(1L))

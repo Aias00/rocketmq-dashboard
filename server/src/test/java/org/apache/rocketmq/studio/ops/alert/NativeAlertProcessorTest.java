@@ -28,6 +28,8 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -81,6 +83,17 @@ class NativeAlertProcessorTest {
         processor.process(List.of(sample("orders")));
         assertThat(saved.values()).singleElement().extracting(AlertRuleState::status)
                 .isEqualTo(AlertStateStatus.FIRING);
+    }
+
+    @Test
+    void loadsRulesOncePerDomainForABatchOfSamples() {
+        AlertService service = mock(AlertService.class);
+        when(service.listRules(AlertDomain.BUSINESS)).thenReturn(List.of());
+
+        processor(service, mock(AlertStateRepository.class), mock(AlertRepository.class))
+                .process(List.of(sample("orders"), sample("payments")));
+
+        verify(service, times(1)).listRules(AlertDomain.BUSINESS);
     }
 
     private static NativeAlertProcessor processor(AlertService service, AlertStateRepository states,

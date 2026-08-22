@@ -36,6 +36,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.TreeMap;
 import java.util.stream.Collectors;
 
@@ -92,6 +93,12 @@ public class MybatisPlusAlertRepository implements AlertRepository {
         return alertMapper.selectList(query).stream()
                 .map(MybatisPlusAlertRepository::toAlertVO)
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    public Optional<SystemAlertVO> findAlertById(Long id) {
+        return id == null ? Optional.empty() : Optional.ofNullable(alertMapper.selectById(id))
+                .map(MybatisPlusAlertRepository::toAlertVO);
     }
 
     @Override

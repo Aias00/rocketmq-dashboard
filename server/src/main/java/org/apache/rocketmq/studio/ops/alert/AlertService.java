@@ -391,11 +391,9 @@ public class AlertService {
         if (id == null) {
             throw new BusinessException(400, "System alert ID is required");
         }
-        List<SystemAlertVO> alerts = alertRepository.findAlerts(null);
-        SystemAlertVO alert = alerts.stream()
-                .filter(a -> Objects.equals(a.getId(), id))
-                .findFirst()
-                .orElseThrow(() -> new org.apache.rocketmq.studio.common.exception.BusinessException(404, "System alert not found: " + id));
+        SystemAlertVO alert = alertRepository.findAlertById(id)
+                .orElseThrow(() -> new org.apache.rocketmq.studio.common.exception.BusinessException(404,
+                        "System alert not found: " + id));
         alert.setAcknowledged(true);
         if (!alertRepository.acknowledgeAlert(alert)) {
             throw new BusinessException(404, "System alert not found: " + id);

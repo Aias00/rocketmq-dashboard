@@ -18,6 +18,7 @@ package org.apache.rocketmq.studio.ops.alert;
 
 import org.apache.rocketmq.studio.common.domain.PageResult;
 import java.util.List;
+import java.util.Optional;
 
 public interface AlertRepository {
     List<AlertRuleVO> findAllRules();
@@ -29,6 +30,8 @@ public interface AlertRepository {
     boolean deleteRule(Long id);
 
     List<SystemAlertVO> findAlerts(String level);
+
+    Optional<SystemAlertVO> findAlertById(Long id);
 
     PageResult<SystemAlertVO> findAlertsPage(SystemAlertQuery query);
 

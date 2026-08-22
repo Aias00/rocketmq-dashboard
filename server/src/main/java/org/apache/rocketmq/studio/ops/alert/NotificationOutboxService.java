@@ -189,7 +189,7 @@ public class NotificationOutboxService {
     }
 
     private SystemAlertVO loadAlert(Long id) {
-        return alertRepository.findAlerts(null).stream().filter(alert -> id.equals(alert.getId())).findFirst()
+        return alertRepository.findAlertById(id)
                 .orElseThrow(() -> new IllegalStateException("Alert event no longer exists: " + id));
     }
 
