@@ -620,6 +620,25 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
             </Form.Item>
           )}
 
+          {domain === 'CLUSTER' && (
+            <>
+              <Form.Item
+                name="clusterName"
+                label="集群（可选）"
+                extra="留空或填写 * 时匹配该实例中的所有集群。"
+              >
+                <Input placeholder="例如 DefaultCluster" />
+              </Form.Item>
+              <Form.Item
+                name="brokerName"
+                label="Broker（可选）"
+                extra="留空或填写 * 时匹配所选集群中的所有 Broker。"
+              >
+                <Input placeholder="例如 broker-a" />
+              </Form.Item>
+            </>
+          )}
+
           <Form.Item label={t('alerts.threshold')}>
             <Flex gap={8}>
               <Form.Item

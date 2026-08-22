@@ -24,7 +24,6 @@ import org.springframework.stereotype.Component;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
-import org.springframework.util.StringUtils;
 
 /** Applies native samples to persisted rule state and emits only lifecycle transitions. */
 @Component
@@ -43,7 +42,7 @@ public class NativeAlertProcessor {
                 if (rule.getId() == null) {
                     continue;
                 }
-                if (!matchesNativeScope(rule, sample)) {
+                if (!NativeAlertRuleScopeMatcher.matches(rule, sample)) {
                     continue;
                 }
                 AlertEvaluationResult evaluation = evaluator.evaluate(rule, sample);
@@ -78,15 +77,4 @@ public class NativeAlertProcessor {
         return AlertLevel.info;
     }
 
-    /** Native rules must be scoped to one Studio instance before they can evaluate collected samples. */
-    private static boolean matchesNativeScope(AlertRuleVO rule, MetricSample sample) {
-        if (!StringUtils.hasText(rule.getInstanceId())
-                || !rule.getInstanceId().trim().equals(sample.instanceId())) {
-            return false;
-        }
-        if (!StringUtils.hasText(rule.getConsumerGroup())) {
-            return true;
-        }
-        return rule.getConsumerGroup().trim().equals(sample.labels().get("consumerGroup"));
-    }
 }

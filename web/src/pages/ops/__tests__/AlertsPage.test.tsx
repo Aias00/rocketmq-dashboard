@@ -237,6 +237,16 @@ describe('AlertsPage', () => {
     await waitFor(() => expect(listNativeAlertMetrics).toHaveBeenCalledWith('local', 'BUSINESS'));
   });
 
+  it('exposes optional cluster and broker scopes for cluster rules', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: '新建规则' }));
+
+    expect(screen.getByRole('textbox', { name: '集群（可选）' })).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Broker（可选）' })).toBeInTheDocument();
+  });
+
   it('keeps metrics from the most recently selected instance', async () => {
     let resolveLocal: (metrics: NativeAlertMetricInfo[]) => void;
     let resolveRemote: (metrics: NativeAlertMetricInfo[]) => void;

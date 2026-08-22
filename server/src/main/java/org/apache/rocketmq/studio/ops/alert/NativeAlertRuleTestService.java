@@ -24,7 +24,6 @@ import org.apache.rocketmq.studio.common.exception.BusinessException;
 import org.apache.rocketmq.studio.instance.InstanceRepository;
 import org.apache.rocketmq.studio.instance.InstanceVO;
 import org.springframework.stereotype.Service;
-import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -51,7 +50,7 @@ public class NativeAlertRuleTestService {
                     .forEach(collector -> samples.addAll(collector.collect(instance)));
         }
         return AlertRuleTestResultVO.builder().samples(samples.stream()
-                .filter(sample -> matchesScope(rule, sample))
+                .filter(sample -> NativeAlertRuleScopeMatcher.matches(rule, sample))
                 .map(sample -> {
                     AlertEvaluationResult evaluation = evaluator.evaluate(rule, sample);
                     return AlertRuleTestResultVO.Sample.builder().labels(sample.labels())
@@ -60,9 +59,4 @@ public class NativeAlertRuleTestService {
                 }).toList()).build();
     }
 
-    private static boolean matchesScope(AlertRuleVO rule, MetricSample sample) {
-        return sample.domain() == rule.getDomain() && sample.instanceId().equals(rule.getInstanceId())
-                && (!StringUtils.hasText(rule.getConsumerGroup())
-                || rule.getConsumerGroup().trim().equals(sample.labels().get("consumerGroup")));
-    }
 }
