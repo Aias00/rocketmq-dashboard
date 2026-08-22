@@ -52,6 +52,9 @@ class ClusterAlertRuleControllerTest {
     @MockBean
     private NativeAlertRuleTestService nativeAlertRuleTestService;
 
+    @MockBean
+    private NativeAlertMetricCatalogService metricCatalogService;
+
     @Test
     void listRulesShouldUseClusterDomain() throws Exception {
         when(alertService.listRules(AlertDomain.CLUSTER)).thenReturn(List.of(

@@ -14,11 +14,14 @@ import org.apache.rocketmq.studio.instance.InstanceVO;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Set;
 
 /** Declares only metrics backed by native collectors for the selected provider. */
 @Service
 @RequiredArgsConstructor
 public class NativeAlertMetricCatalogService {
+    private static final Set<String> NATIVE_METRICS = Set.of("nameserver.availability", "broker.availability",
+            "broker.disk.usage_ratio", "consumer.lag.total", "consumer.lag.max_queue", "dlq.message.count");
     private static final List<NativeAlertMetricInfo> CLUSTER_APACHE = List.of(
             new NativeAlertMetricInfo("nameserver.availability", "NameServer availability", "", false),
             new NativeAlertMetricInfo("broker.availability", "Broker availability", "", false),
@@ -40,5 +43,17 @@ public class NativeAlertMetricCatalogService {
             return List.of();
         }
         return domain == AlertDomain.CLUSTER ? CLUSTER_APACHE : BUSINESS_APACHE;
+    }
+
+    public void validate(AlertRuleVO rule) {
+        if (rule == null || rule.getMetric() == null || !NATIVE_METRICS.contains(rule.getMetric())) {
+            return;
+        }
+        boolean supported = list(rule.getInstanceId(), rule.getDomain()).stream()
+                .anyMatch(metric -> metric.key().equals(rule.getMetric()));
+        if (!supported) {
+            throw new BusinessException(400, "Native metric " + rule.getMetric()
+                    + " is not supported by the selected Studio instance");
+        }
     }
 }

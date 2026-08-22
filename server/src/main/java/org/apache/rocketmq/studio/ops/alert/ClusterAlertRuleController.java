@@ -36,6 +36,7 @@ public class ClusterAlertRuleController {
 
     private final AlertService alertService;
     private final NativeAlertRuleTestService nativeAlertRuleTestService;
+    private final NativeAlertMetricCatalogService metricCatalogService;
 
     @GetMapping
     public Result<List<AlertRuleVO>> listRules() {
@@ -44,7 +45,10 @@ public class ClusterAlertRuleController {
 
     @PostMapping("/create")
     public Result<AlertRuleVO> createRule(@Valid @RequestBody(required = false) AlertRuleRequestDTO rule) {
-        return Result.ok(alertService.createRule(AlertDomain.CLUSTER, requireRule(rule).toAlertRuleVO()));
+        AlertRuleVO candidate = requireRule(rule).toAlertRuleVO();
+        candidate.setDomain(AlertDomain.CLUSTER);
+        metricCatalogService.validate(candidate);
+        return Result.ok(alertService.createRule(AlertDomain.CLUSTER, candidate));
     }
 
     @PostMapping("/update")
@@ -53,13 +57,17 @@ public class ClusterAlertRuleController {
         if (request.getId() == null) {
             throw new BusinessException(400, "id is required");
         }
-        return Result.ok(alertService.updateRule(AlertDomain.CLUSTER, request.toAlertRuleVO()));
+        AlertRuleVO candidate = request.toAlertRuleVO();
+        candidate.setDomain(AlertDomain.CLUSTER);
+        metricCatalogService.validate(candidate);
+        return Result.ok(alertService.updateRule(AlertDomain.CLUSTER, candidate));
     }
 
     @PostMapping("/test")
     public Result<AlertRuleTestResultVO> testRule(@Valid @RequestBody(required = false) AlertRuleRequestDTO rule) {
         AlertRuleVO candidate = requireRule(rule).toAlertRuleVO();
         candidate.setDomain(AlertDomain.CLUSTER);
+        metricCatalogService.validate(candidate);
         return Result.ok(nativeAlertRuleTestService.test(candidate));
     }
 
