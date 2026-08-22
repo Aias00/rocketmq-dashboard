@@ -2,7 +2,11 @@
 
 ## Status
 
-Implementation in progress. Rule domain isolation and the native Apache cluster metric contract are in place; snapshots, scheduling, evaluation, event lifecycle, and notification delivery remain pending. This design does not require Prometheus or Alertmanager for rule evaluation, event creation, or notification delivery.
+Implementation in progress. Native Apache collection, snapshots, scheduling, evaluation, event lifecycle,
+acknowledgement, multi-replica collection lease, rule test-runs, and rule/instance-scoped silence management
+are in place. Notification delivery, label-scoped silences, provider capability catalogs, and non-Apache
+collectors remain pending. This design does not require Prometheus or Alertmanager for rule evaluation or
+event creation.
 
 ## Goals
 
@@ -304,7 +308,9 @@ An event row displays its domain badge, current value, threshold, resource ident
 1. Introduce the metric contract, catalog, Apache collectors, snapshots, and single-node scheduler.
 2. Implement rule evaluation, state transitions, Alert Events lifecycle, acknowledgement, and three initial rules: Broker unavailable, Broker disk pressure, Consumer lag.
 3. Implement Webhook, DingTalk, and Email through the outbox worker, plus cooldown and delivery history.
-4. Add silences, multi-replica lease handling, rule test-run, and capability-aware forms.
+4. Add silences, multi-replica lease handling, rule test-run, and capability-aware forms. Rule/instance
+   silences, multi-replica lease handling, and rule test-runs are complete; label-scoped silences and
+   capability-aware forms remain pending.
 5. Add Proxy and cloud collectors, additional business rules, and optional Prometheus YAML export compatibility.
 
 ## Acceptance Criteria
