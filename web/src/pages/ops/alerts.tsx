@@ -688,6 +688,17 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
             />
           </Form.Item>
 
+          <Flex gap={8}>
+            <Form.Item name="aggregation" label="窗口聚合" initialValue="LAST" style={{ flex: 1 }}>
+              <Select
+                options={['LAST', 'MAX', 'MIN', 'AVG'].map((value) => ({ label: value, value }))}
+              />
+            </Form.Item>
+            <Form.Item name="windowSeconds" label="窗口秒数" initialValue={0} style={{ flex: 1 }}>
+              <InputNumber min={0} precision={0} style={{ width: '100%' }} />
+            </Form.Item>
+          </Flex>
+
           <Form.Item
             name="consecutiveSamples"
             label="连续采样次数"

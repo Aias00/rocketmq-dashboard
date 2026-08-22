@@ -22,5 +22,7 @@ import java.util.List;
 public interface MetricSnapshotRepository {
     void saveAll(List<MetricSample> samples);
 
+    List<MetricSample> findRecent(MetricSample scope, Instant since);
+
     int deleteBefore(Instant cutoff);
 }

@@ -44,6 +44,10 @@ public class RmqAlertRule {
 
     private String duration;
 
+    private String aggregation;
+
+    private Integer windowSeconds;
+
     private String channels;
 
     private Boolean enabled;

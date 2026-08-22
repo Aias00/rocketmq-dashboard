@@ -18,10 +18,13 @@ package org.apache.rocketmq.studio.ops.alert;
 
 import lombok.RequiredArgsConstructor;
 import org.apache.rocketmq.studio.cluster.metrics.MetricSample;
+import org.apache.rocketmq.studio.cluster.metrics.MetricSnapshotRepository;
+import org.apache.rocketmq.studio.cluster.metrics.MetricAvailability;
 import org.apache.rocketmq.studio.common.domain.enums.AlertLevel;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
+import java.time.Duration;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
@@ -36,6 +39,7 @@ public class NativeAlertProcessor {
     private final AlertRuleEvaluator evaluator;
     private final AlertStateMachine stateMachine;
     private final AlertStateRepository stateRepository;
+    private final MetricSnapshotRepository snapshotRepository;
     private final AlertRepository alertRepository;
     private final NotificationOutboxService notificationOutboxService;
 
@@ -49,7 +53,8 @@ public class NativeAlertProcessor {
                 if (!NativeAlertRuleScopeMatcher.matches(rule, sample)) {
                     continue;
                 }
-                AlertEvaluationResult evaluation = evaluator.evaluate(rule, sample);
+                MetricSample evaluatedSample = aggregate(rule, sample);
+                AlertEvaluationResult evaluation = evaluator.evaluate(rule, evaluatedSample);
                 if (!evaluation.matches()) {
                     continue;
                 }
@@ -73,6 +78,25 @@ public class NativeAlertProcessor {
                 }
             }
         }
+    }
+
+    private MetricSample aggregate(AlertRuleVO rule, MetricSample sample) {
+        if (sample.availability() != MetricAvailability.AVAILABLE || rule.getWindowSeconds() <= 0) {
+            return sample;
+        }
+        List<MetricSample> window = snapshotRepository.findRecent(sample,
+                sample.collectedAt().minus(Duration.ofSeconds(rule.getWindowSeconds())));
+        if (window.isEmpty()) {
+            return sample;
+        }
+        double value = switch (rule.getAggregation() == null ? "LAST" : rule.getAggregation().toUpperCase()) {
+            case "MAX" -> window.stream().mapToDouble(item -> item.value()).max().orElse(sample.value());
+            case "MIN" -> window.stream().mapToDouble(item -> item.value()).min().orElse(sample.value());
+            case "AVG" -> window.stream().mapToDouble(item -> item.value()).average().orElse(sample.value());
+            default -> window.get(window.size() - 1).value();
+        };
+        return new MetricSample(sample.metricKey(), sample.domain(), sample.instanceId(), sample.clusterId(), sample.labels(),
+                value, MetricAvailability.AVAILABLE, sample.collectedAt());
     }
 
     private static AlertLevel level(String severity) {

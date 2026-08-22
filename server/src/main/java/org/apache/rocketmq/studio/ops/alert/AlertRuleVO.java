@@ -37,6 +37,10 @@ public class AlertRuleVO {
     private double threshold;
     private String thresholdUnit;
     private String duration;
+    @Builder.Default
+    private String aggregation = "LAST";
+    @Builder.Default
+    private int windowSeconds = 0;
     private List<String> channels;
     private boolean enabled;
     private String lastTriggered;

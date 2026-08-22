@@ -145,6 +145,8 @@ public class MybatisPlusAlertRepository implements AlertRepository {
         vo.setThreshold(entity.getThreshold() == null ? 0 : entity.getThreshold());
         vo.setThresholdUnit(entity.getThresholdUnit());
         vo.setDuration(entity.getDuration());
+        vo.setAggregation(StringUtils.hasText(entity.getAggregation()) ? entity.getAggregation() : "LAST");
+        vo.setWindowSeconds(entity.getWindowSeconds() == null ? 0 : entity.getWindowSeconds());
         vo.setChannels(splitCsv(entity.getChannels()));
         vo.setEnabled(Boolean.TRUE.equals(entity.getEnabled()));
         vo.setLastTriggered(entity.getLastTriggered());
@@ -169,6 +171,8 @@ public class MybatisPlusAlertRepository implements AlertRepository {
         entity.setThreshold(rule.getThreshold());
         entity.setThresholdUnit(rule.getThresholdUnit());
         entity.setDuration(rule.getDuration());
+        entity.setAggregation(StringUtils.hasText(rule.getAggregation()) ? rule.getAggregation().trim().toUpperCase(Locale.ROOT) : "LAST");
+        entity.setWindowSeconds(Math.max(0, rule.getWindowSeconds()));
         entity.setChannels(rule.getChannels() == null
                 ? null
                 : String.join(",", normalizeChannels(rule.getChannels())));

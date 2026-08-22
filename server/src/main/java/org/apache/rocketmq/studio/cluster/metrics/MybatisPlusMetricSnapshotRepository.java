@@ -18,6 +18,7 @@ package org.apache.rocketmq.studio.cluster.metrics;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.apache.rocketmq.studio.persistence.entity.RmqMetricSnapshot;
@@ -53,14 +54,21 @@ public class MybatisPlusMetricSnapshotRepository implements MetricSnapshotReposi
                 .lt("collected_at", LocalDateTime.ofInstant(cutoff, ZoneOffset.UTC))));
     }
 
+    @Override
+    public List<MetricSample> findRecent(MetricSample scope, Instant since) {
+        String labelsJson = serializeLabels(scope.labels());
+        return mapper.selectList(new QueryWrapper<RmqMetricSnapshot>()
+                        .eq("instance_id", scope.instanceId()).eq("metric_key", scope.metricKey())
+                        .eq("domain", scope.domain().name()).eq("labels_hash", sha256(labelsJson))
+                        .eq(scope.clusterId() != null, "cluster_id", scope.clusterId())
+                        .eq("availability", MetricAvailability.AVAILABLE.name())
+                        .ge("collected_at", LocalDateTime.ofInstant(since, ZoneOffset.UTC))
+                        .orderByAsc("collected_at"))
+                .stream().map(this::toSample).toList();
+    }
+
     private RmqMetricSnapshot toEntity(MetricSample sample) {
-        Map<String, String> labels = new TreeMap<>(sample.labels());
-        String labelsJson;
-        try {
-            labelsJson = objectMapper.writeValueAsString(labels);
-        } catch (JsonProcessingException error) {
-            throw new IllegalArgumentException("Unable to serialize metric labels", error);
-        }
+        String labelsJson = serializeLabels(sample.labels());
         RmqMetricSnapshot entity = new RmqMetricSnapshot();
         entity.setInstanceId(sample.instanceId());
         entity.setMetricKey(sample.metricKey());
@@ -72,6 +80,25 @@ public class MybatisPlusMetricSnapshotRepository implements MetricSnapshotReposi
         entity.setAvailability(sample.availability().name());
         entity.setCollectedAt(LocalDateTime.ofInstant(sample.collectedAt(), ZoneOffset.UTC));
         return entity;
+    }
+
+    private MetricSample toSample(RmqMetricSnapshot entity) {
+        try {
+            return new MetricSample(entity.getMetricKey(), org.apache.rocketmq.studio.ops.alert.AlertDomain.valueOf(entity.getDomain()),
+                    entity.getInstanceId(), entity.getClusterId(), objectMapper.readValue(entity.getLabelsJson(), new TypeReference<>() { }),
+                    entity.getValue(), MetricAvailability.valueOf(entity.getAvailability()),
+                    entity.getCollectedAt().toInstant(ZoneOffset.UTC));
+        } catch (JsonProcessingException error) {
+            throw new IllegalStateException("Unable to read metric labels", error);
+        }
+    }
+
+    private String serializeLabels(Map<String, String> labels) {
+        try {
+            return objectMapper.writeValueAsString(new TreeMap<>(labels));
+        } catch (JsonProcessingException error) {
+            throw new IllegalArgumentException("Unable to serialize metric labels", error);
+        }
     }
 
     private static String sha256(String value) {

@@ -250,6 +250,8 @@ CREATE TABLE IF NOT EXISTS rmq_alert_rule (
   threshold DOUBLE,
   threshold_unit VARCHAR(32),
   duration VARCHAR(32),
+  aggregation VARCHAR(16) NOT NULL DEFAULT 'LAST',
+  window_seconds INT NOT NULL DEFAULT 0,
   channels VARCHAR(512) COMMENT '逗号分隔的通知渠道',
   enabled TINYINT(1) DEFAULT 1,
   last_triggered VARCHAR(64),
