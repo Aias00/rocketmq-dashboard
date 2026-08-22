@@ -211,6 +211,7 @@ describe('AlertsPage', () => {
     await screen.findByRole('option', { name: 'local' });
     await user.click(getSelectOption('local'));
     await waitFor(() => expect(listNativeAlertMetrics).toHaveBeenCalledWith('local', 'BUSINESS'));
+    expect(screen.getByRole('textbox', { name: '消费组（可选）' })).toBeInTheDocument();
     await user.click(screen.getByRole('combobox', { name: '监控指标' }));
 
     expect(await screen.findByText('Consumer lag total')).toBeInTheDocument();
