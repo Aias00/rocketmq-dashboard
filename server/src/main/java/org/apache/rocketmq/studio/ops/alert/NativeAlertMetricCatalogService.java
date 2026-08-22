@@ -34,6 +34,9 @@ public class NativeAlertMetricCatalogService {
             new NativeAlertMetricInfo("consumer.lag.total", "Consumer lag total", "messages", true),
             new NativeAlertMetricInfo("consumer.lag.max_queue", "Consumer lag max queue", "messages", true),
             new NativeAlertMetricInfo("dlq.message.count", "DLQ message count", "messages", true));
+    private static final List<NativeAlertMetricInfo> BUSINESS_CLOUD = List.of(
+            new NativeAlertMetricInfo("consumer.lag.total", "Consumer lag total", "messages", true),
+            new NativeAlertMetricInfo("consumer.lag.max_queue", "Consumer lag max queue", "messages", true));
 
     private final InstanceRepository instanceRepository;
 
@@ -43,10 +46,14 @@ public class NativeAlertMetricCatalogService {
         }
         InstanceVO instance = instanceRepository.findByIdentifier(instanceId.trim())
                 .orElseThrow(() -> new BusinessException(404, "Instance not found: " + instanceId));
-        if (instance.getVendor() != null && instance.getVendor() != InstanceVendor.APACHE) {
-            return List.of();
+        if (instance.getVendor() == null || instance.getVendor() == InstanceVendor.APACHE) {
+            return domain == AlertDomain.CLUSTER ? CLUSTER_APACHE : BUSINESS_APACHE;
         }
-        return domain == AlertDomain.CLUSTER ? CLUSTER_APACHE : BUSINESS_APACHE;
+        if (domain == AlertDomain.BUSINESS && (instance.getVendor() == InstanceVendor.ALIYUN
+                || instance.getVendor() == InstanceVendor.TENCENT)) {
+            return BUSINESS_CLOUD;
+        }
+        return List.of();
     }
 
     public void validate(AlertRuleVO rule) {

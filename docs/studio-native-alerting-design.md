@@ -4,9 +4,9 @@
 
 Implementation in progress. Native Apache collection, snapshots, scheduling, evaluation, event lifecycle,
 acknowledgement, multi-replica collection lease, rule test-runs, label-scoped silence management, and
-webhook and SMTP email outbox delivery are in place. Provider capability catalogs are available for Apache;
-non-Apache collectors remain pending. This design does not require Prometheus or Alertmanager for rule evaluation
-or event creation.
+webhook and SMTP email outbox delivery are in place. Provider capability catalogs are available for Apache,
+Aliyun, and Tencent; cloud consumer-lag collection is available while cloud cluster-health collectors remain
+pending. This design does not require Prometheus or Alertmanager for rule evaluation or event creation.
 
 ## Goals
 
@@ -128,8 +128,8 @@ record MetricSample(
 | Cluster | `broker.jvm.heap.usage_ratio` | Broker | Broker runtime data |
 | Cluster | `broker.send_queue.usage_ratio` | Broker | Broker runtime send queue size/capacity |
 | Cluster | `proxy.availability` | Proxy | Proxy health endpoint |
-| Business | `consumer.lag.total` | Consumer Group / Topic | Consumer progress |
-| Business | `consumer.lag.max_queue` | Consumer Group / Queue | Consumer progress |
+| Business | `consumer.lag.total` | Consumer Group / Topic | Consumer progress (Apache, Aliyun, Tencent) |
+| Business | `consumer.lag.max_queue` | Consumer Group / Queue | Consumer progress (Apache, Aliyun, Tencent) |
 | Business | `consumer.delay.seconds` | Consumer Group | Message store time and offset data |
 | Business | `topic.backlog.total` | Topic | Topic and consumer offsets |
 | Business | `dlq.message.count` | Consumer Group / DLQ | DLQ provider |
