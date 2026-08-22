@@ -398,7 +398,8 @@ public class AlertService {
         if (!alertRepository.acknowledgeAlert(alert)) {
             throw new BusinessException(404, "System alert not found: " + id);
         }
-        if (alert.getRuleId() != null && hasText(alert.getFingerprint())) {
+        if ("FIRING".equalsIgnoreCase(alert.getTransition())
+                && alert.getRuleId() != null && hasText(alert.getFingerprint())) {
             alertStateRepository.acknowledge(new AlertStateKey(alert.getRuleId(), alert.getFingerprint()));
         }
         recordAudit("ACKNOWLEDGE_SYSTEM_ALERT", "SYSTEM_ALERT", String.valueOf(alert.getId()), null,

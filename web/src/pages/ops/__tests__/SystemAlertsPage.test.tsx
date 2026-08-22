@@ -161,6 +161,29 @@ describe('SystemAlertsPage', () => {
     });
   });
 
+  it('does not offer acknowledgement for resolved alert history', async () => {
+    vi.mocked(listSystemAlertsPage).mockResolvedValue({
+      items: [
+        {
+          id: 6,
+          level: 'warning',
+          title: 'Recovered broker',
+          description: 'back to normal',
+          time: '2026-08-10 01:02',
+          transition: 'RESOLVED',
+          acknowledged: false,
+        },
+      ],
+      total: 1,
+      page: 1,
+      size: 20,
+    });
+    renderPage();
+
+    await screen.findByText('Recovered broker');
+    expect(screen.queryByRole('button', { name: /^确认$/ })).not.toBeInTheDocument();
+  });
+
   it('tracks simultaneous acknowledgements independently', async () => {
     vi.mocked(acknowledgeAlert).mockImplementation(() => new Promise(() => {}));
     const user = userEvent.setup();

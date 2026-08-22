@@ -856,13 +856,25 @@ class AlertServiceTest {
     @Test
     void acknowledgeNativeAlertShouldAcknowledgeItsActiveRuleState() {
         SystemAlertVO alert = SystemAlertVO.builder().id(1L).ruleId(7L).fingerprint("fingerprint")
-                .acknowledged(false).build();
+                .transition("FIRING").acknowledged(false).build();
         when(alertRepository.findAlertById(1L)).thenReturn(Optional.of(alert));
         when(alertRepository.acknowledgeAlert(any(SystemAlertVO.class))).thenReturn(true);
 
         alertService.acknowledgeAlert(1L);
 
         verify(alertStateRepository).acknowledge(new AlertStateKey(7L, "fingerprint"));
+    }
+
+    @Test
+    void acknowledgingResolvedEventMustNotAcknowledgeANewerFiringState() {
+        SystemAlertVO resolved = SystemAlertVO.builder().id(1L).ruleId(7L).fingerprint("fingerprint")
+                .transition("RESOLVED").acknowledged(false).build();
+        when(alertRepository.findAlertById(1L)).thenReturn(Optional.of(resolved));
+        when(alertRepository.acknowledgeAlert(any(SystemAlertVO.class))).thenReturn(true);
+
+        alertService.acknowledgeAlert(1L);
+
+        verify(alertStateRepository, never()).acknowledge(any(AlertStateKey.class));
     }
 
     @Test

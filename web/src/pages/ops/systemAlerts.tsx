@@ -434,7 +434,7 @@ const SystemAlertsPage = () => {
                   <Button size="small" type="link" onClick={() => void loadDeliveries(alert.id)}>
                     通知
                   </Button>
-                  {!alert.acknowledged && (
+                  {!alert.acknowledged && alert.transition !== 'RESOLVED' && (
                     <Button
                       size="small"
                       type="link"
