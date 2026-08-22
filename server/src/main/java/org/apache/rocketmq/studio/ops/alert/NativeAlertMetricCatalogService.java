@@ -1,0 +1,44 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0.
+ */
+package org.apache.rocketmq.studio.ops.alert;
+
+import lombok.RequiredArgsConstructor;
+import org.apache.rocketmq.studio.common.domain.enums.InstanceVendor;
+import org.apache.rocketmq.studio.common.exception.BusinessException;
+import org.apache.rocketmq.studio.instance.InstanceRepository;
+import org.apache.rocketmq.studio.instance.InstanceVO;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+
+/** Declares only metrics backed by native collectors for the selected provider. */
+@Service
+@RequiredArgsConstructor
+public class NativeAlertMetricCatalogService {
+    private static final List<NativeAlertMetricInfo> CLUSTER_APACHE = List.of(
+            new NativeAlertMetricInfo("nameserver.availability", "NameServer availability", "", false),
+            new NativeAlertMetricInfo("broker.availability", "Broker availability", "", false),
+            new NativeAlertMetricInfo("broker.disk.usage_ratio", "Broker disk usage ratio", "ratio", false));
+    private static final List<NativeAlertMetricInfo> BUSINESS_APACHE = List.of(
+            new NativeAlertMetricInfo("consumer.lag.total", "Consumer lag total", "messages", true),
+            new NativeAlertMetricInfo("consumer.lag.max_queue", "Consumer lag max queue", "messages", true),
+            new NativeAlertMetricInfo("dlq.message.count", "DLQ message count", "messages", true));
+
+    private final InstanceRepository instanceRepository;
+
+    public List<NativeAlertMetricInfo> list(String instanceId, AlertDomain domain) {
+        if (instanceId == null || instanceId.isBlank()) {
+            throw new BusinessException(400, "instanceId is required");
+        }
+        InstanceVO instance = instanceRepository.findByIdentifier(instanceId.trim())
+                .orElseThrow(() -> new BusinessException(404, "Instance not found: " + instanceId));
+        if (instance.getVendor() != null && instance.getVendor() != InstanceVendor.APACHE) {
+            return List.of();
+        }
+        return domain == AlertDomain.CLUSTER ? CLUSTER_APACHE : BUSINESS_APACHE;
+    }
+}
