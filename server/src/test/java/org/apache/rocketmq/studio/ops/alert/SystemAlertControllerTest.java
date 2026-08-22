@@ -51,6 +51,9 @@ class SystemAlertControllerTest {
     @MockBean
     private AlertService alertService;
 
+    @MockBean
+    private NotificationOutboxService notificationOutboxService;
+
     @Test
     void listAlertsShouldReturnSystemAlerts() throws Exception {
         SystemAlertVO alert = SystemAlertVO.builder()

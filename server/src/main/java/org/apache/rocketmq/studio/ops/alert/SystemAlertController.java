@@ -37,6 +37,7 @@ import java.util.Map;
 public class SystemAlertController {
 
     private final AlertService alertService;
+    private final NotificationOutboxService notificationOutboxService;
 
     @GetMapping
     public Result<List<SystemAlertVO>> listAlerts(
@@ -56,6 +57,11 @@ public class SystemAlertController {
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int pageSize) {
         return Result.ok(alertService.listAlerts(level, domain, instanceId, transition, page, pageSize));
+    }
+
+    @GetMapping("/{id}/deliveries")
+    public Result<List<NotificationDeliveryVO>> listDeliveries(@org.springframework.web.bind.annotation.PathVariable Long id) {
+        return Result.ok(notificationOutboxService.listDeliveries(id));
     }
 
     @PostMapping("/acknowledge")

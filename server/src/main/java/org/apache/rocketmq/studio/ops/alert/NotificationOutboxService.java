@@ -66,6 +66,19 @@ public class NotificationOutboxService {
         }
     }
 
+    public List<NotificationDeliveryVO> listDeliveries(Long alertId) {
+        if (alertId == null) {
+            throw new org.apache.rocketmq.studio.common.exception.BusinessException(400, "Alert ID is required");
+        }
+        return mapper.selectList(new QueryWrapper<RmqAlertNotificationOutbox>().eq("alert_id", alertId)
+                        .orderByAsc("id"))
+                .stream().map(row -> NotificationDeliveryVO.builder().channel(row.getChannel())
+                        .status(NotificationOutboxStatus.valueOf(row.getStatus()))
+                        .attemptCount(row.getAttemptCount() == null ? 0 : row.getAttemptCount())
+                        .nextAttemptAt(row.getNextAttemptAt()).lastError(row.getLastError())
+                        .deliveredAt(row.getDeliveredAt()).build()).toList();
+    }
+
     @Scheduled(fixedDelayString = "${studio.alerting.notification-dispatch-interval:PT10S}")
     public void dispatch() {
         LocalDateTime now = LocalDateTime.now();
