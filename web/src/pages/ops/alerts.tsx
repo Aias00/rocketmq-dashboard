@@ -654,6 +654,7 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
                     { label: '<', value: '<' },
                     { label: '>=', value: '>=' },
                     { label: '<=', value: '<=' },
+                    { label: '不可用', value: 'UNAVAILABLE' },
                   ]}
                 />
               </Form.Item>

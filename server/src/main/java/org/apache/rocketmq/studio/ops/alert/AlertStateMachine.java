@@ -30,7 +30,12 @@ public class AlertStateMachine {
             throw new IllegalArgumentException("requiredConsecutiveSamples must be positive");
         }
         AlertRuleState state = previous == null ? AlertRuleState.initial() : previous;
-        if (!evaluation.matches() || evaluation.availability() != MetricAvailability.AVAILABLE) {
+        if (!evaluation.matches()) {
+            return new AlertStateUpdate(state, AlertStateTransition.NONE);
+        }
+        // A regular metric must not clear an alert merely because collection failed. The explicit
+        // UNAVAILABLE condition is the sole opt-in path that turns a failed probe into a firing alert.
+        if (evaluation.availability() != MetricAvailability.AVAILABLE && !evaluation.conditionMet()) {
             return new AlertStateUpdate(state, AlertStateTransition.NONE);
         }
         if (evaluation.conditionMet()) {

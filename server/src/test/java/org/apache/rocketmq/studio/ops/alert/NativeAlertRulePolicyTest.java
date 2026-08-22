@@ -50,6 +50,19 @@ class NativeAlertRulePolicyTest {
     }
 
     @Test
+    void acceptsExplicitUnavailableAvailabilityRule() {
+        assertThatCode(() -> NativeAlertRulePolicy.validate(rule(AlertDomain.CLUSTER, "broker.availability")
+                .instanceId("local").operator("UNAVAILABLE").build())).doesNotThrowAnyException();
+    }
+
+    @Test
+    void rejectsUnavailableForNonAvailabilityMetric() {
+        assertThatThrownBy(() -> NativeAlertRulePolicy.validate(rule(AlertDomain.CLUSTER,
+                "broker.disk.usage_ratio").instanceId("local").operator("UNAVAILABLE").build()))
+                .isInstanceOf(BusinessException.class).hasMessageContaining("only supported");
+    }
+
+    @Test
     void leavesLegacyPrometheusRulesCompatible() {
         assertThatCode(() -> NativeAlertRulePolicy.validate(rule(AlertDomain.BUSINESS,
                 "rocketmq_consumer_lag_messages").build())).doesNotThrowAnyException();

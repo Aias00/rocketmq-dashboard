@@ -36,6 +36,8 @@ final class NativeAlertRulePolicy {
             "dlq.message.count", AlertDomain.BUSINESS);
     private static final Set<String> GROUP_SCOPED_METRICS = Set.of(
             "consumer.lag.total", "consumer.lag.max_queue", "dlq.message.count");
+    private static final Set<String> AVAILABILITY_METRICS = Set.of(
+            "nameserver.availability", "broker.availability", "proxy.availability");
 
     private NativeAlertRulePolicy() {
     }
@@ -54,6 +56,9 @@ final class NativeAlertRulePolicy {
         }
         if (!StringUtils.hasText(rule.getInstanceId())) {
             throw new BusinessException(400, "instanceId is required for native alert rules");
+        }
+        if ("UNAVAILABLE".equals(rule.getOperator()) && !AVAILABILITY_METRICS.contains(rule.getMetric())) {
+            throw new BusinessException(400, "UNAVAILABLE is only supported for native availability metrics");
         }
         if (StringUtils.hasText(rule.getConsumerGroup()) && !GROUP_SCOPED_METRICS.contains(rule.getMetric())) {
             throw new BusinessException(400, "consumerGroup is not supported for metric " + rule.getMetric());

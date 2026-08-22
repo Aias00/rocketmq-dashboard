@@ -33,7 +33,9 @@ public class AlertRuleEvaluator {
             return new AlertEvaluationResult(false, false, null, sample == null ? null : sample.availability());
         }
         if (sample.availability() != MetricAvailability.AVAILABLE) {
-            return new AlertEvaluationResult(true, false, null, sample.availability());
+            boolean unavailableCondition = sample.availability() == MetricAvailability.UNAVAILABLE
+                    && "UNAVAILABLE".equals(rule.getOperator());
+            return new AlertEvaluationResult(true, unavailableCondition, null, sample.availability());
         }
         double value = sample.value();
         return new AlertEvaluationResult(true, compare(value, rule.getOperator(), rule.getThreshold()), value,

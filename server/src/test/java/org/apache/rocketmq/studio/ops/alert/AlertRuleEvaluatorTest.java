@@ -53,6 +53,20 @@ class AlertRuleEvaluatorTest {
     }
 
     @Test
+    void explicitlyTriggersAvailabilityRuleForUnavailableSample() {
+        AlertRuleVO rule = AlertRuleVO.builder().domain(AlertDomain.CLUSTER).metric("broker.availability")
+                .operator("UNAVAILABLE").enabled(true).build();
+        MetricSample sample = new MetricSample("broker.availability", AlertDomain.CLUSTER, "local", null, null,
+                null, MetricAvailability.UNAVAILABLE, Instant.now());
+
+        AlertEvaluationResult result = evaluator.evaluate(rule, sample);
+
+        assertThat(result.matches()).isTrue();
+        assertThat(result.conditionMet()).isTrue();
+        assertThat(result.currentValue()).isNull();
+    }
+
+    @Test
     void doesNotMatchOtherRuleDomain() {
         AlertRuleVO rule = AlertRuleVO.builder().domain(AlertDomain.BUSINESS).metric("broker.disk.usage_ratio")
                 .operator(">=").threshold(0.85).enabled(true).build();

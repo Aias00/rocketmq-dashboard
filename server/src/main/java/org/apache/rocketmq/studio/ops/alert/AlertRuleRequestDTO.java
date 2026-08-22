@@ -29,7 +29,7 @@ public class AlertRuleRequestDTO {
     @NotBlank(message = "name is required")
     private String name;
     private String metric;
-    @Pattern(regexp = ">|>=|<|<=|==|!=", message = "operator is invalid")
+    @Pattern(regexp = ">|>=|<|<=|==|!=|UNAVAILABLE", message = "operator is invalid")
     private String operator;
     private double threshold;
     private String thresholdUnit;

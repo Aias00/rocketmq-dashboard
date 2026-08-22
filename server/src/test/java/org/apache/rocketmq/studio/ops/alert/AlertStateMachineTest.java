@@ -60,6 +60,17 @@ class AlertStateMachineTest {
         assertThat(update.state()).isEqualTo(firing);
     }
 
+    @Test
+    void firesForExplicitUnavailableCondition() {
+        AlertEvaluationResult unavailable = new AlertEvaluationResult(true, true, null,
+                MetricAvailability.UNAVAILABLE);
+
+        AlertStateUpdate update = stateMachine.advance(null, unavailable, 1, now);
+
+        assertThat(update.transition()).isEqualTo(AlertStateTransition.FIRING);
+        assertThat(update.state().status()).isEqualTo(AlertStateStatus.FIRING);
+    }
+
     private static AlertEvaluationResult met() {
         return new AlertEvaluationResult(true, true, 0.9, MetricAvailability.AVAILABLE);
     }
