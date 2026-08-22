@@ -161,6 +161,14 @@ describe('Ops API - Alert Rules', () => {
     await createAlertRule({ name: 'TestAlert', metric: 'memory', operator: '>', threshold: 90 });
   });
 
+  it('routes business alert rules to the business rule API', async () => {
+    mock.onGet('/alert-rules').reply(200, { code: 200, data: [] });
+    mock.onPost('/alert-rules/create').reply(200, { code: 200, data: { id: 2 } });
+
+    await expect(listAlertRules('BUSINESS')).resolves.toEqual([]);
+    await expect(createAlertRule({ name: 'Lag' }, 'BUSINESS')).resolves.toEqual({ id: 2 });
+  });
+
   it('updates an alert rule', async () => {
     mock.onPost('/cluster-alert-rules/update').reply((config) => {
       const body = JSON.parse(config.data);

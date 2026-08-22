@@ -37,7 +37,7 @@ import {
 import type { ColumnsType, TableRowSelection } from 'antd/es/table/interface';
 import PageHeader from '../../components/PageHeader';
 import { useLang } from '../../i18n/LangContext';
-import type { AlertRule, AlertRuleTestResult } from '../../api/ops';
+import type { AlertRule, AlertRuleDomain, AlertRuleTestResult } from '../../api/ops';
 import {
   createAlertRule,
   bulkDeleteAlertRules,
@@ -57,15 +57,25 @@ const channelColors: Record<string, string> = {
   sms: 'orange',
 };
 
-const metricOptions = [
+const clusterMetricOptions = [
   { label: 'NameServer availability', value: 'nameserver.availability' },
   { label: 'Broker availability', value: 'broker.availability' },
   { label: 'Broker disk usage ratio', value: 'broker.disk.usage_ratio' },
 ];
 
+const businessMetricOptions = [
+  { label: 'Consumer lag total', value: 'consumer.lag.total' },
+  { label: 'Consumer lag max queue', value: 'consumer.lag.max_queue' },
+  { label: 'DLQ message count', value: 'dlq.message.count' },
+];
+
 const durationOptions = ['1m', '5m', '15m', '30m'];
 
-const AlertsPage = () => {
+interface AlertsPageProps {
+  domain?: AlertRuleDomain;
+}
+
+const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
   const { t } = useLang();
   const { token } = theme.useToken();
   const [rules, setRules] = useState<AlertRule[]>([]);
@@ -79,6 +89,7 @@ const AlertsPage = () => {
   const [selectedRuleIds, setSelectedRuleIds] = useState<Key[]>([]);
   const [bulkAction, setBulkAction] = useState<'enable' | 'disable' | 'delete' | null>(null);
   const [form] = Form.useForm();
+  const metricOptions = domain === 'BUSINESS' ? businessMetricOptions : clusterMetricOptions;
 
   const channelLabels: Record<string, string> = {
     dingtalk: 'DingTalk',
@@ -89,7 +100,7 @@ const AlertsPage = () => {
   useEffect(() => {
     let cancelled = false;
 
-    void listAlertRules()
+    void (domain === 'CLUSTER' ? listAlertRules() : listAlertRules(domain))
       .then((nextRules) => {
         if (!cancelled) setRules(nextRules);
       })
@@ -103,7 +114,7 @@ const AlertsPage = () => {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [domain]);
 
   const enabledCount = rules.filter((r) => r.enabled).length;
   const selectedCount = selectedRuleIds.length;
@@ -133,7 +144,9 @@ const AlertsPage = () => {
     if (isActionRunning) return;
     setActionId(`toggle-${rule.id}`);
     try {
-      const updated = await toggleAlertRule(rule.id, enabled);
+      const updated = await (domain === 'CLUSTER'
+        ? toggleAlertRule(rule.id, enabled)
+        : toggleAlertRule(rule.id, enabled, domain));
       setRules((previous) => previous.map((item) => (item.id === rule.id ? updated : item)));
     } catch {
       message.error('更新告警规则状态失败，请稍后重试');
@@ -146,7 +159,7 @@ const AlertsPage = () => {
     if (isActionRunning) return;
     setActionId(`delete-${rule.id}`);
     try {
-      await deleteAlertRule(rule.id);
+      await (domain === 'CLUSTER' ? deleteAlertRule(rule.id) : deleteAlertRule(rule.id, domain));
       setRules((previous) => previous.filter((item) => item.id !== rule.id));
       setSelectedRuleIds((previous) => previous.filter((id) => id !== rule.id));
       message.success('告警规则已删除');
@@ -163,7 +176,9 @@ const AlertsPage = () => {
 
     setBulkAction(enabled ? 'enable' : 'disable');
     try {
-      const result = await bulkToggleAlertRules(targetIds, enabled);
+      const result = await (domain === 'CLUSTER'
+        ? bulkToggleAlertRules(targetIds, enabled)
+        : bulkToggleAlertRules(targetIds, enabled, domain));
       const updatedRules = new Map(result.updatedRules.map((rule) => [rule.id, rule]));
       const failedIds = Object.keys(result.failures);
 
@@ -213,7 +228,9 @@ const AlertsPage = () => {
       onOk: async () => {
         setBulkAction('delete');
         try {
-          const result = await bulkDeleteAlertRules(targetIds);
+          const result = await (domain === 'CLUSTER'
+            ? bulkDeleteAlertRules(targetIds)
+            : bulkDeleteAlertRules(targetIds, domain));
           const succeeded = new Set(result.succeededIds);
           const failedIds = Object.keys(result.failures);
           setRules((previous) => previous.filter((rule) => !succeeded.has(rule.id)));
@@ -337,13 +354,17 @@ const AlertsPage = () => {
       const payload = values as Partial<AlertRule>;
       setSubmitting(true);
       if (editingRule) {
-        const updated = await updateAlertRule({ ...editingRule, ...payload });
+        const updated = await (domain === 'CLUSTER'
+          ? updateAlertRule({ ...editingRule, ...payload })
+          : updateAlertRule({ ...editingRule, ...payload }, domain));
         setRules((previous) =>
           previous.map((rule) => (rule.id === editingRule.id ? updated : rule)),
         );
         message.success('告警规则已更新');
       } else {
-        const created = await createAlertRule(payload);
+        const created = await (domain === 'CLUSTER'
+          ? createAlertRule(payload)
+          : createAlertRule(payload, domain));
         setRules((previous) => [...previous, created]);
         message.success(t('alerts.ruleCreated'));
       }
@@ -363,7 +384,9 @@ const AlertsPage = () => {
     try {
       const values = (await form.validateFields()) as Partial<AlertRule>;
       setTesting(true);
-      const result = await testAlertRule(values);
+      const result = await (domain === 'CLUSTER'
+        ? testAlertRule(values)
+        : testAlertRule(values, domain));
       setTestResult(result);
       if (result.samples.length === 0) {
         message.warning('未采集到匹配样本，请检查实例和指标作用域');
@@ -635,7 +658,6 @@ const AlertsPage = () => {
             <Checkbox.Group
               options={[
                 { label: 'DingTalk', value: 'dingtalk' },
-                { label: 'Email', value: 'email' },
                 { label: 'SMS', value: 'sms' },
               ]}
             />

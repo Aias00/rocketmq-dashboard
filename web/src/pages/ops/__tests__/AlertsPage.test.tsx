@@ -91,11 +91,11 @@ function cloneRule(rule: AlertRule): AlertRule {
   };
 }
 
-function renderPage() {
+function renderPage(domain?: 'BUSINESS' | 'CLUSTER') {
   return render(
     <App>
       <LangProvider>
-        <AlertsPage />
+        <AlertsPage domain={domain} />
       </LangProvider>
     </App>,
   );
@@ -156,6 +156,19 @@ describe('AlertsPage', () => {
     );
     expect(within(getRuleRow('Broker disk usage')).getByRole('checkbox')).not.toBeChecked();
     expect(within(getRuleRow('Consumer lag')).getByRole('checkbox')).not.toBeChecked();
+  });
+
+  it('uses the business rule API and exposes only business metrics', async () => {
+    const user = userEvent.setup();
+    renderPage('BUSINESS');
+
+    await screen.findByText('Broker disk usage');
+    expect(listAlertRules).toHaveBeenCalledWith('BUSINESS');
+    await user.click(screen.getByRole('button', { name: '新建规则' }));
+    await user.click(screen.getByRole('combobox', { name: '监控指标' }));
+
+    expect(await screen.findByText('Consumer lag total')).toBeInTheDocument();
+    expect(screen.queryByText('Broker disk usage ratio')).not.toBeInTheDocument();
   });
 
   it('keeps only failed alert rules selected after a partial bulk failure', async () => {

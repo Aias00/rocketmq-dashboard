@@ -18,6 +18,8 @@ export interface AlertRule {
   consecutiveSamples?: number;
 }
 
+export type AlertRuleDomain = 'BUSINESS' | 'CLUSTER';
+
 export interface AlertRuleBulkResult {
   succeededIds: number[];
   failures: Record<string, string>;
@@ -122,50 +124,73 @@ export interface AuditQuery {
 }
 
 // ─── Alert Rules ────────────────────────────────────────────────
-export async function listAlertRules() {
-  const res = await client.get<{ data: AlertRule[] }>('/cluster-alert-rules');
+const alertRulePath = (domain: AlertRuleDomain) =>
+  domain === 'BUSINESS' ? '/alert-rules' : '/cluster-alert-rules';
+
+export async function listAlertRules(domain: AlertRuleDomain = 'CLUSTER') {
+  const res = await client.get<{ data: AlertRule[] }>(alertRulePath(domain));
   return res.data.data;
 }
 
-export async function createAlertRule(data: Partial<AlertRule>) {
-  const res = await client.post<{ data: AlertRule }>('/cluster-alert-rules/create', data);
+export async function createAlertRule(
+  data: Partial<AlertRule>,
+  domain: AlertRuleDomain = 'CLUSTER',
+) {
+  const res = await client.post<{ data: AlertRule }>(`${alertRulePath(domain)}/create`, data);
   return res.data.data;
 }
 
-export async function updateAlertRule(data: AlertRule) {
-  const res = await client.post<{ data: AlertRule }>('/cluster-alert-rules/update', data);
+export async function updateAlertRule(data: AlertRule, domain: AlertRuleDomain = 'CLUSTER') {
+  const res = await client.post<{ data: AlertRule }>(`${alertRulePath(domain)}/update`, data);
   return res.data.data;
 }
 
-export async function toggleAlertRule(id: number, enabled: boolean) {
-  const res = await client.post<{ data: AlertRule }>('/cluster-alert-rules/toggle', {
+export async function toggleAlertRule(
+  id: number,
+  enabled: boolean,
+  domain: AlertRuleDomain = 'CLUSTER',
+) {
+  const res = await client.post<{ data: AlertRule }>(`${alertRulePath(domain)}/toggle`, {
     id,
     enabled,
   });
   return res.data.data;
 }
 
-export async function deleteAlertRule(id: number) {
-  await client.post('/cluster-alert-rules/delete', { id });
+export async function deleteAlertRule(id: number, domain: AlertRuleDomain = 'CLUSTER') {
+  await client.post(`${alertRulePath(domain)}/delete`, { id });
 }
 
-export async function bulkToggleAlertRules(ids: number[], enabled: boolean) {
-  const res = await client.post<{ data: AlertRuleBulkResult }>('/cluster-alert-rules/bulk-toggle', {
-    ids,
-    enabled,
-  });
+export async function bulkToggleAlertRules(
+  ids: number[],
+  enabled: boolean,
+  domain: AlertRuleDomain = 'CLUSTER',
+) {
+  const res = await client.post<{ data: AlertRuleBulkResult }>(
+    `${alertRulePath(domain)}/bulk-toggle`,
+    {
+      ids,
+      enabled,
+    },
+  );
   return res.data.data;
 }
 
-export async function bulkDeleteAlertRules(ids: number[]) {
-  const res = await client.post<{ data: AlertRuleBulkResult }>('/cluster-alert-rules/bulk-delete', {
-    ids,
-  });
+export async function bulkDeleteAlertRules(ids: number[], domain: AlertRuleDomain = 'CLUSTER') {
+  const res = await client.post<{ data: AlertRuleBulkResult }>(
+    `${alertRulePath(domain)}/bulk-delete`,
+    {
+      ids,
+    },
+  );
   return res.data.data;
 }
 
-export async function testAlertRule(data: Partial<AlertRule>) {
-  const res = await client.post<{ data: AlertRuleTestResult }>('/cluster-alert-rules/test', data);
+export async function testAlertRule(data: Partial<AlertRule>, domain: AlertRuleDomain = 'CLUSTER') {
+  const res = await client.post<{ data: AlertRuleTestResult }>(
+    `${alertRulePath(domain)}/test`,
+    data,
+  );
   return res.data.data;
 }
 

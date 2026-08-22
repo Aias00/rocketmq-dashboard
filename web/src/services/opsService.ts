@@ -5,6 +5,7 @@ import * as opsApi from '../api/ops';
 import type {
   AlertRule,
   AlertRuleBulkResult,
+  AlertRuleDomain,
   AlertRuleTestResult,
   CollectorStatus,
   SystemAlert,
@@ -103,12 +104,15 @@ function formatAuditCsv(records: AuditRecord[]): string {
   return `\uFEFF${header}${rows.length > 0 ? `${rows.join('\r\n')}\r\n` : ''}`;
 }
 
-export async function listAlertRules(): Promise<AlertRule[]> {
+export async function listAlertRules(domain: AlertRuleDomain = 'CLUSTER'): Promise<AlertRule[]> {
   if (isMockMode()) return alertRulesState.map(copyAlertRule);
-  return opsApi.listAlertRules();
+  return opsApi.listAlertRules(domain);
 }
 
-export async function createAlertRule(data: Partial<AlertRule>): Promise<AlertRule> {
+export async function createAlertRule(
+  data: Partial<AlertRule>,
+  domain: AlertRuleDomain = 'CLUSTER',
+): Promise<AlertRule> {
   if (isMockMode()) {
     const rule: AlertRule = {
       id: Date.now(),
@@ -127,10 +131,13 @@ export async function createAlertRule(data: Partial<AlertRule>): Promise<AlertRu
     alertRulesState.push(rule);
     return copyAlertRule(rule);
   }
-  return opsApi.createAlertRule(data);
+  return opsApi.createAlertRule(data, domain);
 }
 
-export async function updateAlertRule(data: AlertRule): Promise<AlertRule> {
+export async function updateAlertRule(
+  data: AlertRule,
+  domain: AlertRuleDomain = 'CLUSTER',
+): Promise<AlertRule> {
   if (isMockMode()) {
     const index = alertRulesState.findIndex((rule) => rule.id === data.id);
     if (index < 0) throw new Error(`Alert rule not found: ${data.id}`);
@@ -138,33 +145,41 @@ export async function updateAlertRule(data: AlertRule): Promise<AlertRule> {
     alertRulesState[index] = rule;
     return copyAlertRule(rule);
   }
-  return opsApi.updateAlertRule(data);
+  return opsApi.updateAlertRule(data, domain);
 }
 
-export async function toggleAlertRule(id: number, enabled: boolean): Promise<AlertRule> {
+export async function toggleAlertRule(
+  id: number,
+  enabled: boolean,
+  domain: AlertRuleDomain = 'CLUSTER',
+): Promise<AlertRule> {
   if (isMockMode()) {
     const rule = alertRulesState.find((item) => item.id === id);
     if (!rule) throw new Error(`Alert rule not found: ${id}`);
     rule.enabled = enabled;
     return copyAlertRule(rule);
   }
-  return opsApi.toggleAlertRule(id, enabled);
+  return opsApi.toggleAlertRule(id, enabled, domain);
 }
 
-export async function deleteAlertRule(id: number): Promise<void> {
+export async function deleteAlertRule(
+  id: number,
+  domain: AlertRuleDomain = 'CLUSTER',
+): Promise<void> {
   if (isMockMode()) {
     const idx = alertRulesState.findIndex((rule) => rule.id === id);
     if (idx >= 0) alertRulesState.splice(idx, 1);
     return;
   }
-  return opsApi.deleteAlertRule(id);
+  return opsApi.deleteAlertRule(id, domain);
 }
 
 export async function bulkToggleAlertRules(
   ids: number[],
   enabled: boolean,
+  domain: AlertRuleDomain = 'CLUSTER',
 ): Promise<AlertRuleBulkResult> {
-  if (!isMockMode()) return opsApi.bulkToggleAlertRules(ids, enabled);
+  if (!isMockMode()) return opsApi.bulkToggleAlertRules(ids, enabled, domain);
   const succeededIds: number[] = [];
   const failures: Record<string, string> = {};
   const updatedRules: AlertRule[] = [];
@@ -181,8 +196,11 @@ export async function bulkToggleAlertRules(
   return { succeededIds, failures, updatedRules };
 }
 
-export async function bulkDeleteAlertRules(ids: number[]): Promise<AlertRuleBulkResult> {
-  if (!isMockMode()) return opsApi.bulkDeleteAlertRules(ids);
+export async function bulkDeleteAlertRules(
+  ids: number[],
+  domain: AlertRuleDomain = 'CLUSTER',
+): Promise<AlertRuleBulkResult> {
+  if (!isMockMode()) return opsApi.bulkDeleteAlertRules(ids, domain);
   const succeededIds: number[] = [];
   const failures: Record<string, string> = {};
   for (const id of [...new Set(ids)]) {
@@ -197,9 +215,12 @@ export async function bulkDeleteAlertRules(ids: number[]): Promise<AlertRuleBulk
   return { succeededIds, failures, updatedRules: [] };
 }
 
-export async function testAlertRule(data: Partial<AlertRule>): Promise<AlertRuleTestResult> {
+export async function testAlertRule(
+  data: Partial<AlertRule>,
+  domain: AlertRuleDomain = 'CLUSTER',
+): Promise<AlertRuleTestResult> {
   if (isMockMode()) return { samples: [] };
-  return opsApi.testAlertRule(data);
+  return opsApi.testAlertRule(data, domain);
 }
 
 export async function listSystemAlerts(): Promise<SystemAlert[]> {
