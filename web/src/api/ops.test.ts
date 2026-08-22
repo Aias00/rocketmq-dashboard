@@ -37,6 +37,9 @@ import {
   acknowledgeAlert,
   clearAcknowledgedAlerts,
   listAlertDeliveries,
+  listAlertSilences,
+  createAlertSilence,
+  deleteAlertSilence,
   listAuditRecords,
   cleanupAuditLogs,
 } from './ops';
@@ -269,6 +272,21 @@ describe('Ops API - System Alerts & Audit', () => {
     await expect(listAlertDeliveries(1)).resolves.toEqual([
       { channel: 'dingtalk', status: 'DELIVERED', attemptCount: 1 },
     ]);
+  });
+
+  it('manages alert silences', async () => {
+    const silence = {
+      id: 2,
+      startsAt: '2026-08-22T10:00',
+      endsAt: '2026-08-22T11:00',
+      createdBy: 'admin',
+    };
+    mock.onGet('/alert-silences').reply(200, { code: 200, data: [silence] });
+    mock.onPost('/alert-silences').reply(200, { code: 200, data: silence });
+    mock.onDelete('/alert-silences/2').reply(200, { code: 200 });
+    await expect(listAlertSilences()).resolves.toEqual([silence]);
+    await expect(createAlertSilence(silence)).resolves.toEqual(silence);
+    await expect(deleteAlertSilence(2)).resolves.toBeUndefined();
   });
 
   it('lists audit records with params', async () => {

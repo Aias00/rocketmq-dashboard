@@ -74,6 +74,19 @@ export interface NotificationDelivery {
   deliveredAt?: string | null;
 }
 
+export interface AlertSilence {
+  id: number;
+  domain?: 'BUSINESS' | 'CLUSTER' | null;
+  ruleId?: number | null;
+  instanceId?: string | null;
+  startsAt: string;
+  endsAt: string;
+  reason?: string | null;
+  createdBy: string;
+}
+
+export type CreateAlertSilence = Omit<AlertSilence, 'id' | 'createdBy'>;
+
 // Matches mock/audit.ts (inferred from data)
 export interface AuditRecord {
   id: number;
@@ -185,6 +198,20 @@ export async function clearAcknowledgedAlerts() {
 export async function listAlertDeliveries(id: number) {
   const res = await client.get<{ data: NotificationDelivery[] }>(`/system-alerts/${id}/deliveries`);
   return res.data.data;
+}
+
+export async function listAlertSilences() {
+  const res = await client.get<{ data: AlertSilence[] }>('/alert-silences');
+  return res.data.data;
+}
+
+export async function createAlertSilence(data: CreateAlertSilence) {
+  const res = await client.post<{ data: AlertSilence }>('/alert-silences', data);
+  return res.data.data;
+}
+
+export async function deleteAlertSilence(id: number) {
+  await client.delete(`/alert-silences/${id}`);
 }
 
 // ─── Audit Logs ─────────────────────────────────────────────────

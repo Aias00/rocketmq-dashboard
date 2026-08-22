@@ -13,6 +13,8 @@ import type {
   AuditRecord,
   PageResult,
   NotificationDelivery,
+  AlertSilence,
+  CreateAlertSilence,
 } from '../api/ops';
 import { mockAlertRules } from '../mock/alerts';
 import { mockAuditRecords } from '../mock/audit';
@@ -20,6 +22,7 @@ import { systemAlerts as mockSystemAlerts } from '../mock/dashboard';
 
 let auditRecordsState = mockAuditRecords as unknown as AuditRecord[];
 const alertRulesState = mockAlertRules as unknown as AlertRule[];
+let alertSilencesState: AlertSilence[] = [];
 
 function copyAlertRule(rule: AlertRule): AlertRule {
   return {
@@ -262,6 +265,23 @@ export async function clearAcknowledgedAlerts(): Promise<number> {
 export async function listAlertDeliveries(id: number): Promise<NotificationDelivery[]> {
   if (isMockMode()) return [];
   return opsApi.listAlertDeliveries(id);
+}
+
+export async function listAlertSilences(): Promise<AlertSilence[]> {
+  if (isMockMode()) return alertSilencesState.map((silence) => ({ ...silence }));
+  return opsApi.listAlertSilences();
+}
+
+export async function createAlertSilence(data: CreateAlertSilence): Promise<AlertSilence> {
+  if (!isMockMode()) return opsApi.createAlertSilence(data);
+  const silence = { ...data, id: Date.now(), createdBy: 'admin' } as AlertSilence;
+  alertSilencesState = [silence, ...alertSilencesState];
+  return silence;
+}
+
+export async function deleteAlertSilence(id: number): Promise<void> {
+  if (!isMockMode()) return opsApi.deleteAlertSilence(id);
+  alertSilencesState = alertSilencesState.filter((silence) => silence.id !== id);
 }
 
 export async function listAuditRecords(params: AuditQuery = {}): Promise<PageResult<AuditRecord>> {
