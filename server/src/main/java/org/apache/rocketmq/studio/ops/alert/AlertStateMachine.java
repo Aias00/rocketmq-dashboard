@@ -20,14 +20,23 @@ import org.apache.rocketmq.studio.cluster.metrics.MetricAvailability;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
+import java.time.Duration;
 
 @Component
 public class AlertStateMachine {
 
     public AlertStateUpdate advance(AlertRuleState previous, AlertEvaluationResult evaluation,
             int requiredConsecutiveSamples, Instant now) {
+        return advance(previous, evaluation, requiredConsecutiveSamples, Duration.ZERO, now);
+    }
+
+    public AlertStateUpdate advance(AlertRuleState previous, AlertEvaluationResult evaluation,
+            int requiredConsecutiveSamples, Duration requiredDuration, Instant now) {
         if (requiredConsecutiveSamples < 1) {
             throw new IllegalArgumentException("requiredConsecutiveSamples must be positive");
+        }
+        if (requiredDuration == null || requiredDuration.isNegative()) {
+            throw new IllegalArgumentException("requiredDuration must not be negative");
         }
         AlertRuleState state = previous == null ? AlertRuleState.initial() : previous;
         if (!evaluation.matches()) {
@@ -39,19 +48,20 @@ public class AlertStateMachine {
             return new AlertStateUpdate(state, AlertStateTransition.NONE);
         }
         if (evaluation.conditionMet()) {
-            return advanceHit(state, evaluation.currentValue(), requiredConsecutiveSamples, now);
+            return advanceHit(state, evaluation.currentValue(), requiredConsecutiveSamples, requiredDuration, now);
         }
         return advanceClear(state, evaluation.currentValue(), now);
     }
 
-    private AlertStateUpdate advanceHit(AlertRuleState state, Double value, int required, Instant now) {
+    private AlertStateUpdate advanceHit(AlertRuleState state, Double value, int required, Duration duration,
+            Instant now) {
         if (state.status() == AlertStateStatus.FIRING || state.status() == AlertStateStatus.ACKED) {
             return new AlertStateUpdate(new AlertRuleState(state.status(), state.consecutiveHits(), value,
                     state.firstPendingAt(), state.firedAt(), null), AlertStateTransition.NONE);
         }
         int hits = state.consecutiveHits() + 1;
         Instant pendingAt = state.firstPendingAt() == null ? now : state.firstPendingAt();
-        if (hits < required) {
+        if (hits < required || now.isBefore(pendingAt.plus(duration))) {
             return new AlertStateUpdate(new AlertRuleState(AlertStateStatus.PENDING, hits, value, pendingAt,
                     null, null), AlertStateTransition.PENDING);
         }

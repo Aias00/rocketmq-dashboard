@@ -20,6 +20,7 @@ import org.apache.rocketmq.studio.cluster.metrics.MetricAvailability;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
+import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -69,6 +70,19 @@ class AlertStateMachineTest {
 
         assertThat(update.transition()).isEqualTo(AlertStateTransition.FIRING);
         assertThat(update.state().status()).isEqualTo(AlertStateStatus.FIRING);
+    }
+
+    @Test
+    void waitsForTheConfiguredDurationAfterTheFirstMatchingSample() {
+        AlertStateUpdate pending = stateMachine.advance(null, met(), 1, Duration.ofMinutes(5), now);
+        AlertStateUpdate stillPending = stateMachine.advance(pending.state(), met(), 1, Duration.ofMinutes(5),
+                now.plusSeconds(299));
+        AlertStateUpdate firing = stateMachine.advance(stillPending.state(), met(), 1, Duration.ofMinutes(5),
+                now.plusSeconds(300));
+
+        assertThat(pending.transition()).isEqualTo(AlertStateTransition.PENDING);
+        assertThat(stillPending.transition()).isEqualTo(AlertStateTransition.PENDING);
+        assertThat(firing.transition()).isEqualTo(AlertStateTransition.FIRING);
     }
 
     private static AlertEvaluationResult met() {

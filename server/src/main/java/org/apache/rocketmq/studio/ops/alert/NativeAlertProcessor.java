@@ -52,7 +52,8 @@ public class NativeAlertProcessor {
                 AlertStateKey key = new AlertStateKey(rule.getId(),
                         AlertFingerprint.of(rule.getId(), sample.instanceId(), sample.labels()));
                 AlertStateUpdate update = stateMachine.advance(stateRepository.find(key).orElse(null), evaluation,
-                        Math.max(1, rule.getConsecutiveSamples()), sample.collectedAt());
+                        Math.max(1, rule.getConsecutiveSamples()), AlertRuleDuration.parse(rule.getDuration()),
+                        sample.collectedAt());
                 stateRepository.save(key, update.state());
                 if (update.transition() == AlertStateTransition.FIRING || update.transition() == AlertStateTransition.RESOLVED) {
                     SystemAlertVO event = alertRepository.saveAlert(SystemAlertVO.builder().level(level(rule.getSeverity()))
