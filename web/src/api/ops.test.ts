@@ -36,6 +36,7 @@ import {
   listSystemAlertsPage,
   acknowledgeAlert,
   clearAcknowledgedAlerts,
+  listAlertDeliveries,
   listAuditRecords,
   cleanupAuditLogs,
 } from './ops';
@@ -258,6 +259,16 @@ describe('Ops API - System Alerts & Audit', () => {
   it('clears acknowledged alerts', async () => {
     mock.onPost('/system-alerts/clear-acknowledged').reply(200, { code: 200 });
     await clearAcknowledgedAlerts();
+  });
+
+  it('lists delivery state for an alert event', async () => {
+    mock.onGet('/system-alerts/1/deliveries').reply(200, {
+      code: 200,
+      data: [{ channel: 'dingtalk', status: 'DELIVERED', attemptCount: 1 }],
+    });
+    await expect(listAlertDeliveries(1)).resolves.toEqual([
+      { channel: 'dingtalk', status: 'DELIVERED', attemptCount: 1 },
+    ]);
   });
 
   it('lists audit records with params', async () => {

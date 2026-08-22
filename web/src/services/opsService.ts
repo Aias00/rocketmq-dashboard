@@ -12,6 +12,7 @@ import type {
   AuditQuery,
   AuditRecord,
   PageResult,
+  NotificationDelivery,
 } from '../api/ops';
 import { mockAlertRules } from '../mock/alerts';
 import { mockAuditRecords } from '../mock/audit';
@@ -256,6 +257,11 @@ export async function clearAcknowledgedAlerts(): Promise<number> {
   }
   const result = await opsApi.clearAcknowledgedAlerts();
   return result.cleared;
+}
+
+export async function listAlertDeliveries(id: number): Promise<NotificationDelivery[]> {
+  if (isMockMode()) return [];
+  return opsApi.listAlertDeliveries(id);
 }
 
 export async function listAuditRecords(params: AuditQuery = {}): Promise<PageResult<AuditRecord>> {

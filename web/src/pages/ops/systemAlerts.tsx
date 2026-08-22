@@ -16,7 +16,18 @@
  */
 
 import { useEffect, useState } from 'react';
-import { Card, Tag, Flex, Typography, Badge, Button, message, Pagination, Select } from 'antd';
+import {
+  Card,
+  Tag,
+  Flex,
+  Typography,
+  Badge,
+  Button,
+  message,
+  Pagination,
+  Select,
+  Spin,
+} from 'antd';
 import { CheckCircle, Trash } from '@phosphor-icons/react';
 import PageHeader from '../../components/PageHeader';
 import { useLang } from '../../i18n/LangContext';
@@ -24,9 +35,10 @@ import {
   acknowledgeAlert,
   clearAcknowledgedAlerts,
   getCollectorStatus,
+  listAlertDeliveries,
   listSystemAlertsPage,
 } from '../../services/opsService';
-import type { CollectorStatus, PageResult, SystemAlert } from '../../api/ops';
+import type { CollectorStatus, NotificationDelivery, PageResult, SystemAlert } from '../../api/ops';
 
 const { Text } = Typography;
 
@@ -53,6 +65,8 @@ const SystemAlertsPage = () => {
   const pageSize = 20;
   const [acknowledgingIds, setAcknowledgingIds] = useState<Set<number>>(() => new Set());
   const [clearing, setClearing] = useState(false);
+  const [deliveries, setDeliveries] = useState<Record<number, NotificationDelivery[]>>({});
+  const [loadingDeliveries, setLoadingDeliveries] = useState<Set<number>>(() => new Set());
 
   useEffect(() => {
     let cancelled = false;
@@ -117,6 +131,23 @@ const SystemAlertsPage = () => {
       message.error('清理已确认告警失败，请稍后重试');
     } finally {
       setClearing(false);
+    }
+  };
+
+  const loadDeliveries = async (alertId: number) => {
+    if (deliveries[alertId] || loadingDeliveries.has(alertId)) return;
+    setLoadingDeliveries((current) => new Set(current).add(alertId));
+    try {
+      const result = await listAlertDeliveries(alertId);
+      setDeliveries((current) => ({ ...current, [alertId]: result }));
+    } catch {
+      message.error('通知投递记录加载失败，请稍后重试');
+    } finally {
+      setLoadingDeliveries((current) => {
+        const next = new Set(current);
+        next.delete(alertId);
+        return next;
+      });
     }
   };
 
@@ -256,11 +287,37 @@ const SystemAlertsPage = () => {
                       {alert.currentValue != null ? ` · ${alert.currentValue}` : ''}
                     </Text>
                   )}
+                  {loadingDeliveries.has(alert.id) && <Spin size="small" />}
+                  {deliveries[alert.id] && (
+                    <Flex gap={6} wrap="wrap" style={{ marginTop: 6 }}>
+                      {deliveries[alert.id].length === 0 && (
+                        <Text type="secondary">未配置通知通道</Text>
+                      )}
+                      {deliveries[alert.id].map((delivery) => (
+                        <Tag
+                          key={delivery.channel}
+                          color={
+                            delivery.status === 'DELIVERED'
+                              ? 'success'
+                              : delivery.status === 'FAILED'
+                                ? 'error'
+                                : 'processing'
+                          }
+                        >
+                          {delivery.channel}: {delivery.status} ({delivery.attemptCount})
+                          {delivery.lastError ? ` - ${delivery.lastError}` : ''}
+                        </Tag>
+                      ))}
+                    </Flex>
+                  )}
                 </div>
                 <Flex align="center" gap={8} style={{ flexShrink: 0 }}>
                   <Text type="secondary" style={{ fontSize: 14 }}>
                     {alert.time}
                   </Text>
+                  <Button size="small" type="link" onClick={() => void loadDeliveries(alert.id)}>
+                    通知
+                  </Button>
                   {!alert.acknowledged && (
                     <Button
                       size="small"

@@ -65,6 +65,15 @@ export interface SystemAlertQuery {
   pageSize?: number;
 }
 
+export interface NotificationDelivery {
+  channel: string;
+  status: 'PENDING' | 'SENDING' | 'DELIVERED' | 'RETRY_WAIT' | 'FAILED';
+  attemptCount: number;
+  nextAttemptAt?: string | null;
+  lastError?: string | null;
+  deliveredAt?: string | null;
+}
+
 // Matches mock/audit.ts (inferred from data)
 export interface AuditRecord {
   id: number;
@@ -170,6 +179,11 @@ export async function acknowledgeAlert(id: number) {
 
 export async function clearAcknowledgedAlerts() {
   const res = await client.post<{ data: { cleared: number } }>('/system-alerts/clear-acknowledged');
+  return res.data.data;
+}
+
+export async function listAlertDeliveries(id: number) {
+  const res = await client.get<{ data: NotificationDelivery[] }>(`/system-alerts/${id}/deliveries`);
   return res.data.data;
 }
 
