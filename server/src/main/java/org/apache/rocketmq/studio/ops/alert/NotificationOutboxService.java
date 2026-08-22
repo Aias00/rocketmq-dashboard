@@ -17,6 +17,7 @@ import org.apache.rocketmq.studio.persistence.mapper.RmqAlertNotificationOutboxM
 import org.apache.rocketmq.studio.settings.GeneralSettingsVO;
 import org.apache.rocketmq.studio.settings.SettingsRepository;
 import org.springframework.http.ResponseEntity;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -58,6 +59,7 @@ public class NotificationOutboxService {
                 () -> null);
     }
 
+    @Autowired
     public NotificationOutboxService(RmqAlertNotificationOutboxMapper mapper, SettingsRepository settingsRepository,
             AlertSilenceService silenceService, AlertRepository alertRepository,
             OperationAuditService operationAuditService, ObjectProvider<JavaMailSender> mailSender) {
