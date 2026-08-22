@@ -50,6 +50,8 @@ import {
   updateAlertRule,
 } from '../../services/opsService';
 import { tableScrollX } from '../../utils/table';
+import { listInstances } from '../../services/instanceService';
+import type { Instance } from '../../api/instance';
 const { TextArea } = Input;
 
 const channelColors: Record<string, string> = {
@@ -57,18 +59,6 @@ const channelColors: Record<string, string> = {
   email: 'green',
   sms: 'orange',
 };
-
-const clusterMetricOptions = [
-  { label: 'NameServer availability', value: 'nameserver.availability' },
-  { label: 'Broker availability', value: 'broker.availability' },
-  { label: 'Broker disk usage ratio', value: 'broker.disk.usage_ratio' },
-];
-
-const businessMetricOptions = [
-  { label: 'Consumer lag total', value: 'consumer.lag.total' },
-  { label: 'Consumer lag max queue', value: 'consumer.lag.max_queue' },
-  { label: 'DLQ message count', value: 'dlq.message.count' },
-];
 
 const durationOptions = ['1m', '5m', '15m', '30m'];
 
@@ -90,9 +80,10 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
   const [selectedRuleIds, setSelectedRuleIds] = useState<Key[]>([]);
   const [bulkAction, setBulkAction] = useState<'enable' | 'disable' | 'delete' | null>(null);
   const [form] = Form.useForm();
-  const [metricOptions, setMetricOptions] = useState(
-    domain === 'BUSINESS' ? businessMetricOptions : clusterMetricOptions,
-  );
+  const [metricOptions, setMetricOptions] = useState<{ label: string; value: string }[]>([]);
+  const [selectedInstanceId, setSelectedInstanceId] = useState<string>();
+  const [metricLoading, setMetricLoading] = useState(false);
+  const [instances, setInstances] = useState<Instance[]>([]);
 
   const channelLabels: Record<string, string> = {
     dingtalk: 'DingTalk',
@@ -119,6 +110,12 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
     };
   }, [domain]);
 
+  useEffect(() => {
+    void listInstances()
+      .then(setInstances)
+      .catch(() => message.error('Studio 实例加载失败，请稍后重试'));
+  }, []);
+
   const enabledCount = rules.filter((r) => r.enabled).length;
   const selectedCount = selectedRuleIds.length;
   const hasSelectedRules = selectedCount > 0;
@@ -133,12 +130,17 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
 
   const openCreateModal = () => {
     setEditingRule(null);
+    setSelectedInstanceId(undefined);
+    setMetricOptions([]);
+    setTestResult(null);
     form.resetFields();
     setModalVisible(true);
   };
 
   const loadMetricCapabilities = async (instanceId?: string) => {
     if (!instanceId?.trim()) return;
+    setMetricLoading(true);
+    setMetricOptions([]);
     try {
       const metrics = await listNativeAlertMetrics(instanceId.trim(), domain);
       setMetricOptions(metrics.map((metric) => ({ label: metric.label, value: metric.key })));
@@ -146,12 +148,16 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
       if (metrics.length === 0) message.warning('该实例暂不支持原生告警指标');
     } catch {
       message.error('告警指标能力加载失败，请检查 Studio 实例');
+    } finally {
+      setMetricLoading(false);
     }
   };
 
   const openEditModal = (rule: AlertRule) => {
     setEditingRule(rule);
     form.setFieldsValue(rule);
+    setSelectedInstanceId(rule.instanceId);
+    void loadMetricCapabilities(rule.instanceId);
     setModalVisible(true);
   };
 
@@ -558,11 +564,35 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
           </Form.Item>
 
           <Form.Item
+            name="instanceId"
+            label="Studio 实例"
+            rules={[{ required: true, message: '请选择 Studio 实例' }]}
+            extra="原生采集规则必须绑定一个 Studio 实例。"
+          >
+            <Select
+              placeholder="请选择 Studio 实例"
+              options={instances.map((instance) => ({
+                value: instance.name,
+                label: `${instance.name}${instance.vendor && instance.vendor !== 'APACHE' ? ` (${instance.vendor})` : ''}`,
+              }))}
+              onChange={(instanceId) => {
+                setSelectedInstanceId(instanceId);
+                void loadMetricCapabilities(instanceId);
+              }}
+            />
+          </Form.Item>
+
+          <Form.Item
             name="metric"
             label={t('alerts.metric')}
             rules={[{ required: true, message: '请选择监控指标' }]}
           >
-            <Select placeholder="请选择监控指标" options={metricOptions} />
+            <Select
+              placeholder={metricLoading ? '正在加载监控指标' : '请选择监控指标'}
+              options={metricOptions}
+              disabled={!selectedInstanceId || metricLoading}
+              loading={metricLoading}
+            />
           </Form.Item>
 
           <Form.Item label={t('alerts.threshold')}>
@@ -601,18 +631,6 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
             <Select
               placeholder="请选择持续时间"
               options={durationOptions.map((d) => ({ label: d, value: d }))}
-            />
-          </Form.Item>
-
-          <Form.Item
-            name="instanceId"
-            label="Studio 实例"
-            rules={[{ required: true, message: '请输入 Studio 实例 ID' }]}
-            extra="原生采集规则必须绑定一个 Studio 实例。"
-          >
-            <Input
-              placeholder="例如 local"
-              onBlur={(event) => void loadMetricCapabilities(event.target.value)}
             />
           </Form.Item>
 

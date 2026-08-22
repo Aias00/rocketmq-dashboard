@@ -15,13 +15,14 @@
  * limitations under the License.
  */
 
-import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { App } from 'antd';
 import type { AlertRule } from '../../../api/ops';
 import { LangProvider } from '../../../i18n/LangContext';
 import AlertsPage from '../alerts';
+import { listInstances } from '../../../services/instanceService';
 import {
   bulkDeleteAlertRules,
   bulkToggleAlertRules,
@@ -29,6 +30,10 @@ import {
   listNativeAlertMetrics,
   toggleAlertRule,
 } from '../../../services/opsService';
+
+vi.mock('../../../services/instanceService', () => ({
+  listInstances: vi.fn(),
+}));
 
 vi.mock('../../../services/opsService', () => ({
   createAlertRule: vi.fn(),
@@ -109,11 +114,35 @@ function getRuleRow(ruleName: string) {
   return row;
 }
 
+function getSelectOption(label: string) {
+  const option = screen
+    .getAllByText(label)
+    .find((element) => element.classList.contains('ant-select-item-option-content'));
+  if (!option) throw new Error(`Select option not found: ${label}`);
+  return option;
+}
+
 describe('AlertsPage', () => {
+  afterEach(cleanup);
+
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(listAlertRules).mockResolvedValue(alertRules.map(cloneRule));
     vi.mocked(listNativeAlertMetrics).mockResolvedValue([]);
+    vi.mocked(listInstances).mockResolvedValue([
+      {
+        id: 1,
+        name: 'local',
+        remark: null,
+        type: 'DIRECT',
+        endpoint: 'localhost:9876',
+        vendor: 'APACHE',
+        topicCount: 0,
+        consumerGroupCount: 0,
+        gmtCreate: '',
+        gmtModified: '',
+      },
+    ]);
     vi.mocked(toggleAlertRule).mockImplementation(async (id, enabled) => {
       const rule = alertRules.find((item) => item.id === id);
       if (!rule) throw new Error(`Rule not found: ${id}`);
@@ -161,7 +190,15 @@ describe('AlertsPage', () => {
     expect(within(getRuleRow('Consumer lag')).getByRole('checkbox')).not.toBeChecked();
   });
 
-  it('uses the business rule API and exposes only business metrics', async () => {
+  it('uses the business rule API and loads only business metrics for the selected instance', async () => {
+    vi.mocked(listNativeAlertMetrics).mockResolvedValue([
+      {
+        key: 'consumer.lag.total',
+        label: 'Consumer lag total',
+        thresholdUnit: 'messages',
+        supportsConsumerGroup: true,
+      },
+    ]);
     const user = userEvent.setup();
     renderPage('BUSINESS');
 
@@ -169,6 +206,11 @@ describe('AlertsPage', () => {
     await screen.findByText('Broker disk usage');
     expect(listAlertRules).toHaveBeenCalledWith('BUSINESS');
     await user.click(screen.getByRole('button', { name: '新建规则' }));
+    expect(screen.getByRole('combobox', { name: '监控指标' })).toBeDisabled();
+    await user.click(screen.getByRole('combobox', { name: 'Studio 实例' }));
+    await screen.findByRole('option', { name: 'local' });
+    await user.click(getSelectOption('local'));
+    await waitFor(() => expect(listNativeAlertMetrics).toHaveBeenCalledWith('local', 'BUSINESS'));
     await user.click(screen.getByRole('combobox', { name: '监控指标' }));
 
     expect(await screen.findByText('Consumer lag total')).toBeInTheDocument();
@@ -187,8 +229,9 @@ describe('AlertsPage', () => {
     const user = userEvent.setup();
     renderPage('BUSINESS');
     await user.click(await screen.findByRole('button', { name: '新建规则' }));
-    await user.type(screen.getByLabelText('Studio 实例'), 'local');
-    await user.tab();
+    await user.click(screen.getByRole('combobox', { name: 'Studio 实例' }));
+    await screen.findByRole('option', { name: 'local' });
+    await user.click(getSelectOption('local'));
 
     await waitFor(() => expect(listNativeAlertMetrics).toHaveBeenCalledWith('local', 'BUSINESS'));
   });
