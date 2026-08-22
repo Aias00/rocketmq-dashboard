@@ -19,6 +19,7 @@ package org.apache.rocketmq.studio.ops.alert;
 import org.apache.rocketmq.studio.common.exception.BusinessException;
 import org.apache.rocketmq.studio.common.domain.PageResult;
 import org.apache.rocketmq.studio.audit.OperationAuditService;
+import org.apache.rocketmq.studio.auth.AuthenticatedUserContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -32,6 +33,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Pattern;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 
 @Slf4j
 @Service
@@ -395,6 +398,8 @@ public class AlertService {
                 .orElseThrow(() -> new org.apache.rocketmq.studio.common.exception.BusinessException(404,
                         "System alert not found: " + id));
         alert.setAcknowledged(true);
+        alert.setAcknowledgedBy(AuthenticatedUserContext.currentUsernameOrSystem());
+        alert.setAcknowledgedAt(LocalDateTime.now(ZoneOffset.UTC));
         if (!alertRepository.acknowledgeAlert(alert)) {
             throw new BusinessException(404, "System alert not found: " + id);
         }

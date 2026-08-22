@@ -53,6 +53,8 @@ export interface SystemAlert {
   description: string;
   time: string;
   acknowledged: boolean;
+  acknowledgedBy?: string | null;
+  acknowledgedAt?: string | null;
   domain?: 'BUSINESS' | 'CLUSTER' | null;
   ruleId?: number | null;
   fingerprint?: string | null;

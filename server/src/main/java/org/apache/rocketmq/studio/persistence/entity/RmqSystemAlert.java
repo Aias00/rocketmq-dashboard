@@ -40,6 +40,10 @@ public class RmqSystemAlert {
 
     private Boolean acknowledged;
 
+    private String acknowledgedBy;
+
+    private LocalDateTime acknowledgedAt;
+
     private String domain;
 
     private Long ruleId;

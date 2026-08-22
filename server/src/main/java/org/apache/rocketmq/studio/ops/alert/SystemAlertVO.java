@@ -36,6 +36,8 @@ public class SystemAlertVO {
     private String description;
     private LocalDateTime time;
     private boolean acknowledged;
+    private String acknowledgedBy;
+    private LocalDateTime acknowledgedAt;
     private AlertDomain domain;
     private Long ruleId;
     private String fingerprint;

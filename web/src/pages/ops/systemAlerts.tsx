@@ -394,6 +394,11 @@ const SystemAlertsPage = () => {
                       {alert.currentValue != null ? ` · ${alert.currentValue}` : ''}
                     </Text>
                   )}
+                  {alert.acknowledgedAt && (
+                    <Text type="secondary" style={{ display: 'block', fontSize: 12 }}>
+                      确认：{alert.acknowledgedBy ?? 'system'} · {alert.acknowledgedAt}
+                    </Text>
+                  )}
                   {alert.labels && Object.keys(alert.labels).length > 0 && (
                     <Flex gap={4} wrap="wrap" style={{ marginTop: 6 }}>
                       {Object.entries(alert.labels).map(([key, value]) => (

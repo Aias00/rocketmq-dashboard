@@ -848,6 +848,8 @@ class AlertServiceTest {
         SystemAlertVO result = alertService.acknowledgeAlert(1L);
 
         assertThat(result.isAcknowledged()).isTrue();
+        assertThat(result.getAcknowledgedBy()).isEqualTo("system");
+        assertThat(result.getAcknowledgedAt()).isNotNull();
         verify(alertRepository).acknowledgeAlert(result);
         verify(operationAuditService).record(eq("ACKNOWLEDGE_SYSTEM_ALERT"), eq("SYSTEM_ALERT"), eq("1"),
                 eq(null), eq("acknowledged=true"), eq("SUCCESS"), eq(null));

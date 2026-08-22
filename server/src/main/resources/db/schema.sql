@@ -355,6 +355,8 @@ CREATE TABLE IF NOT EXISTS rmq_system_alert (
   description TEXT,
   time DATETIME,
   acknowledged TINYINT(1) DEFAULT 0,
+  acknowledged_by VARCHAR(128),
+  acknowledged_at DATETIME,
   domain VARCHAR(16),
   rule_id bigint(20) unsigned,
   fingerprint CHAR(64),

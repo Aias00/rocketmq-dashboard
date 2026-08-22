@@ -209,6 +209,8 @@ public class MybatisPlusAlertRepository implements AlertRepository {
         vo.setDescription(entity.getDescription());
         vo.setTime(entity.getTime());
         vo.setAcknowledged(Boolean.TRUE.equals(entity.getAcknowledged()));
+        vo.setAcknowledgedBy(entity.getAcknowledgedBy());
+        vo.setAcknowledgedAt(entity.getAcknowledgedAt());
         vo.setDomain(parseDomain(entity.getDomain()));
         vo.setRuleId(entity.getRuleId());
         vo.setFingerprint(entity.getFingerprint());
@@ -227,6 +229,8 @@ public class MybatisPlusAlertRepository implements AlertRepository {
         entity.setDescription(alert.getDescription());
         entity.setTime(alert.getTime());
         entity.setAcknowledged(alert.isAcknowledged());
+        entity.setAcknowledgedBy(alert.getAcknowledgedBy());
+        entity.setAcknowledgedAt(alert.getAcknowledgedAt());
         entity.setDomain(alert.getDomain() == null ? null : alert.getDomain().name());
         entity.setRuleId(alert.getRuleId());
         entity.setFingerprint(alert.getFingerprint());
