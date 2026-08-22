@@ -7,6 +7,7 @@ The ASF licenses this file to You under the Apache License, Version 2.0.
 package org.apache.rocketmq.studio.ops.alert;
 
 import org.apache.rocketmq.studio.common.domain.enums.AlertLevel;
+import org.apache.rocketmq.studio.audit.OperationAuditService;
 import org.apache.rocketmq.studio.persistence.entity.RmqAlertNotificationOutbox;
 import org.apache.rocketmq.studio.persistence.mapper.RmqAlertNotificationOutboxMapper;
 import org.apache.rocketmq.studio.settings.GeneralSettingsVO;
@@ -40,7 +41,7 @@ class NotificationOutboxServiceTest {
         SystemAlertVO alert = SystemAlertVO.builder().id(9L).level(AlertLevel.warning).title("Lag")
                 .description("lag is high").instanceId("local").time(LocalDateTime.now()).build();
         NotificationOutboxService service = new NotificationOutboxService(mapper, mock(SettingsRepository.class),
-                silences, mock(AlertRepository.class));
+                silences, mock(AlertRepository.class), mock(OperationAuditService.class));
 
         when(silences.isActive(rule, "local", alert.getTime())).thenReturn(false);
         service.enqueue(alert, rule);
@@ -57,6 +58,7 @@ class NotificationOutboxServiceTest {
         SettingsRepository settings = mock(SettingsRepository.class);
         AlertSilenceService silences = mock(AlertSilenceService.class);
         AlertRepository alerts = mock(AlertRepository.class);
+        OperationAuditService audit = mock(OperationAuditService.class);
         RestTemplate client = new RestTemplate();
         MockRestServiceServer server = MockRestServiceServer.bindTo(client).build();
         RmqAlertNotificationOutbox row = new RmqAlertNotificationOutbox();
@@ -77,10 +79,12 @@ class NotificationOutboxServiceTest {
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("Lag")))
                 .andRespond(withSuccess());
 
-        new NotificationOutboxService(mapper, settings, silences, alerts, client).dispatch();
+        new NotificationOutboxService(mapper, settings, silences, alerts, audit, client).dispatch();
 
         server.verify();
         verify(mapper, org.mockito.Mockito.times(2)).update(any(), any());
+        verify(audit).record("DELIVER_ALERT_NOTIFICATION", "ALERT_NOTIFICATION", "8", null,
+                "alertId=9, channel=dingtalk", "SUCCESS", null);
     }
 
     @Test
@@ -95,11 +99,14 @@ class NotificationOutboxServiceTest {
         when(mapper.selectList(any())).thenReturn(List.of(row));
         when(mapper.update(any(), any())).thenReturn(1);
         AlertRepository alerts = mock(AlertRepository.class);
+        OperationAuditService audit = mock(OperationAuditService.class);
         when(alerts.findAlerts(null)).thenReturn(List.of(SystemAlertVO.builder().id(9L).build()));
 
-        new NotificationOutboxService(mapper, mock(SettingsRepository.class), mock(AlertSilenceService.class), alerts)
-                .dispatch();
+        new NotificationOutboxService(mapper, mock(SettingsRepository.class), mock(AlertSilenceService.class), alerts,
+                audit).dispatch();
 
         verify(mapper, org.mockito.Mockito.times(2)).update(any(), argThat(wrapper -> wrapper != null));
+        verify(audit).record("RETRY_ALERT_NOTIFICATION", "ALERT_NOTIFICATION", "8", null,
+                "alertId=9, channel=dingtalk", "RETRYING", "No configured dingtalk webhook");
     }
 }

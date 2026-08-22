@@ -9,6 +9,7 @@ package org.apache.rocketmq.studio.ops.alert;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.rocketmq.studio.audit.OperationAuditService;
 import org.apache.rocketmq.studio.common.util.NoRedirectClientHttpRequestFactory;
 import org.apache.rocketmq.studio.common.util.UrlHostGuard;
 import org.apache.rocketmq.studio.persistence.entity.RmqAlertNotificationOutbox;
@@ -39,19 +40,23 @@ public class NotificationOutboxService {
     private final SettingsRepository settingsRepository;
     private final AlertSilenceService silenceService;
     private final AlertRepository alertRepository;
+    private final OperationAuditService operationAuditService;
     private final RestTemplate restTemplate;
 
     public NotificationOutboxService(RmqAlertNotificationOutboxMapper mapper, SettingsRepository settingsRepository,
-            AlertSilenceService silenceService, AlertRepository alertRepository) {
-        this(mapper, settingsRepository, silenceService, alertRepository, newClient());
+            AlertSilenceService silenceService, AlertRepository alertRepository,
+            OperationAuditService operationAuditService) {
+        this(mapper, settingsRepository, silenceService, alertRepository, operationAuditService, newClient());
     }
 
     NotificationOutboxService(RmqAlertNotificationOutboxMapper mapper, SettingsRepository settingsRepository,
-            AlertSilenceService silenceService, AlertRepository alertRepository, RestTemplate restTemplate) {
+            AlertSilenceService silenceService, AlertRepository alertRepository,
+            OperationAuditService operationAuditService, RestTemplate restTemplate) {
         this.mapper = mapper;
         this.settingsRepository = settingsRepository;
         this.silenceService = silenceService;
         this.alertRepository = alertRepository;
+        this.operationAuditService = operationAuditService;
         this.restTemplate = restTemplate;
     }
 
@@ -122,6 +127,7 @@ public class NotificationOutboxService {
             mapper.update(null, new UpdateWrapper<RmqAlertNotificationOutbox>().eq("id", row.getId())
                     .set("status", NotificationOutboxStatus.DELIVERED.name()).set("delivered_at", now)
                     .set("last_error", null));
+            recordDelivery(row, "DELIVER_ALERT_NOTIFICATION", "SUCCESS", null);
         } catch (Exception error) {
             retry(row, now, error.getMessage());
         }
@@ -155,7 +161,14 @@ public class NotificationOutboxService {
                         : NotificationOutboxStatus.RETRY_WAIT).name())
                 .set("next_attempt_at", now.plusSeconds(Math.min(300, 5L << Math.min(attempts - 1, 5))))
                 .set("last_error", abbreviate(error)));
+        recordDelivery(row, exhausted ? "FAIL_ALERT_NOTIFICATION" : "RETRY_ALERT_NOTIFICATION",
+                exhausted ? "FAILURE" : "RETRYING", abbreviate(error));
         log.warn("Alert notification {} for event {}: {}", exhausted ? "failed" : "will retry", row.getAlertId(), error);
+    }
+
+    private void recordDelivery(RmqAlertNotificationOutbox row, String operation, String result, String error) {
+        operationAuditService.record(operation, "ALERT_NOTIFICATION", String.valueOf(row.getId()), null,
+                "alertId=" + row.getAlertId() + ", channel=" + row.getChannel(), result, error);
     }
 
     private static String abbreviate(String value) {
