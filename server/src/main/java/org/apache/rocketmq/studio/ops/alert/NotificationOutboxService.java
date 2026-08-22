@@ -43,6 +43,7 @@ import jakarta.mail.internet.InternetAddress;
 public class NotificationOutboxService {
     private static final int MAX_ATTEMPTS = 5;
     private static final int BATCH_SIZE = 20;
+    private static final Duration CLAIM_TIMEOUT = Duration.ofMinutes(1);
 
     private final RmqAlertNotificationOutboxMapper mapper;
     private final SettingsRepository settingsRepository;
@@ -133,13 +134,10 @@ public class NotificationOutboxService {
     @Scheduled(fixedDelayString = "${studio.alerting.notification-dispatch-interval:PT10S}")
     public void dispatch() {
         LocalDateTime now = LocalDateTime.now();
-        List<RmqAlertNotificationOutbox> due = mapper.selectList(new QueryWrapper<RmqAlertNotificationOutbox>()
-                .in("status", NotificationOutboxStatus.PENDING.name(), NotificationOutboxStatus.RETRY_WAIT.name())
-                .le("next_attempt_at", now).orderByAsc("id").last("LIMIT " + BATCH_SIZE));
+        LocalDateTime staleBefore = now.minus(CLAIM_TIMEOUT);
+        List<RmqAlertNotificationOutbox> due = mapper.findDispatchable(now, staleBefore, BATCH_SIZE);
         for (RmqAlertNotificationOutbox row : due) {
-            if (mapper.update(null, new UpdateWrapper<RmqAlertNotificationOutbox>().eq("id", row.getId())
-                    .in("status", NotificationOutboxStatus.PENDING.name(), NotificationOutboxStatus.RETRY_WAIT.name())
-                    .set("status", NotificationOutboxStatus.SENDING.name())) != 1) {
+            if (mapper.claimForDispatch(row.getId(), now, staleBefore, now) != 1) {
                 continue;
             }
             send(row, now);
@@ -157,6 +155,7 @@ public class NotificationOutboxService {
             }
             mapper.update(null, new UpdateWrapper<RmqAlertNotificationOutbox>().eq("id", row.getId())
                     .set("status", NotificationOutboxStatus.DELIVERED.name()).set("delivered_at", now)
+                    .set("sending_started_at", null)
                     .set("last_error", null));
             recordDelivery(row, "DELIVER_ALERT_NOTIFICATION", "SUCCESS", null);
         } catch (Exception error) {
@@ -233,6 +232,7 @@ public class NotificationOutboxService {
                 .set("attempt_count", attempts).set("status", (exhausted ? NotificationOutboxStatus.FAILED
                         : NotificationOutboxStatus.RETRY_WAIT).name())
                 .set("next_attempt_at", now.plusSeconds(Math.min(300, 5L << Math.min(attempts - 1, 5))))
+                .set("sending_started_at", null)
                 .set("last_error", abbreviate(error)));
         recordDelivery(row, exhausted ? "FAIL_ALERT_NOTIFICATION" : "RETRY_ALERT_NOTIFICATION",
                 exhausted ? "FAILURE" : "RETRYING", abbreviate(error));

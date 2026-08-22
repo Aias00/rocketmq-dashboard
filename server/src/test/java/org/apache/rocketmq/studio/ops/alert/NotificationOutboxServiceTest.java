@@ -70,7 +70,10 @@ class NotificationOutboxServiceTest {
         row.setChannel("dingtalk");
         row.setStatus("PENDING");
         row.setAttemptCount(0);
-        when(mapper.selectList(any())).thenReturn(List.of(row));
+        when(mapper.findDispatchable(any(LocalDateTime.class), any(LocalDateTime.class), any(Integer.class)))
+                .thenReturn(List.of(row));
+        when(mapper.claimForDispatch(any(), any(LocalDateTime.class), any(LocalDateTime.class),
+                any(LocalDateTime.class))).thenReturn(1);
         when(mapper.update(any(), any())).thenReturn(1);
         when(alerts.findAlerts(null)).thenReturn(List.of(SystemAlertVO.builder().id(9L)
                 .level(AlertLevel.warning).title("Lag").description("high").instanceId("local").build()));
@@ -85,7 +88,7 @@ class NotificationOutboxServiceTest {
         new NotificationOutboxService(mapper, settings, silences, alerts, audit, client).dispatch();
 
         server.verify();
-        verify(mapper, org.mockito.Mockito.times(2)).update(any(), any());
+        verify(mapper).update(any(), any());
         verify(audit).record("DELIVER_ALERT_NOTIFICATION", "ALERT_NOTIFICATION", "8", null,
                 "alertId=9, channel=dingtalk", "SUCCESS", null);
     }
@@ -99,7 +102,10 @@ class NotificationOutboxServiceTest {
         row.setChannel("dingtalk");
         row.setStatus("PENDING");
         row.setAttemptCount(0);
-        when(mapper.selectList(any())).thenReturn(List.of(row));
+        when(mapper.findDispatchable(any(LocalDateTime.class), any(LocalDateTime.class), any(Integer.class)))
+                .thenReturn(List.of(row));
+        when(mapper.claimForDispatch(any(), any(LocalDateTime.class), any(LocalDateTime.class),
+                any(LocalDateTime.class))).thenReturn(1);
         when(mapper.update(any(), any())).thenReturn(1);
         AlertRepository alerts = mock(AlertRepository.class);
         OperationAuditService audit = mock(OperationAuditService.class);
@@ -108,7 +114,7 @@ class NotificationOutboxServiceTest {
         new NotificationOutboxService(mapper, mock(SettingsRepository.class), mock(AlertSilenceService.class), alerts,
                 audit).dispatch();
 
-        verify(mapper, org.mockito.Mockito.times(2)).update(any(), argThat(wrapper -> wrapper != null));
+        verify(mapper).update(any(), argThat(wrapper -> wrapper != null));
         verify(audit).record("RETRY_ALERT_NOTIFICATION", "ALERT_NOTIFICATION", "8", null,
                 "alertId=9, channel=dingtalk", "RETRYING", "No configured dingtalk webhook");
     }
@@ -126,7 +132,10 @@ class NotificationOutboxServiceTest {
         row.setChannel("email");
         row.setStatus("PENDING");
         row.setAttemptCount(0);
-        when(mapper.selectList(any())).thenReturn(List.of(row));
+        when(mapper.findDispatchable(any(LocalDateTime.class), any(LocalDateTime.class), any(Integer.class)))
+                .thenReturn(List.of(row));
+        when(mapper.claimForDispatch(any(), any(LocalDateTime.class), any(LocalDateTime.class),
+                any(LocalDateTime.class))).thenReturn(1);
         when(mapper.update(any(), any())).thenReturn(1);
         when(alerts.findAlerts(null)).thenReturn(List.of(SystemAlertVO.builder().id(9L)
                 .level(AlertLevel.warning).title("Lag").description("high").instanceId("local").build()));
@@ -141,5 +150,26 @@ class NotificationOutboxServiceTest {
                 && "[RocketMQ Studio] Lag".equals(message.getSubject())));
         verify(audit).record("DELIVER_ALERT_NOTIFICATION", "ALERT_NOTIFICATION", "8", null,
                 "alertId=9, channel=email", "SUCCESS", null);
+    }
+
+    @Test
+    void reclaimsAStaleSendingDelivery() {
+        RmqAlertNotificationOutboxMapper mapper = mock(RmqAlertNotificationOutboxMapper.class);
+        RmqAlertNotificationOutbox row = new RmqAlertNotificationOutbox();
+        row.setId(8L);
+        row.setAlertId(9L);
+        row.setChannel("dingtalk");
+        row.setStatus("SENDING");
+        row.setSendingStartedAt(LocalDateTime.now().minusMinutes(2));
+        when(mapper.findDispatchable(any(LocalDateTime.class), any(LocalDateTime.class), any(Integer.class)))
+                .thenReturn(List.of(row));
+        when(mapper.claimForDispatch(any(), any(LocalDateTime.class), any(LocalDateTime.class),
+                any(LocalDateTime.class))).thenReturn(0);
+
+        new NotificationOutboxService(mapper, mock(SettingsRepository.class), mock(AlertSilenceService.class),
+                mock(AlertRepository.class), mock(OperationAuditService.class)).dispatch();
+
+        verify(mapper).claimForDispatch(org.mockito.ArgumentMatchers.eq(8L), any(LocalDateTime.class),
+                any(LocalDateTime.class), any(LocalDateTime.class));
     }
 }

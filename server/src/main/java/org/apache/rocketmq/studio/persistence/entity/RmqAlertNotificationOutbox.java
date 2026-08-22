@@ -22,6 +22,7 @@ public class RmqAlertNotificationOutbox {
     private String status;
     private Integer attemptCount;
     private LocalDateTime nextAttemptAt;
+    private LocalDateTime sendingStartedAt;
     private String lastError;
     private LocalDateTime deliveredAt;
     private LocalDateTime gmtModified;

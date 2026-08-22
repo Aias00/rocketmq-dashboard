@@ -332,6 +332,7 @@ CREATE TABLE IF NOT EXISTS rmq_alert_notification_outbox (
   `status` VARCHAR(16) NOT NULL,
   `attempt_count` INT NOT NULL DEFAULT 0,
   `next_attempt_at` DATETIME NOT NULL,
+  `sending_started_at` DATETIME NULL,
   `last_error` VARCHAR(1000) NULL,
   `delivered_at` DATETIME NULL,
   `gmt_create` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
