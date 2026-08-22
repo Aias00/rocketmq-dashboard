@@ -20,6 +20,13 @@ export interface AlertRule {
 
 export type AlertRuleDomain = 'BUSINESS' | 'CLUSTER';
 
+export interface NativeAlertMetricInfo {
+  key: string;
+  label: string;
+  thresholdUnit: string;
+  supportsConsumerGroup: boolean;
+}
+
 export interface AlertRuleBulkResult {
   succeededIds: number[];
   failures: Record<string, string>;
@@ -126,6 +133,13 @@ export interface AuditQuery {
 // ─── Alert Rules ────────────────────────────────────────────────
 const alertRulePath = (domain: AlertRuleDomain) =>
   domain === 'BUSINESS' ? '/alert-rules' : '/cluster-alert-rules';
+
+export async function listNativeAlertMetrics(instanceId: string, domain: AlertRuleDomain) {
+  const res = await client.get<{ data: NativeAlertMetricInfo[] }>('/native-alert-metrics', {
+    params: { instanceId, domain },
+  });
+  return res.data.data;
+}
 
 export async function listAlertRules(domain: AlertRuleDomain = 'CLUSTER') {
   const res = await client.get<{ data: AlertRule[] }>(alertRulePath(domain));

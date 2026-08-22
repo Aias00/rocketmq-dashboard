@@ -44,6 +44,7 @@ import {
   bulkToggleAlertRules,
   deleteAlertRule,
   listAlertRules,
+  listNativeAlertMetrics,
   toggleAlertRule,
   testAlertRule,
   updateAlertRule,
@@ -89,7 +90,9 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
   const [selectedRuleIds, setSelectedRuleIds] = useState<Key[]>([]);
   const [bulkAction, setBulkAction] = useState<'enable' | 'disable' | 'delete' | null>(null);
   const [form] = Form.useForm();
-  const metricOptions = domain === 'BUSINESS' ? businessMetricOptions : clusterMetricOptions;
+  const [metricOptions, setMetricOptions] = useState(
+    domain === 'BUSINESS' ? businessMetricOptions : clusterMetricOptions,
+  );
 
   const channelLabels: Record<string, string> = {
     dingtalk: 'DingTalk',
@@ -132,6 +135,18 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
     setEditingRule(null);
     form.resetFields();
     setModalVisible(true);
+  };
+
+  const loadMetricCapabilities = async (instanceId?: string) => {
+    if (!instanceId?.trim()) return;
+    try {
+      const metrics = await listNativeAlertMetrics(instanceId.trim(), domain);
+      setMetricOptions(metrics.map((metric) => ({ label: metric.label, value: metric.key })));
+      form.setFieldValue('metric', undefined);
+      if (metrics.length === 0) message.warning('该实例暂不支持原生告警指标');
+    } catch {
+      message.error('告警指标能力加载失败，请检查 Studio 实例');
+    }
   };
 
   const openEditModal = (rule: AlertRule) => {
@@ -595,7 +610,10 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
             rules={[{ required: true, message: '请输入 Studio 实例 ID' }]}
             extra="原生采集规则必须绑定一个 Studio 实例。"
           >
-            <Input placeholder="例如 local" />
+            <Input
+              placeholder="例如 local"
+              onBlur={(event) => void loadMetricCapabilities(event.target.value)}
+            />
           </Form.Item>
 
           <Form.Item

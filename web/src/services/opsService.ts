@@ -7,6 +7,7 @@ import type {
   AlertRuleBulkResult,
   AlertRuleDomain,
   AlertRuleTestResult,
+  NativeAlertMetricInfo,
   CollectorStatus,
   SystemAlert,
   SystemAlertQuery,
@@ -107,6 +108,56 @@ function formatAuditCsv(records: AuditRecord[]): string {
 export async function listAlertRules(domain: AlertRuleDomain = 'CLUSTER'): Promise<AlertRule[]> {
   if (isMockMode()) return alertRulesState.map(copyAlertRule);
   return opsApi.listAlertRules(domain);
+}
+
+export async function listNativeAlertMetrics(
+  instanceId: string,
+  domain: AlertRuleDomain,
+): Promise<NativeAlertMetricInfo[]> {
+  if (isMockMode()) {
+    return domain === 'BUSINESS'
+      ? [
+          {
+            key: 'consumer.lag.total',
+            label: 'Consumer lag total',
+            thresholdUnit: 'messages',
+            supportsConsumerGroup: true,
+          },
+          {
+            key: 'consumer.lag.max_queue',
+            label: 'Consumer lag max queue',
+            thresholdUnit: 'messages',
+            supportsConsumerGroup: true,
+          },
+          {
+            key: 'dlq.message.count',
+            label: 'DLQ message count',
+            thresholdUnit: 'messages',
+            supportsConsumerGroup: true,
+          },
+        ]
+      : [
+          {
+            key: 'nameserver.availability',
+            label: 'NameServer availability',
+            thresholdUnit: '',
+            supportsConsumerGroup: false,
+          },
+          {
+            key: 'broker.availability',
+            label: 'Broker availability',
+            thresholdUnit: '',
+            supportsConsumerGroup: false,
+          },
+          {
+            key: 'broker.disk.usage_ratio',
+            label: 'Broker disk usage ratio',
+            thresholdUnit: 'ratio',
+            supportsConsumerGroup: false,
+          },
+        ];
+  }
+  return opsApi.listNativeAlertMetrics(instanceId, domain);
 }
 
 export async function createAlertRule(

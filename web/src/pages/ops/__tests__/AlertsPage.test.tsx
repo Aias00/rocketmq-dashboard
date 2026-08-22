@@ -26,6 +26,7 @@ import {
   bulkDeleteAlertRules,
   bulkToggleAlertRules,
   listAlertRules,
+  listNativeAlertMetrics,
   toggleAlertRule,
 } from '../../../services/opsService';
 
@@ -33,6 +34,7 @@ vi.mock('../../../services/opsService', () => ({
   createAlertRule: vi.fn(),
   deleteAlertRule: vi.fn(),
   listAlertRules: vi.fn(),
+  listNativeAlertMetrics: vi.fn(),
   toggleAlertRule: vi.fn(),
   bulkToggleAlertRules: vi.fn(),
   bulkDeleteAlertRules: vi.fn(),
@@ -111,6 +113,7 @@ describe('AlertsPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(listAlertRules).mockResolvedValue(alertRules.map(cloneRule));
+    vi.mocked(listNativeAlertMetrics).mockResolvedValue([]);
     vi.mocked(toggleAlertRule).mockImplementation(async (id, enabled) => {
       const rule = alertRules.find((item) => item.id === id);
       if (!rule) throw new Error(`Rule not found: ${id}`);
@@ -170,6 +173,24 @@ describe('AlertsPage', () => {
 
     expect(await screen.findByText('Consumer lag total')).toBeInTheDocument();
     expect(screen.queryByText('Broker disk usage ratio')).not.toBeInTheDocument();
+  });
+
+  it('refreshes metric options from the selected instance capabilities', async () => {
+    vi.mocked(listNativeAlertMetrics).mockResolvedValue([
+      {
+        key: 'consumer.lag.total',
+        label: 'Consumer lag total',
+        thresholdUnit: 'messages',
+        supportsConsumerGroup: true,
+      },
+    ]);
+    const user = userEvent.setup();
+    renderPage('BUSINESS');
+    await user.click(await screen.findByRole('button', { name: '新建规则' }));
+    await user.type(screen.getByLabelText('Studio 实例'), 'local');
+    await user.tab();
+
+    await waitFor(() => expect(listNativeAlertMetrics).toHaveBeenCalledWith('local', 'BUSINESS'));
   });
 
   it('keeps only failed alert rules selected after a partial bulk failure', async () => {

@@ -26,6 +26,7 @@ import {
   updateIsVIPChannel,
   updateUseTLS,
   listAlertRules,
+  listNativeAlertMetrics,
   createAlertRule,
   updateAlertRule,
   toggleAlertRule,
@@ -167,6 +168,26 @@ describe('Ops API - Alert Rules', () => {
 
     await expect(listAlertRules('BUSINESS')).resolves.toEqual([]);
     await expect(createAlertRule({ name: 'Lag' }, 'BUSINESS')).resolves.toEqual({ id: 2 });
+  });
+
+  it('loads native metric capabilities for an instance and domain', async () => {
+    mock
+      .onGet('/native-alert-metrics', { params: { instanceId: 'local', domain: 'BUSINESS' } })
+      .reply(200, {
+        code: 200,
+        data: [
+          {
+            key: 'consumer.lag.total',
+            label: 'Consumer lag total',
+            thresholdUnit: 'messages',
+            supportsConsumerGroup: true,
+          },
+        ],
+      });
+
+    await expect(listNativeAlertMetrics('local', 'BUSINESS')).resolves.toMatchObject([
+      { key: 'consumer.lag.total' },
+    ]);
   });
 
   it('updates an alert rule', async () => {
