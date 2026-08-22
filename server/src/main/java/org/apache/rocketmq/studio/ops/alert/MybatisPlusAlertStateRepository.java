@@ -47,24 +47,20 @@ public class MybatisPlusAlertStateRepository implements AlertStateRepository {
             entity = new RmqAlertState();
             entity.setRuleId(key.ruleId());
             entity.setFingerprint(key.fingerprint());
+            entity.setVersion(0);
             apply(entity, state);
             mapper.insert(entity);
         } else {
+            int version = entity.getVersion() == null ? 0 : entity.getVersion();
             apply(entity, state);
-            mapper.updateById(entity);
+            // A concurrent acknowledgement wins over this sample. The next collection cycle reloads the state.
+            mapper.updateIfVersion(entity, version);
         }
     }
 
     @Override
     public boolean acknowledge(AlertStateKey key) {
-        RmqAlertState entity = mapper.selectOne(new QueryWrapper<RmqAlertState>()
-                .eq("rule_id", key.ruleId()).eq("fingerprint", key.fingerprint()).last("LIMIT 1"));
-        if (entity == null || !AlertStateStatus.FIRING.name().equals(entity.getStatus())) {
-            return false;
-        }
-        entity.setStatus(AlertStateStatus.ACKED.name());
-        entity.setGmtModified(LocalDateTime.now(ZoneOffset.UTC));
-        return mapper.updateById(entity) > 0;
+        return mapper.acknowledgeFiring(key.ruleId(), key.fingerprint(), LocalDateTime.now(ZoneOffset.UTC)) > 0;
     }
 
     private static void apply(RmqAlertState entity, AlertRuleState state) {

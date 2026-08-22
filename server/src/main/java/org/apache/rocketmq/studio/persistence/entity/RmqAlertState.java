@@ -36,5 +36,6 @@ public class RmqAlertState {
     private LocalDateTime firstPendingAt;
     private LocalDateTime firedAt;
     private LocalDateTime resolvedAt;
+    private Integer version;
     private LocalDateTime gmtModified;
 }

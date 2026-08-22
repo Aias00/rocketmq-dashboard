@@ -303,6 +303,7 @@ CREATE TABLE IF NOT EXISTS rmq_alert_state (
   `first_pending_at` DATETIME NULL,
   `fired_at` DATETIME NULL,
   `resolved_at` DATETIME NULL,
+  `version` INT NOT NULL DEFAULT 0,
   `gmt_modified` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY uk_alert_state_rule_fingerprint (`rule_id`, `fingerprint`)
