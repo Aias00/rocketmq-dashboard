@@ -46,6 +46,7 @@ public class ApacheRocketMqClusterMetricsCollector implements ClusterMetricsColl
     static final String NAMESERVER_AVAILABILITY = "nameserver.availability";
     static final String BROKER_AVAILABILITY = "broker.availability";
     static final String BROKER_DISK_USAGE_RATIO = "broker.disk.usage_ratio";
+    static final String BROKER_JVM_HEAP_USAGE_RATIO = "broker.jvm.heap.usage_ratio";
 
     private final RuntimeAdminClientResolver adminClientResolver;
 
@@ -110,6 +111,9 @@ public class ApacheRocketMqClusterMetricsCollector implements ClusterMetricsColl
             parseDiskUsage(runtime.getTable().get("commitLogDiskRatio"))
                     .ifPresent(value -> samples.add(available(BROKER_DISK_USAGE_RATIO, instance, clusterId,
                             labels, value, collectedAt)));
+            parseHeapUsage(runtime.getTable().get("jvmMemoryHeapUsed"), runtime.getTable().get("jvmMemoryHeapMax"))
+                    .ifPresent(value -> samples.add(available(BROKER_JVM_HEAP_USAGE_RATIO, instance, clusterId,
+                            labels, value, collectedAt)));
         } catch (Exception error) {
             log.warn("Failed to collect runtime metrics for broker {} on instance {}: {}", brokerName,
                     instance.getName(), error.getMessage());
@@ -128,6 +132,19 @@ public class ApacheRocketMqClusterMetricsCollector implements ClusterMetricsColl
             }
             return java.util.Optional.of(value > 1D ? value / 100D : value);
         } catch (NumberFormatException ignored) {
+            return java.util.Optional.empty();
+        }
+    }
+
+    private static java.util.Optional<Double> parseHeapUsage(String usedRaw, String maxRaw) {
+        try {
+            double used = Double.parseDouble(usedRaw);
+            double max = Double.parseDouble(maxRaw);
+            if (!Double.isFinite(used) || !Double.isFinite(max) || used < 0 || max <= 0 || used > max) {
+                return java.util.Optional.empty();
+            }
+            return java.util.Optional.of(used / max);
+        } catch (RuntimeException ignored) {
             return java.util.Optional.empty();
         }
     }

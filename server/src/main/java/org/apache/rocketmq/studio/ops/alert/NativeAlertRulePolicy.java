@@ -28,6 +28,7 @@ final class NativeAlertRulePolicy {
             "nameserver.availability", AlertDomain.CLUSTER,
             "broker.availability", AlertDomain.CLUSTER,
             "broker.disk.usage_ratio", AlertDomain.CLUSTER,
+            "broker.jvm.heap.usage_ratio", AlertDomain.CLUSTER,
             "consumer.lag.total", AlertDomain.BUSINESS,
             "consumer.lag.max_queue", AlertDomain.BUSINESS,
             "dlq.message.count", AlertDomain.BUSINESS);
