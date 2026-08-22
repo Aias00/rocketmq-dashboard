@@ -45,13 +45,14 @@ class ApacheRocketMqBusinessMetricsCollectorTest {
         when(registry.byInstanceId("local")).thenReturn(Optional.of(provider));
         when(provider.listConsumerGroups("local", null)).thenReturn(List.of(orders, payments));
         when(provider.getGroupProgress("local", "orders")).thenReturn(List.of(QueueProgressVO.builder()
-                .diffTotal(17).build(), QueueProgressVO.builder().diffTotal(42).build()));
+                .topic("orders-topic").diffTotal(17).build(), QueueProgressVO.builder()
+                .topic("orders-topic").diffTotal(42).build()));
         when(provider.getGroupProgress("local", "payments")).thenReturn(List.of(QueueProgressVO.builder()
-                .diffTotal(0).build()));
+                .topic("payments-topic").diffTotal(0).build()));
 
         List<MetricSample> samples = new ApacheRocketMqBusinessMetricsCollector(registry).collect(apacheInstance());
 
-        assertThat(samples).hasSize(4).allSatisfy(sample -> {
+        assertThat(samples).hasSize(6).allSatisfy(sample -> {
             assertThat(sample.availability()).isEqualTo(MetricAvailability.AVAILABLE);
         });
         assertThat(samples).filteredOn(sample -> sample.metricKey().equals(
@@ -62,6 +63,10 @@ class ApacheRocketMqBusinessMetricsCollectorTest {
                 ApacheRocketMqBusinessMetricsCollector.CONSUMER_LAG_MAX_QUEUE)
                 && "orders".equals(sample.labels().get("consumerGroup"))).singleElement()
                 .satisfies(sample -> assertThat(sample.value()).isEqualTo(42D));
+        assertThat(samples).filteredOn(sample -> sample.metricKey().equals(
+                ApacheRocketMqBusinessMetricsCollector.TOPIC_BACKLOG_TOTAL)
+                && "orders-topic".equals(sample.labels().get("topic"))).singleElement()
+                .satisfies(sample -> assertThat(sample.value()).isEqualTo(59D));
     }
 
     @Test
@@ -91,7 +96,7 @@ class ApacheRocketMqBusinessMetricsCollectorTest {
         InstanceProviderRegistry registry = mock(InstanceProviderRegistry.class);
         when(registry.byInstanceId("local")).thenThrow(new IllegalStateException("offline"));
 
-        assertThat(new ApacheRocketMqBusinessMetricsCollector(registry).collect(apacheInstance())).hasSize(2)
+        assertThat(new ApacheRocketMqBusinessMetricsCollector(registry).collect(apacheInstance())).hasSize(3)
                 .allSatisfy(sample -> {
                     assertThat(sample.availability()).isEqualTo(MetricAvailability.UNAVAILABLE);
                     assertThat(sample.value()).isNull();

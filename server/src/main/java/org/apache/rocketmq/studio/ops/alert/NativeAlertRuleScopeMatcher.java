@@ -31,7 +31,9 @@ final class NativeAlertRuleScopeMatcher {
         }
         String consumerGroup = sample.labels() == null ? null : sample.labels().get("consumerGroup");
         String brokerName = sample.labels() == null ? null : sample.labels().get("brokerName");
+        String topic = sample.labels() == null ? null : sample.labels().get("topic");
         return matchesSelector(rule.getConsumerGroup(), consumerGroup)
+                && matchesSelector(rule.getTopic(), topic)
                 && matchesSelector(rule.getBrokerName(), brokerName)
                 && matchesSelector(rule.getClusterName(), sample.clusterId());
     }

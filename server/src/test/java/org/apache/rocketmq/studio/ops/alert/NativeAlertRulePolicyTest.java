@@ -32,6 +32,16 @@ class NativeAlertRulePolicyTest {
     }
 
     @Test
+    void acceptsTopicSelectorOnlyForTopicBacklog() {
+        assertThatCode(() -> NativeAlertRulePolicy.validate(rule(AlertDomain.BUSINESS, "topic.backlog.total")
+                .instanceId("local").consumerGroup("orders").topic("orders-topic").build()))
+                .doesNotThrowAnyException();
+        assertThatThrownBy(() -> NativeAlertRulePolicy.validate(rule(AlertDomain.BUSINESS, "consumer.lag.total")
+                .instanceId("local").topic("orders-topic").build()))
+                .isInstanceOf(BusinessException.class).hasMessageContaining("topic is not supported");
+    }
+
+    @Test
     void rejectsNativeRuleWithoutInstanceScope() {
         assertThatThrownBy(() -> NativeAlertRulePolicy.validate(rule(AlertDomain.CLUSTER, "broker.availability")
                 .build())).isInstanceOf(BusinessException.class).hasMessageContaining("instanceId");

@@ -24,7 +24,7 @@ public class NativeAlertMetricCatalogService {
             "proxy.availability", "cloud.instance.availability",
             "broker.disk.usage_ratio", "broker.jvm.heap.usage_ratio", "consumer.lag.total",
             "broker.send_queue.usage_ratio",
-            "consumer.lag.max_queue", "dlq.message.count");
+            "consumer.lag.max_queue", "topic.backlog.total", "dlq.message.count");
     private static final List<NativeAlertMetricInfo> CLUSTER_APACHE = List.of(
             new NativeAlertMetricInfo("nameserver.availability", "NameServer availability", "", false),
             new NativeAlertMetricInfo("broker.availability", "Broker availability", "", false),
@@ -35,10 +35,12 @@ public class NativeAlertMetricCatalogService {
     private static final List<NativeAlertMetricInfo> BUSINESS_APACHE = List.of(
             new NativeAlertMetricInfo("consumer.lag.total", "Consumer lag total", "messages", true),
             new NativeAlertMetricInfo("consumer.lag.max_queue", "Consumer lag max queue", "messages", true),
+            new NativeAlertMetricInfo("topic.backlog.total", "Topic backlog (per consumer group)", "messages", true),
             new NativeAlertMetricInfo("dlq.message.count", "DLQ message count", "messages", true));
     private static final List<NativeAlertMetricInfo> BUSINESS_CLOUD = List.of(
             new NativeAlertMetricInfo("consumer.lag.total", "Consumer lag total", "messages", true),
-            new NativeAlertMetricInfo("consumer.lag.max_queue", "Consumer lag max queue", "messages", true));
+            new NativeAlertMetricInfo("consumer.lag.max_queue", "Consumer lag max queue", "messages", true),
+            new NativeAlertMetricInfo("topic.backlog.total", "Topic backlog (per consumer group)", "messages", true));
     private static final List<NativeAlertMetricInfo> CLUSTER_CLOUD = List.of(
             new NativeAlertMetricInfo("cloud.instance.availability", "Cloud instance availability", "", false));
 

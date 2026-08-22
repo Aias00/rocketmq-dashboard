@@ -42,6 +42,7 @@ import java.util.Map;
 public class ApacheRocketMqBusinessMetricsCollector implements BusinessMetricsCollector {
     public static final String CONSUMER_LAG_TOTAL = "consumer.lag.total";
     public static final String CONSUMER_LAG_MAX_QUEUE = "consumer.lag.max_queue";
+    public static final String TOPIC_BACKLOG_TOTAL = "topic.backlog.total";
 
     private final InstanceProviderRegistry providerRegistry;
 
@@ -65,13 +66,14 @@ public class ApacheRocketMqBusinessMetricsCollector implements BusinessMetricsCo
                     continue;
                 }
                 samples.add(totalLagSample(instance, group, collectedAt));
-                samples.add(maxQueueLagSample(provider, instance, group, collectedAt));
+                samples.addAll(queueLagSamples(provider, instance, group, collectedAt));
             }
             return samples;
         } catch (RuntimeException error) {
             log.warn("Failed to collect consumer lag for instance {}: {}", instance.getName(), error.getMessage());
             return List.of(unavailable(CONSUMER_LAG_TOTAL, instance, Map.of(), collectedAt),
-                    unavailable(CONSUMER_LAG_MAX_QUEUE, instance, Map.of(), collectedAt));
+                    unavailable(CONSUMER_LAG_MAX_QUEUE, instance, Map.of(), collectedAt),
+                    unavailable(TOPIC_BACKLOG_TOTAL, instance, Map.of(), collectedAt));
         }
     }
 
@@ -81,18 +83,29 @@ public class ApacheRocketMqBusinessMetricsCollector implements BusinessMetricsCo
                 MetricAvailability.AVAILABLE, collectedAt);
     }
 
-    private static MetricSample maxQueueLagSample(InstanceProvider provider, InstanceVO instance,
+    private static List<MetricSample> queueLagSamples(InstanceProvider provider, InstanceVO instance,
             ConsumerGroupVO group, Instant collectedAt) {
         Map<String, String> labels = Map.of("consumerGroup", group.getName());
         try {
-            long maxLag = provider.getGroupProgress(instance.getName(), group.getName()).stream()
-                    .mapToLong(QueueProgressVO::getDiffTotal).map(value -> Math.max(0, value)).max().orElse(0);
-            return new MetricSample(CONSUMER_LAG_MAX_QUEUE, AlertDomain.BUSINESS, instance.getName(),
-                    group.getClusterId(), labels, (double) maxLag, MetricAvailability.AVAILABLE, collectedAt);
+            List<QueueProgressVO> progress = provider.getGroupProgress(instance.getName(), group.getName());
+            long maxLag = progress.stream().mapToLong(QueueProgressVO::getDiffTotal)
+                    .map(value -> Math.max(0, value)).max().orElse(0);
+            List<MetricSample> samples = new ArrayList<>();
+            samples.add(new MetricSample(CONSUMER_LAG_MAX_QUEUE, AlertDomain.BUSINESS, instance.getName(),
+                    group.getClusterId(), labels, (double) maxLag, MetricAvailability.AVAILABLE, collectedAt));
+            progress.stream().filter(row -> row.getTopic() != null && !row.getTopic().isBlank())
+                    .collect(java.util.stream.Collectors.groupingBy(QueueProgressVO::getTopic,
+                            java.util.stream.Collectors.summingLong(
+                                    row -> Math.max(0, row.getDiffTotal()))))
+                    .forEach((topic, lag) -> samples.add(new MetricSample(TOPIC_BACKLOG_TOTAL, AlertDomain.BUSINESS,
+                            instance.getName(), group.getClusterId(), Map.of("consumerGroup", group.getName(),
+                            "topic", topic), (double) lag, MetricAvailability.AVAILABLE, collectedAt)));
+            return samples;
         } catch (RuntimeException error) {
             log.warn("Failed to collect queue lag for group {} on instance {}: {}", group.getName(),
                     instance.getName(), error.getMessage());
-            return unavailable(CONSUMER_LAG_MAX_QUEUE, instance, labels, collectedAt);
+            return List.of(unavailable(CONSUMER_LAG_MAX_QUEUE, instance, labels, collectedAt),
+                    unavailable(TOPIC_BACKLOG_TOTAL, instance, labels, collectedAt));
         }
     }
 

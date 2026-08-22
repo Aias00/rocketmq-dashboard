@@ -62,6 +62,8 @@ public class RmqAlertRule {
 
     private String consumerGroup;
 
+    private String topic;
+
     private Integer consecutiveSamples;
 
     private LocalDateTime gmtCreate;

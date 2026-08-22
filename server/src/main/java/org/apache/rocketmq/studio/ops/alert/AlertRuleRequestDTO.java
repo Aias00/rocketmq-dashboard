@@ -45,6 +45,7 @@ public class AlertRuleRequestDTO {
     private String severity;
     private String instanceId;
     private String consumerGroup;
+    private String topic;
     @Min(value = 1, message = "consecutiveSamples must be at least 1")
     private Integer consecutiveSamples;
 
@@ -65,6 +66,7 @@ public class AlertRuleRequestDTO {
                 .severity(severity)
                 .instanceId(instanceId)
                 .consumerGroup(consumerGroup)
+                .topic(topic)
                 .consecutiveSamples(consecutiveSamples == null ? 1 : consecutiveSamples)
                 .build();
     }

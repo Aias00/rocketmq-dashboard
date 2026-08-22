@@ -43,6 +43,21 @@ class NativeAlertRuleScopeMatcherTest {
         assertThat(NativeAlertRuleScopeMatcher.matches(rule, sample("cluster-a", "broker-a"))).isTrue();
     }
 
+    @Test
+    void matchesTopicAndConsumerGroupSelectors() {
+        AlertRuleVO rule = AlertRuleVO.builder().instanceId("local").consumerGroup("orders")
+                .topic("orders-topic").build();
+        MetricSample matching = new MetricSample("topic.backlog.total", AlertDomain.BUSINESS, "local", "cluster-a",
+                Map.of("consumerGroup", "orders", "topic", "orders-topic"), 42D,
+                MetricAvailability.AVAILABLE, Instant.now());
+        MetricSample otherTopic = new MetricSample("topic.backlog.total", AlertDomain.BUSINESS, "local", "cluster-a",
+                Map.of("consumerGroup", "orders", "topic", "payments-topic"), 42D,
+                MetricAvailability.AVAILABLE, Instant.now());
+
+        assertThat(NativeAlertRuleScopeMatcher.matches(rule, matching)).isTrue();
+        assertThat(NativeAlertRuleScopeMatcher.matches(rule, otherTopic)).isFalse();
+    }
+
     private static MetricSample sample(String clusterId, String brokerName) {
         return new MetricSample("broker.availability", AlertDomain.CLUSTER, "local", clusterId,
                 Map.of("brokerName", brokerName), 1D, MetricAvailability.AVAILABLE, Instant.now());

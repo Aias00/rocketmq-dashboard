@@ -15,6 +15,7 @@ export interface AlertRule {
   description: string;
   instanceId?: string;
   consumerGroup?: string;
+  topic?: string;
   consecutiveSamples?: number;
 }
 

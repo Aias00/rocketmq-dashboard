@@ -611,13 +611,22 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
           </Form.Item>
 
           {domain === 'BUSINESS' && (
-            <Form.Item
-              name="consumerGroup"
-              label="消费组（可选）"
-              extra="留空时，对该实例中的所有消费组分别评估规则。"
-            >
-              <Input placeholder="例如 order-consumer" />
-            </Form.Item>
+            <>
+              <Form.Item
+                name="consumerGroup"
+                label="消费组（可选）"
+                extra="留空时，对该实例中的所有消费组分别评估规则。"
+              >
+                <Input placeholder="例如 order-consumer" />
+              </Form.Item>
+              <Form.Item
+                name="topic"
+                label="Topic（可选）"
+                extra="仅适用于 Topic backlog 指标；留空时匹配所有 Topic。"
+              >
+                <Input placeholder="例如 order-topic" />
+              </Form.Item>
+            </>
           )}
 
           {domain === 'CLUSTER' && (

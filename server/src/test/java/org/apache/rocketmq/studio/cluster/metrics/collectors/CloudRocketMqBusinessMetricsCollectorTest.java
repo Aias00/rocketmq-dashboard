@@ -45,16 +45,19 @@ class CloudRocketMqBusinessMetricsCollectorTest {
         when(registry.byInstanceId("aliyun")).thenReturn(Optional.of(provider));
         when(provider.listConsumerGroups("aliyun", null)).thenReturn(List.of(group));
         when(provider.getGroupProgress("aliyun", "orders")).thenReturn(List.of(
-                QueueProgressVO.builder().diffTotal(12).build(), QueueProgressVO.builder().diffTotal(30).build()));
+                QueueProgressVO.builder().topic("orders-topic").diffTotal(12).build(), QueueProgressVO.builder()
+                .topic("orders-topic").diffTotal(30).build()));
 
         List<MetricSample> samples = new CloudRocketMqBusinessMetricsCollector(registry).collect(instance);
 
-        assertThat(samples).hasSize(2).allSatisfy(sample -> assertThat(sample.availability())
+        assertThat(samples).hasSize(3).allSatisfy(sample -> assertThat(sample.availability())
                 .isEqualTo(MetricAvailability.AVAILABLE));
         assertThat(samples).filteredOn(sample -> sample.metricKey().equals("consumer.lag.total"))
                 .singleElement().extracting(MetricSample::value).isEqualTo(42D);
         assertThat(samples).filteredOn(sample -> sample.metricKey().equals("consumer.lag.max_queue"))
                 .singleElement().extracting(MetricSample::value).isEqualTo(30D);
+        assertThat(samples).filteredOn(sample -> sample.metricKey().equals("topic.backlog.total"))
+                .singleElement().extracting(MetricSample::value).isEqualTo(42D);
     }
 
     @Test

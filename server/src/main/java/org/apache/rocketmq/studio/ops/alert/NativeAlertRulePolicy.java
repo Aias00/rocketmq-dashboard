@@ -24,19 +24,21 @@ import java.util.Set;
 
 /** Enforces the scope required to safely evaluate Studio-native metric rules. */
 final class NativeAlertRulePolicy {
-    private static final Map<String, AlertDomain> NATIVE_METRICS = Map.of(
-            "nameserver.availability", AlertDomain.CLUSTER,
-            "broker.availability", AlertDomain.CLUSTER,
-            "proxy.availability", AlertDomain.CLUSTER,
-            "cloud.instance.availability", AlertDomain.CLUSTER,
-            "broker.disk.usage_ratio", AlertDomain.CLUSTER,
-            "broker.jvm.heap.usage_ratio", AlertDomain.CLUSTER,
-            "broker.send_queue.usage_ratio", AlertDomain.CLUSTER,
-            "consumer.lag.total", AlertDomain.BUSINESS,
-            "consumer.lag.max_queue", AlertDomain.BUSINESS,
-            "dlq.message.count", AlertDomain.BUSINESS);
+    private static final Map<String, AlertDomain> NATIVE_METRICS = Map.ofEntries(
+            Map.entry("nameserver.availability", AlertDomain.CLUSTER),
+            Map.entry("broker.availability", AlertDomain.CLUSTER),
+            Map.entry("proxy.availability", AlertDomain.CLUSTER),
+            Map.entry("cloud.instance.availability", AlertDomain.CLUSTER),
+            Map.entry("broker.disk.usage_ratio", AlertDomain.CLUSTER),
+            Map.entry("broker.jvm.heap.usage_ratio", AlertDomain.CLUSTER),
+            Map.entry("broker.send_queue.usage_ratio", AlertDomain.CLUSTER),
+            Map.entry("consumer.lag.total", AlertDomain.BUSINESS),
+            Map.entry("consumer.lag.max_queue", AlertDomain.BUSINESS),
+            Map.entry("topic.backlog.total", AlertDomain.BUSINESS),
+            Map.entry("dlq.message.count", AlertDomain.BUSINESS));
     private static final Set<String> GROUP_SCOPED_METRICS = Set.of(
-            "consumer.lag.total", "consumer.lag.max_queue", "dlq.message.count");
+            "consumer.lag.total", "consumer.lag.max_queue", "topic.backlog.total", "dlq.message.count");
+    private static final Set<String> TOPIC_SCOPED_METRICS = Set.of("topic.backlog.total");
     private static final Set<String> AVAILABILITY_METRICS = Set.of(
             "nameserver.availability", "broker.availability", "proxy.availability", "cloud.instance.availability");
 
@@ -63,6 +65,9 @@ final class NativeAlertRulePolicy {
         }
         if (StringUtils.hasText(rule.getConsumerGroup()) && !GROUP_SCOPED_METRICS.contains(rule.getMetric())) {
             throw new BusinessException(400, "consumerGroup is not supported for metric " + rule.getMetric());
+        }
+        if (StringUtils.hasText(rule.getTopic()) && !TOPIC_SCOPED_METRICS.contains(rule.getMetric())) {
+            throw new BusinessException(400, "topic is not supported for metric " + rule.getMetric());
         }
         if (rule.getConsecutiveSamples() < 1) {
             throw new BusinessException(400, "consecutiveSamples must be at least 1");
