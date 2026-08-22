@@ -93,12 +93,12 @@ public class NotificationOutboxService {
     }
 
     public void enqueue(SystemAlertVO alert, AlertRuleVO rule, Map<String, String> labels) {
-        boolean silenced = labels == null || labels.isEmpty()
-                ? silenceService.isActive(rule, alert.getInstanceId(), alert.getTime())
-                : silenceService.isActive(rule, alert.getInstanceId(), labels, alert.getTime());
-        if (alert.getId() == null || silenced) {
+        if (alert.getId() == null) {
             return;
         }
+        Map<String, String> effectiveLabels = labels == null ? Map.of() : labels;
+        LocalDateTime silenceEndsAt = silenceService.activeUntil(rule, alert.getInstanceId(), effectiveLabels,
+                alert.getTime());
         Set<String> channels = new LinkedHashSet<>();
         if (rule.getChannels() != null) {
             rule.getChannels().stream().filter(StringUtils::hasText)
@@ -113,7 +113,7 @@ public class NotificationOutboxService {
             row.setChannel(channel);
             row.setStatus(NotificationOutboxStatus.PENDING.name());
             row.setAttemptCount(0);
-            row.setNextAttemptAt(LocalDateTime.now());
+            row.setNextAttemptAt(silenceEndsAt == null ? LocalDateTime.now() : silenceEndsAt);
             mapper.insert(row);
         }
     }
@@ -147,6 +147,13 @@ public class NotificationOutboxService {
     private void send(RmqAlertNotificationOutbox row, LocalDateTime now) {
         try {
             SystemAlertVO alert = loadAlert(row.getAlertId());
+            LocalDateTime silenceEndsAt = silenceService.activeUntil(
+                    AlertRuleVO.builder().id(alert.getRuleId()).domain(alert.getDomain()).build(),
+                    alert.getInstanceId(), Map.of(), now);
+            if (silenceEndsAt != null) {
+                deferUntilSilenceEnds(row, silenceEndsAt);
+                return;
+            }
             GeneralSettingsVO settings = settingsRepository.loadGeneralSettings();
             if ("email".equals(row.getChannel())) {
                 sendEmail(settings, alert);
@@ -161,6 +168,12 @@ public class NotificationOutboxService {
         } catch (Exception error) {
             retry(row, now, error.getMessage());
         }
+    }
+
+    private void deferUntilSilenceEnds(RmqAlertNotificationOutbox row, LocalDateTime silenceEndsAt) {
+        mapper.update(null, new UpdateWrapper<RmqAlertNotificationOutbox>().eq("id", row.getId())
+                .set("status", NotificationOutboxStatus.PENDING.name()).set("next_attempt_at", silenceEndsAt)
+                .set("sending_started_at", null));
     }
 
     private void sendWebhook(GeneralSettingsVO settings, SystemAlertVO alert, String channel) {

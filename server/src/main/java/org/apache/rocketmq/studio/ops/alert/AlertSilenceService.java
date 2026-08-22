@@ -75,9 +75,20 @@ public class AlertSilenceService {
     }
 
     public boolean isActive(AlertRuleVO rule, String instanceId, Map<String, String> labels, LocalDateTime now) {
+        return activeUntil(rule, instanceId, labels, now) != null;
+    }
+
+    /**
+     * Returns the end of the currently matching maintenance window, or {@code null} when delivery is allowed.
+     * Overlapping matching windows suppress delivery until the last one ends.
+     */
+    public LocalDateTime activeUntil(AlertRuleVO rule, String instanceId, Map<String, String> labels,
+            LocalDateTime now) {
         AlertDomain domain = rule.getDomain() == null ? AlertDomain.BUSINESS : rule.getDomain();
-        return repository.findAll().stream().anyMatch(silence -> matches(silence, rule.getId(), domain, instanceId,
-                labels == null ? Map.of() : labels, now));
+        return repository.findAll().stream()
+                .filter(silence -> matches(silence, rule.getId(), domain, instanceId,
+                        labels == null ? Map.of() : labels, now))
+                .map(AlertSilenceVO::getEndsAt).max(LocalDateTime::compareTo).orElse(null);
     }
 
     private static boolean matches(AlertSilenceVO silence, Long ruleId, AlertDomain domain, String instanceId,

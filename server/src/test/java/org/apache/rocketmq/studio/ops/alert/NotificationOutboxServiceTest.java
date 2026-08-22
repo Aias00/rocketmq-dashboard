@@ -26,6 +26,7 @@ import java.util.List;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.client.ExpectedCount.once;
@@ -46,13 +47,40 @@ class NotificationOutboxServiceTest {
         NotificationOutboxService service = new NotificationOutboxService(mapper, mock(SettingsRepository.class),
                 silences, mock(AlertRepository.class), mock(OperationAuditService.class));
 
-        when(silences.isActive(rule, "local", alert.getTime())).thenReturn(false);
+        when(silences.activeUntil(rule, "local", java.util.Map.of(), alert.getTime())).thenReturn(null);
         service.enqueue(alert, rule);
         verify(mapper, org.mockito.Mockito.times(3)).insert(any(RmqAlertNotificationOutbox.class));
 
-        when(silences.isActive(rule, "local", alert.getTime())).thenReturn(true);
+        when(silences.activeUntil(rule, "local", java.util.Map.of(), alert.getTime()))
+                .thenReturn(alert.getTime().plusHours(1));
         service.enqueue(alert, rule);
-        verify(mapper, org.mockito.Mockito.times(3)).insert(any(RmqAlertNotificationOutbox.class));
+        verify(mapper, org.mockito.Mockito.times(6)).insert(any(RmqAlertNotificationOutbox.class));
+    }
+
+    @Test
+    void defersDeliveryUntilTheActiveSilenceEnds() {
+        RmqAlertNotificationOutboxMapper mapper = mock(RmqAlertNotificationOutboxMapper.class);
+        AlertSilenceService silences = mock(AlertSilenceService.class);
+        AlertRepository alerts = mock(AlertRepository.class);
+        OperationAuditService audit = mock(OperationAuditService.class);
+        RmqAlertNotificationOutbox row = new RmqAlertNotificationOutbox();
+        row.setId(8L);
+        row.setAlertId(9L);
+        row.setChannel("dingtalk");
+        when(mapper.findDispatchable(any(LocalDateTime.class), any(LocalDateTime.class), any(Integer.class)))
+                .thenReturn(List.of(row));
+        when(mapper.claimForDispatch(any(), any(LocalDateTime.class), any(LocalDateTime.class),
+                any(LocalDateTime.class))).thenReturn(1);
+        LocalDateTime silenceEndsAt = LocalDateTime.now().plusHours(1);
+        when(alerts.findAlerts(null)).thenReturn(List.of(SystemAlertVO.builder().id(9L).ruleId(4L)
+                .domain(AlertDomain.BUSINESS).instanceId("local").build()));
+        when(silences.activeUntil(any(AlertRuleVO.class), org.mockito.ArgumentMatchers.eq("local"),
+                org.mockito.ArgumentMatchers.eq(java.util.Map.of()), any(LocalDateTime.class))).thenReturn(silenceEndsAt);
+
+        new NotificationOutboxService(mapper, mock(SettingsRepository.class), silences, alerts, audit).dispatch();
+
+        verify(mapper).update(any(), any());
+        verify(audit, never()).record(any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
