@@ -61,7 +61,14 @@ public class NotificationOutboxService {
     }
 
     public void enqueue(SystemAlertVO alert, AlertRuleVO rule) {
-        if (alert.getId() == null || silenceService.isActive(rule, alert.getInstanceId(), alert.getTime())) {
+        enqueue(alert, rule, Map.of());
+    }
+
+    public void enqueue(SystemAlertVO alert, AlertRuleVO rule, Map<String, String> labels) {
+        boolean silenced = labels == null || labels.isEmpty()
+                ? silenceService.isActive(rule, alert.getInstanceId(), alert.getTime())
+                : silenceService.isActive(rule, alert.getInstanceId(), labels, alert.getTime());
+        if (alert.getId() == null || silenced) {
             return;
         }
         Set<String> channels = new LinkedHashSet<>();

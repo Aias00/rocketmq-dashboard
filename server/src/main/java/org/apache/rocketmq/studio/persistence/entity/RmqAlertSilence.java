@@ -31,6 +31,7 @@ public class RmqAlertSilence {
     private String domain;
     private Long ruleId;
     private String instanceId;
+    private String labelsJson;
     private LocalDateTime startsAt;
     private LocalDateTime endsAt;
     private String reason;

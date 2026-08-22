@@ -20,12 +20,15 @@ import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 
 @Data
 public class CreateAlertSilenceDTO {
     private AlertDomain domain;
     private Long ruleId;
     private String instanceId;
+    /** Optional exact-match labels, such as brokerName, topic, or consumerGroup. */
+    private Map<String, String> labels;
     @NotNull(message = "startsAt is required")
     private LocalDateTime startsAt;
     @NotNull(message = "endsAt is required")

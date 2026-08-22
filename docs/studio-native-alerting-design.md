@@ -3,10 +3,9 @@
 ## Status
 
 Implementation in progress. Native Apache collection, snapshots, scheduling, evaluation, event lifecycle,
-acknowledgement, multi-replica collection lease, rule test-runs, and rule/instance-scoped silence management
-are in place. Notification delivery, label-scoped silences, provider capability catalogs, and non-Apache
-collectors remain pending. This design does not require Prometheus or Alertmanager for rule evaluation or
-event creation.
+acknowledgement, multi-replica collection lease, rule test-runs, label-scoped silence management, and
+webhook outbox delivery are in place. Provider capability catalogs, email delivery, and non-Apache collectors
+remain pending. This design does not require Prometheus or Alertmanager for rule evaluation or event creation.
 
 ## Goals
 

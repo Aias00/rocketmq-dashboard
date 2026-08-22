@@ -204,6 +204,7 @@ describe('SystemAlertsPage', () => {
     expect(await screen.findByText(/CLUSTER.*local/)).toBeInTheDocument();
 
     await user.type(screen.getByLabelText('规则 ID'), '42');
+    await user.type(screen.getByLabelText('标签范围'), 'brokerName=broker-a,topic=orders');
     fireEvent.change(screen.getByLabelText('开始时间'), { target: { value: '2026-08-11T01:00' } });
     fireEvent.change(screen.getByLabelText('结束时间'), { target: { value: '2026-08-11T02:00' } });
     await user.click(screen.getByRole('button', { name: /创\s*建/ }));
@@ -213,6 +214,7 @@ describe('SystemAlertsPage', () => {
         expect.objectContaining({
           domain: 'BUSINESS',
           ruleId: 42,
+          labels: { brokerName: 'broker-a', topic: 'orders' },
           startsAt: '2026-08-11T01:00',
           endsAt: '2026-08-11T02:00',
         }),

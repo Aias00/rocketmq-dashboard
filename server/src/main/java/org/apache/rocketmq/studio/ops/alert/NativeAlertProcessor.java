@@ -62,7 +62,7 @@ public class NativeAlertProcessor {
                             .acknowledged(false).domain(sample.domain()).ruleId(rule.getId())
                             .fingerprint(key.fingerprint()).transition(update.transition().name())
                             .instanceId(sample.instanceId()).currentValue(update.state().currentValue()).build());
-                    notificationOutboxService.enqueue(event, rule);
+                    notificationOutboxService.enqueue(event, rule, sample.labels());
                 }
             }
         }

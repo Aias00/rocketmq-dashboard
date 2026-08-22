@@ -312,6 +312,7 @@ CREATE TABLE IF NOT EXISTS rmq_alert_silence (
   `domain` VARCHAR(16) NULL,
   `rule_id` bigint(20) unsigned NULL,
   `instance_id` VARCHAR(128) NULL,
+  `labels_json` TEXT NULL,
   `starts_at` DATETIME NOT NULL,
   `ends_at` DATETIME NOT NULL,
   `reason` VARCHAR(512) NULL,

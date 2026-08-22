@@ -22,6 +22,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 
 @Data
 @Builder
@@ -32,6 +33,7 @@ public class AlertSilenceVO {
     private AlertDomain domain;
     private Long ruleId;
     private String instanceId;
+    private Map<String, String> labels;
     private LocalDateTime startsAt;
     private LocalDateTime endsAt;
     private String reason;

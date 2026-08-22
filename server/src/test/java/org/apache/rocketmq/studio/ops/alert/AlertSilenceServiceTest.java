@@ -26,6 +26,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -81,5 +82,21 @@ class AlertSilenceServiceTest {
         assertThatThrownBy(() -> service.create(request))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("Silence end time must be after start time");
+    }
+
+    @Test
+    void matchesOnlyWhenAllConfiguredResourceLabelsMatch() {
+        AlertSilenceService service = new AlertSilenceService(repository, operationAuditService);
+        LocalDateTime now = LocalDateTime.of(2026, 8, 22, 10, 0);
+        AlertSilenceVO silence = AlertSilenceVO.builder().domain(AlertDomain.CLUSTER).ruleId(5L)
+                .instanceId("local").labels(Map.of("brokerName", "broker-a"))
+                .startsAt(now.minusMinutes(1)).endsAt(now.plusMinutes(1)).createdBy("admin").build();
+        when(repository.findAll()).thenReturn(List.of(silence));
+
+        AlertRuleVO rule = AlertRuleVO.builder().id(5L).domain(AlertDomain.CLUSTER).build();
+        assertThat(service.isActive(rule, "local", Map.of("brokerName", "broker-a", "cluster", "Default"), now))
+                .isTrue();
+        assertThat(service.isActive(rule, "local", Map.of("brokerName", "broker-b"), now)).isFalse();
+        assertThat(service.isActive(rule, "local", Map.of(), now)).isFalse();
     }
 }

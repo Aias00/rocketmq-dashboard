@@ -58,6 +58,19 @@ const { Text } = Typography;
 
 const normalizeAlertLevel = (level?: string | null) => (level ?? '').toLowerCase();
 
+const parseSilenceLabels = (value?: string): Record<string, string> | undefined => {
+  if (!value?.trim()) return undefined;
+  const labels: Record<string, string> = {};
+  for (const pair of value.split(',')) {
+    const separator = pair.indexOf('=');
+    if (separator <= 0 || !pair.slice(separator + 1).trim()) {
+      throw new Error('标签格式应为 key=value，并以逗号分隔');
+    }
+    labels[pair.slice(0, separator).trim()] = pair.slice(separator + 1).trim();
+  }
+  return labels;
+};
+
 const SystemAlertsPage = () => {
   const { t } = useLang();
   const userId = useAuthStore((state) => state.userId);
@@ -198,6 +211,7 @@ const SystemAlertsPage = () => {
       startsAt: string;
       endsAt: string;
       reason?: string;
+      labelsText?: string;
     };
     try {
       values = await silenceForm.validateFields();
@@ -207,9 +221,13 @@ const SystemAlertsPage = () => {
     setSavingSilence(true);
     try {
       const request: CreateAlertSilence = {
-        ...values,
+        instanceId: values.instanceId,
+        startsAt: values.startsAt,
+        endsAt: values.endsAt,
+        reason: values.reason,
         ruleId: values.ruleId ? Number(values.ruleId) : undefined,
         domain: values.domain || undefined,
+        labels: parseSilenceLabels(values.labelsText),
       };
       await createAlertSilence(request);
       silenceForm.resetFields();
@@ -492,6 +510,13 @@ const SystemAlertsPage = () => {
             <Form.Item name="reason" label="原因">
               <Input maxLength={512} />
             </Form.Item>
+            <Form.Item
+              name="labelsText"
+              label="标签范围"
+              extra="可选，格式：brokerName=broker-a,topic=orders"
+            >
+              <Input />
+            </Form.Item>
           </Form>
         )}
         <Spin spinning={loadingSilences}>
@@ -502,6 +527,11 @@ const SystemAlertsPage = () => {
                 <Text>
                   {silence.domain ?? '全部'} · {silence.instanceId ?? '全部实例'} ·{' '}
                   {silence.startsAt} - {silence.endsAt}
+                  {silence.labels && Object.keys(silence.labels).length > 0
+                    ? ` · ${Object.entries(silence.labels)
+                        .map(([key, value]) => `${key}=${value}`)
+                        .join(', ')}`
+                    : ''}
                 </Text>
                 {canManageSilences && (
                   <Button

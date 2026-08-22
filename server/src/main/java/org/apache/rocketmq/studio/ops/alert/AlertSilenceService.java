@@ -24,6 +24,8 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -47,6 +49,7 @@ public class AlertSilenceService {
         }
         AlertSilenceVO silence = AlertSilenceVO.builder().domain(request.getDomain())
                 .ruleId(request.getRuleId()).instanceId(trimToNull(request.getInstanceId()))
+                .labels(normalizeLabels(request.getLabels()))
                 .startsAt(request.getStartsAt()).endsAt(request.getEndsAt())
                 .reason(trimToNull(request.getReason()))
                 .createdBy(AuthenticatedUserContext.currentUsernameOrSystem()).build();
@@ -68,19 +71,41 @@ public class AlertSilenceService {
     }
 
     public boolean isActive(AlertRuleVO rule, String instanceId, LocalDateTime now) {
+        return isActive(rule, instanceId, Map.of(), now);
+    }
+
+    public boolean isActive(AlertRuleVO rule, String instanceId, Map<String, String> labels, LocalDateTime now) {
         AlertDomain domain = rule.getDomain() == null ? AlertDomain.BUSINESS : rule.getDomain();
-        return repository.findAll().stream().anyMatch(silence -> matches(silence, rule.getId(), domain, instanceId, now));
+        return repository.findAll().stream().anyMatch(silence -> matches(silence, rule.getId(), domain, instanceId,
+                labels == null ? Map.of() : labels, now));
     }
 
     private static boolean matches(AlertSilenceVO silence, Long ruleId, AlertDomain domain, String instanceId,
-            LocalDateTime now) {
+            Map<String, String> labels, LocalDateTime now) {
         return !now.isBefore(silence.getStartsAt()) && now.isBefore(silence.getEndsAt())
                 && (silence.getDomain() == null || silence.getDomain() == domain)
                 && (silence.getRuleId() == null || silence.getRuleId().equals(ruleId))
-                && (silence.getInstanceId() == null || silence.getInstanceId().equals(instanceId));
+                && (silence.getInstanceId() == null || silence.getInstanceId().equals(instanceId))
+                && (silence.getLabels() == null || labels.entrySet().containsAll(silence.getLabels().entrySet()));
     }
 
     private static String trimToNull(String value) {
         return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    private static Map<String, String> normalizeLabels(Map<String, String> labels) {
+        if (labels == null || labels.isEmpty()) return Map.of();
+        if (labels.size() > 16) throw new BusinessException(400, "At most 16 silence labels are supported");
+        Map<String, String> normalized = new LinkedHashMap<>();
+        labels.forEach((key, value) -> {
+            String normalizedKey = trimToNull(key);
+            String normalizedValue = trimToNull(value);
+            if (normalizedKey == null || normalizedValue == null || normalizedKey.length() > 128
+                    || normalizedValue.length() > 512) {
+                throw new BusinessException(400, "Silence labels must have non-empty bounded keys and values");
+            }
+            normalized.put(normalizedKey, normalizedValue);
+        });
+        return Map.copyOf(normalized);
     }
 }

@@ -79,6 +79,7 @@ export interface AlertSilence {
   domain?: 'BUSINESS' | 'CLUSTER' | null;
   ruleId?: number | null;
   instanceId?: string | null;
+  labels?: Record<string, string>;
   startsAt: string;
   endsAt: string;
   reason?: string | null;
