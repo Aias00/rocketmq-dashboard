@@ -48,8 +48,6 @@ import {
   testAlertRule,
   updateAlertRule,
 } from '../../services/opsService';
-<<<<<<< HEAD
-import { attachThresholdUnit } from './alertRulePayload';
 import { tableScrollX } from '../../utils/table';
 const { TextArea } = Input;
 
