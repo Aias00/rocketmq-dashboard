@@ -98,6 +98,34 @@ class SystemAlertControllerTest {
     }
 
     @Test
+    void listDeliveriesPageShouldForwardFiltersAndPaging() throws Exception {
+        NotificationDeliveryPageVO delivery = NotificationDeliveryPageVO.builder().id(8L).alertId(9L)
+                .channel("dingtalk").status(NotificationOutboxStatus.DELIVERED).attemptCount(0)
+                .alertTitle("Disk usage high").instanceId("local").build();
+        when(notificationOutboxService.listDeliveries("dingtalk", "DELIVERED", "local", 2, 10))
+                .thenReturn(PageResult.of(List.of(delivery), 11, 2, 10));
+
+        mockMvc.perform(get("/api/system-alerts/deliveries/page").param("channel", "dingtalk")
+                        .param("status", "DELIVERED").param("instanceId", "local")
+                        .param("page", "2").param("pageSize", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(11))
+                .andExpect(jsonPath("$.data.items[0].channel").value("dingtalk"))
+                .andExpect(jsonPath("$.data.items[0].alertTitle").value("Disk usage high"));
+
+        verify(notificationOutboxService).listDeliveries("dingtalk", "DELIVERED", "local", 2, 10);
+    }
+
+    @Test
+    void retryFailedDeliveryShouldForwardDeliveryId() throws Exception {
+        mockMvc.perform(post("/api/system-alerts/deliveries/8/retry"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200));
+
+        verify(notificationOutboxService).retryFailedDelivery(8L);
+    }
+
+    @Test
     void acknowledgeAlertShouldPassValidatedRequest() throws Exception {
         SystemAlertVO acknowledged = SystemAlertVO.builder()
                 .id(1L)

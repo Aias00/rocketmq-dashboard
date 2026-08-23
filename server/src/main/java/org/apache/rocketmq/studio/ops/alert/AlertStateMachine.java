@@ -32,6 +32,11 @@ public class AlertStateMachine {
 
     public AlertStateUpdate advance(AlertRuleState previous, AlertEvaluationResult evaluation,
             int requiredConsecutiveSamples, Duration requiredDuration, Instant now) {
+        return advance(previous, evaluation, requiredConsecutiveSamples, requiredDuration, Duration.ZERO, now);
+    }
+
+    public AlertStateUpdate advance(AlertRuleState previous, AlertEvaluationResult evaluation,
+            int requiredConsecutiveSamples, Duration requiredDuration, Duration reminderInterval, Instant now) {
         if (requiredConsecutiveSamples < 1) {
             throw new IllegalArgumentException("requiredConsecutiveSamples must be positive");
         }
@@ -48,33 +53,43 @@ public class AlertStateMachine {
             return new AlertStateUpdate(state, AlertStateTransition.NONE);
         }
         if (evaluation.conditionMet()) {
-            return advanceHit(state, evaluation.currentValue(), requiredConsecutiveSamples, requiredDuration, now);
+            return advanceHit(state, evaluation.currentValue(), requiredConsecutiveSamples, requiredDuration,
+                    reminderInterval, now);
         }
         return advanceClear(state, evaluation.currentValue(), now);
     }
 
     private AlertStateUpdate advanceHit(AlertRuleState state, Double value, int required, Duration duration,
-            Instant now) {
-        if (state.status() == AlertStateStatus.FIRING || state.status() == AlertStateStatus.ACKED) {
+            Duration reminderInterval, Instant now) {
+        if (state.status() == AlertStateStatus.ACKED) {
             return new AlertStateUpdate(new AlertRuleState(state.status(), state.consecutiveHits(), value,
-                    state.firstPendingAt(), state.firedAt(), null), AlertStateTransition.NONE);
+                    state.firstPendingAt(), state.firedAt(), state.lastNotifiedAt(), null), AlertStateTransition.NONE);
+        }
+        if (state.status() == AlertStateStatus.FIRING) {
+            Instant lastNotifiedAt = state.lastNotifiedAt();
+            if (!reminderInterval.isZero() && (lastNotifiedAt == null || !now.isBefore(lastNotifiedAt.plus(reminderInterval)))) {
+                return new AlertStateUpdate(new AlertRuleState(AlertStateStatus.FIRING, state.consecutiveHits(), value,
+                        state.firstPendingAt(), state.firedAt(), now, null), AlertStateTransition.REMINDER);
+            }
+            return new AlertStateUpdate(new AlertRuleState(AlertStateStatus.FIRING, state.consecutiveHits(), value,
+                    state.firstPendingAt(), state.firedAt(), lastNotifiedAt, null), AlertStateTransition.NONE);
         }
         int hits = state.consecutiveHits() + 1;
         Instant pendingAt = state.firstPendingAt() == null ? now : state.firstPendingAt();
         if (hits < required || now.isBefore(pendingAt.plus(duration))) {
             return new AlertStateUpdate(new AlertRuleState(AlertStateStatus.PENDING, hits, value, pendingAt,
-                    null, null), AlertStateTransition.PENDING);
+                    null, null, null), AlertStateTransition.PENDING);
         }
         return new AlertStateUpdate(new AlertRuleState(AlertStateStatus.FIRING, hits, value, pendingAt, now,
-                null), AlertStateTransition.FIRING);
+                now, null), AlertStateTransition.FIRING);
     }
 
     private AlertStateUpdate advanceClear(AlertRuleState state, Double value, Instant now) {
         if (state.status() == AlertStateStatus.FIRING || state.status() == AlertStateStatus.ACKED) {
             return new AlertStateUpdate(new AlertRuleState(AlertStateStatus.RESOLVED, 0, value, null,
-                    state.firedAt(), now), AlertStateTransition.RESOLVED);
+                    state.firedAt(), state.lastNotifiedAt(), now), AlertStateTransition.RESOLVED);
         }
-        return new AlertStateUpdate(new AlertRuleState(AlertStateStatus.OK, 0, value, null, null, null),
+        return new AlertStateUpdate(new AlertRuleState(AlertStateStatus.OK, 0, value, null, null, null, null),
                 AlertStateTransition.NONE);
     }
 }

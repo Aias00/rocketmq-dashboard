@@ -85,6 +85,7 @@ public class MybatisPlusAlertStateRepository implements AlertStateRepository {
         entity.setCurrentValue(state.currentValue());
         entity.setFirstPendingAt(toLocal(state.firstPendingAt()));
         entity.setFiredAt(toLocal(state.firedAt()));
+        entity.setLastNotifiedAt(toLocal(state.lastNotifiedAt()));
         entity.setResolvedAt(toLocal(state.resolvedAt()));
         entity.setGmtModified(LocalDateTime.now(ZoneOffset.UTC));
     }
@@ -92,7 +93,8 @@ public class MybatisPlusAlertStateRepository implements AlertStateRepository {
     private static AlertRuleState toState(RmqAlertState entity) {
         return new AlertRuleState(AlertStateStatus.valueOf(entity.getStatus()),
                 entity.getConsecutiveHits() == null ? 0 : entity.getConsecutiveHits(), entity.getCurrentValue(),
-                toInstant(entity.getFirstPendingAt()), toInstant(entity.getFiredAt()), toInstant(entity.getResolvedAt()));
+                toInstant(entity.getFirstPendingAt()), toInstant(entity.getFiredAt()),
+                toInstant(entity.getLastNotifiedAt()), toInstant(entity.getResolvedAt()));
     }
 
     private static LocalDateTime toLocal(Instant instant) {

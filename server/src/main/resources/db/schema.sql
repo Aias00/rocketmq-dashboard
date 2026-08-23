@@ -264,6 +264,7 @@ CREATE TABLE IF NOT EXISTS rmq_alert_rule (
   consumer_group VARCHAR(255) COMMENT 'Optional consumer group selector for business metrics',
   topic VARCHAR(255) COMMENT 'Optional topic selector for topic backlog metrics',
   consecutive_samples INT NOT NULL DEFAULT 1 COMMENT 'Consecutive native samples required before firing',
+  reminder_interval VARCHAR(32) NOT NULL DEFAULT '30m' COMMENT 'Repeat notification interval while unacknowledged',
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -304,6 +305,7 @@ CREATE TABLE IF NOT EXISTS rmq_alert_state (
   `current_value` DOUBLE NULL,
   `first_pending_at` DATETIME NULL,
   `fired_at` DATETIME NULL,
+  `last_notified_at` DATETIME NULL,
   `resolved_at` DATETIME NULL,
   `version` INT NOT NULL DEFAULT 0,
   `gmt_modified` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,

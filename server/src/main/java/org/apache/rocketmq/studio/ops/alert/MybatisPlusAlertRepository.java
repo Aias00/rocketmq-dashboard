@@ -172,6 +172,7 @@ public class MybatisPlusAlertRepository implements AlertRepository {
         vo.setConsumerGroup(entity.getConsumerGroup());
         vo.setTopic(entity.getTopic());
         vo.setConsecutiveSamples(entity.getConsecutiveSamples() == null ? 1 : entity.getConsecutiveSamples());
+        vo.setReminderInterval(StringUtils.hasText(entity.getReminderInterval()) ? entity.getReminderInterval() : "30m");
         return vo;
     }
 
@@ -200,6 +201,7 @@ public class MybatisPlusAlertRepository implements AlertRepository {
         entity.setConsumerGroup(rule.getConsumerGroup());
         entity.setTopic(rule.getTopic());
         entity.setConsecutiveSamples(Math.max(1, rule.getConsecutiveSamples()));
+        entity.setReminderInterval(StringUtils.hasText(rule.getReminderInterval()) ? rule.getReminderInterval() : "30m");
         entity.setGmtModified(LocalDateTime.now());
         return entity;
     }

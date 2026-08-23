@@ -50,7 +50,7 @@ public class AlertSchemaMigration implements ApplicationRunner {
             new Table("rmq_alert_state", "CREATE TABLE rmq_alert_state ("
                     + "id BIGINT AUTO_INCREMENT PRIMARY KEY, rule_id BIGINT NOT NULL, fingerprint CHAR(64) NOT NULL, "
                     + "status VARCHAR(16) NOT NULL, consecutive_hits INT NOT NULL DEFAULT 0, current_value DOUBLE, "
-                    + "first_pending_at DATETIME, fired_at DATETIME, resolved_at DATETIME, version INT NOT NULL DEFAULT 0, "
+                    + "first_pending_at DATETIME, fired_at DATETIME, last_notified_at DATETIME, resolved_at DATETIME, version INT NOT NULL DEFAULT 0, "
                     + "gmt_modified DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "
                     + "CONSTRAINT uk_alert_state_rule_fingerprint UNIQUE (rule_id, fingerprint))"),
             new Table("rmq_alert_silence", "CREATE TABLE rmq_alert_silence ("
@@ -73,6 +73,8 @@ public class AlertSchemaMigration implements ApplicationRunner {
             new Column("rmq_alert_rule", "consumer_group", "VARCHAR(255)"),
             new Column("rmq_alert_rule", "topic", "VARCHAR(255)"),
             new Column("rmq_alert_rule", "consecutive_samples", "INT NOT NULL DEFAULT 1"),
+            new Column("rmq_alert_rule", "reminder_interval", "VARCHAR(32) NOT NULL DEFAULT '30m'"),
+            new Column("rmq_alert_state", "last_notified_at", "DATETIME"),
             new Column("rmq_system_alert", "acknowledged_by", "VARCHAR(128)"),
             new Column("rmq_system_alert", "acknowledged_at", "DATETIME"),
             new Column("rmq_system_alert", "domain", "VARCHAR(16)"),

@@ -20,5 +20,6 @@ public enum AlertStateTransition {
     NONE,
     PENDING,
     FIRING,
+    REMINDER,
     RESOLVED
 }

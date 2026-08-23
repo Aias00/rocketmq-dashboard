@@ -55,6 +55,8 @@ public class AlertRuleRequestDTO {
     private String topic;
     @Min(value = 1, message = "consecutiveSamples must be at least 1")
     private Integer consecutiveSamples;
+    @Pattern(regexp = "(?:[0-9]+(?:ms|s|m|h|d|w|y))+", message = "reminderInterval is invalid")
+    private String reminderInterval;
 
     public AlertRuleVO toAlertRuleVO() {
         return AlertRuleVO.builder()
@@ -77,6 +79,7 @@ public class AlertRuleRequestDTO {
                 .consumerGroup(consumerGroup)
                 .topic(topic)
                 .consecutiveSamples(consecutiveSamples == null ? 1 : consecutiveSamples)
+                .reminderInterval(reminderInterval == null ? "30m" : reminderInterval)
                 .build();
     }
 

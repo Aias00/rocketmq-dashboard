@@ -37,6 +37,7 @@ import {
   PlugsConnected,
   BellRinging,
   Siren,
+  PaperPlaneTilt,
   Notebook,
   Warning,
 } from '@phosphor-icons/react';
@@ -220,6 +221,11 @@ const MainLayout = () => {
             icon: <Siren size={16} />,
             label: t('nav.alertEvents'),
           },
+          {
+            key: '/ops/alert-deliveries',
+            icon: <PaperPlaneTilt size={16} />,
+            label: t('nav.alertDeliveries'),
+          },
           { key: '/ops/dashboard', icon: <ChartBar size={16} />, label: t('nav.dashboard') },
         ],
       },
@@ -255,6 +261,7 @@ const MainLayout = () => {
       '/ops/dashboard': t('nav.dashboard'),
       '/ops/grafana': t('nav.grafanaDashboards'),
       '/ops/system-alerts': t('nav.alertEvents'),
+      '/ops/alert-deliveries': t('nav.alertDeliveries'),
       '/ops/business-alerts': t('nav.alertRuleAssets'),
       '/ops/alerts': t('nav.alertRules'),
       '/ops/audit': t('nav.audit'),

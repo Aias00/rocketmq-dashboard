@@ -41,7 +41,6 @@ class CollectorSchedulerTest {
     @Test
     void persistsFastInstanceWhileAnotherInstanceTimesOut() throws Exception {
         AlertingProperties properties = new AlertingProperties();
-        properties.setCollectionEnabled(true);
         properties.setCollectionParallelism(2);
         properties.setCollectionTimeout("PT0.1S");
         InstanceRepository instances = mock(InstanceRepository.class);
@@ -85,9 +84,8 @@ class CollectorSchedulerTest {
     }
 
     @Test
-    void collectsAndPersistsSupportedSamplesWhenEnabled() {
+    void collectsAndPersistsSupportedSamples() {
         AlertingProperties properties = new AlertingProperties();
-        properties.setCollectionEnabled(true);
         InstanceRepository instances = mock(InstanceRepository.class);
         ClusterMetricsCollector collector = mock(ClusterMetricsCollector.class);
         MetricSnapshotRepository snapshots = mock(MetricSnapshotRepository.class);
@@ -108,19 +106,6 @@ class CollectorSchedulerTest {
     }
 
     @Test
-    void doesNotCollectWhenDisabled() {
-        AlertingProperties properties = new AlertingProperties();
-        InstanceRepository instances = mock(InstanceRepository.class);
-        MetricSnapshotRepository snapshots = mock(MetricSnapshotRepository.class);
-
-        new CollectorScheduler(properties, instances, List.of(), List.of(), snapshots, mock(NativeAlertProcessor.class),
-                mock(AlertCollectionLease.class)).collect();
-
-        verify(instances, never()).findAll();
-        verify(snapshots, never()).saveAll(any());
-    }
-
-    @Test
     void removesExpiredSnapshotsUsingConfiguredRetention() {
         AlertingProperties properties = new AlertingProperties();
         properties.setSnapshotRetention("PT2H");
@@ -135,7 +120,6 @@ class CollectorSchedulerTest {
     @Test
     void doesNotCollectWhenAnotherReplicaHoldsTheLease() {
         AlertingProperties properties = new AlertingProperties();
-        properties.setCollectionEnabled(true);
         InstanceRepository instances = mock(InstanceRepository.class);
         AlertCollectionLease lease = mock(AlertCollectionLease.class);
         when(lease.tryAcquire()).thenReturn(false);
@@ -149,7 +133,6 @@ class CollectorSchedulerTest {
     @Test
     void discardsCollectedSamplesWhenTheLeaseExpiresBeforePersistence() {
         AlertingProperties properties = new AlertingProperties();
-        properties.setCollectionEnabled(true);
         InstanceRepository instances = mock(InstanceRepository.class);
         ClusterMetricsCollector collector = mock(ClusterMetricsCollector.class);
         MetricSnapshotRepository snapshots = mock(MetricSnapshotRepository.class);

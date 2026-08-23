@@ -7,8 +7,9 @@ export interface AlertRule {
   metric: string;
   operator: string;
   threshold: number;
-  thresholdUnit: string;
+  thresholdUnit?: string | null;
   duration: string;
+  reminderInterval?: string;
   aggregation?: 'LAST' | 'MAX' | 'MIN' | 'AVG' | 'SUM';
   windowSeconds?: number;
   channels: string[];
@@ -65,7 +66,6 @@ export interface SystemAlert {
 }
 
 export interface CollectorStatus {
-  collectionEnabled: boolean;
   collectionInterval: string;
   clusterCollectorCount: number;
   businessCollectorCount: number;
@@ -85,12 +85,31 @@ export interface SystemAlertQuery {
 }
 
 export interface NotificationDelivery {
+  id: number;
   channel: string;
   status: 'PENDING' | 'SENDING' | 'DELIVERED' | 'RETRY_WAIT' | 'FAILED';
   attemptCount: number;
   nextAttemptAt?: string | null;
   lastError?: string | null;
   deliveredAt?: string | null;
+}
+
+export interface NotificationDeliveryRecord extends NotificationDelivery {
+  id: number;
+  alertId: number;
+  createdAt: string;
+  alertTitle: string;
+  alertDomain?: 'BUSINESS' | 'CLUSTER' | null;
+  transition?: 'FIRING' | 'RESOLVED' | null;
+  instanceId?: string | null;
+}
+
+export interface NotificationDeliveryQuery {
+  channel?: string;
+  status?: NotificationDelivery['status'];
+  instanceId?: string;
+  page?: number;
+  pageSize?: number;
 }
 
 export interface AlertSilence {
@@ -247,6 +266,18 @@ export async function clearAcknowledgedAlerts() {
 
 export async function listAlertDeliveries(id: number) {
   const res = await client.get<{ data: NotificationDelivery[] }>(`/system-alerts/${id}/deliveries`);
+  return res.data.data;
+}
+
+export async function retryAlertDelivery(id: number) {
+  await client.post(`/system-alerts/deliveries/${id}/retry`);
+}
+
+export async function listAlertDeliveriesPage(params: NotificationDeliveryQuery = {}) {
+  const res = await client.get<{ data: PageResult<NotificationDeliveryRecord> }>(
+    '/system-alerts/deliveries/page',
+    { params },
+  );
   return res.data.data;
 }
 

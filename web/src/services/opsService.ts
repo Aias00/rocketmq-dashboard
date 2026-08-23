@@ -15,6 +15,8 @@ import type {
   AuditRecord,
   PageResult,
   NotificationDelivery,
+  NotificationDeliveryQuery,
+  NotificationDeliveryRecord,
   AlertSilence,
   CreateAlertSilence,
 } from '../api/ops';
@@ -310,7 +312,6 @@ export async function listSystemAlertsPage(
 export async function getCollectorStatus(): Promise<CollectorStatus> {
   if (isMockMode()) {
     return {
-      collectionEnabled: false,
       collectionInterval: 'PT30S',
       clusterCollectorCount: 0,
       businessCollectorCount: 0,
@@ -342,6 +343,20 @@ export async function clearAcknowledgedAlerts(): Promise<number> {
 export async function listAlertDeliveries(id: number): Promise<NotificationDelivery[]> {
   if (isMockMode()) return [];
   return opsApi.listAlertDeliveries(id);
+}
+
+export async function retryAlertDelivery(id: number): Promise<void> {
+  if (isMockMode()) return;
+  return opsApi.retryAlertDelivery(id);
+}
+
+export async function listAlertDeliveriesPage(
+  params: NotificationDeliveryQuery = {},
+): Promise<PageResult<NotificationDeliveryRecord>> {
+  if (isMockMode()) {
+    return { items: [], total: 0, page: params.page ?? 1, size: params.pageSize ?? 20 };
+  }
+  return opsApi.listAlertDeliveriesPage(params);
 }
 
 export async function listAlertSilences(): Promise<AlertSilence[]> {

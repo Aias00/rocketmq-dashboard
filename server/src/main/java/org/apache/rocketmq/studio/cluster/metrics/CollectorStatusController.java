@@ -34,7 +34,7 @@ public class CollectorStatusController {
 
     @GetMapping
     public Result<CollectorStatusVO> status() {
-        return Result.ok(new CollectorStatusVO(properties.isCollectionEnabled(), properties.getCollectionInterval(),
+        return Result.ok(new CollectorStatusVO(properties.getCollectionInterval(),
                 clusterCollectors.size(), businessCollectors.size()));
     }
 }

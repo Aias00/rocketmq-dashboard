@@ -26,7 +26,7 @@ import java.time.LocalDateTime;
 public interface RmqAlertStateMapper extends BaseMapper<RmqAlertState> {
     @Update("UPDATE rmq_alert_state SET status = #{state.status}, consecutive_hits = #{state.consecutiveHits}, "
             + "current_value = #{state.currentValue}, first_pending_at = #{state.firstPendingAt}, "
-            + "fired_at = #{state.firedAt}, resolved_at = #{state.resolvedAt}, "
+            + "fired_at = #{state.firedAt}, last_notified_at = #{state.lastNotifiedAt}, resolved_at = #{state.resolvedAt}, "
             + "gmt_modified = #{state.gmtModified}, version = version + 1 "
             + "WHERE id = #{state.id} AND version = #{expectedVersion}")
     int updateIfVersion(@Param("state") RmqAlertState state, @Param("expectedVersion") int expectedVersion);

@@ -10,6 +10,7 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.rocketmq.studio.audit.OperationAuditService;
+import org.apache.rocketmq.studio.common.domain.PageResult;
 import org.apache.rocketmq.studio.common.util.NoRedirectClientHttpRequestFactory;
 import org.apache.rocketmq.studio.common.util.UrlHostGuard;
 import org.apache.rocketmq.studio.persistence.entity.RmqAlertNotificationOutbox;
@@ -36,6 +37,11 @@ import java.util.Set;
 import java.util.ArrayList;
 import java.util.function.Supplier;
 import java.util.UUID;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
 import jakarta.mail.internet.AddressException;
 import jakarta.mail.internet.InternetAddress;
 
@@ -94,6 +100,22 @@ public class NotificationOutboxService {
         enqueue(alert, rule, Map.of());
     }
 
+    public void sendTestMessage(String channel) {
+        if (!"dingtalk".equals(channel) && !"email".equals(channel) && !"sms".equals(channel)) {
+            throw new IllegalArgumentException("Unsupported notification channel: " + channel);
+        }
+        GeneralSettingsVO settings = settingsRepository.loadGeneralSettings();
+        SystemAlertVO alert = SystemAlertVO.builder().level(org.apache.rocketmq.studio.common.domain.enums.AlertLevel.info)
+                .title("RocketMQ Studio test notification").description("DingTalk notification configuration is working.")
+                .build();
+        try {
+            if ("email".equals(channel)) sendEmail(settings, alert);
+            else sendWebhook(settings, alert, channel);
+        } catch (Exception error) {
+            throw new IllegalStateException("Test notification failed: " + error.getMessage(), error);
+        }
+    }
+
     public void enqueue(SystemAlertVO alert, AlertRuleVO rule, Map<String, String> labels) {
         if (alert.getId() == null) {
             throw new IllegalStateException("Cannot enqueue notification for an alert without a persistent ID");
@@ -126,11 +148,70 @@ public class NotificationOutboxService {
         }
         return mapper.selectList(new QueryWrapper<RmqAlertNotificationOutbox>().eq("alert_id", alertId)
                         .orderByAsc("id"))
-                .stream().map(row -> NotificationDeliveryVO.builder().channel(row.getChannel())
+                .stream().map(row -> NotificationDeliveryVO.builder().id(row.getId()).channel(row.getChannel())
                         .status(NotificationOutboxStatus.valueOf(row.getStatus()))
                         .attemptCount(row.getAttemptCount() == null ? 0 : row.getAttemptCount())
                         .nextAttemptAt(row.getNextAttemptAt()).lastError(row.getLastError())
                         .deliveredAt(row.getDeliveredAt()).build()).toList();
+    }
+
+    public PageResult<NotificationDeliveryPageVO> listDeliveries(String channel, String status, String instanceId,
+            int page, int pageSize) {
+        int safePage = Math.max(1, page);
+        int safePageSize = Math.min(100, Math.max(1, pageSize));
+        String normalizedChannel = normalizeFilter(channel);
+        String normalizedStatus = normalizeStatus(status);
+        String normalizedInstanceId = normalizeTrim(instanceId);
+        long total = mapper.countPage(normalizedChannel, normalizedStatus, normalizedInstanceId);
+        if (total == 0) {
+            return PageResult.empty(safePage, safePageSize);
+        }
+        return PageResult.of(mapper.findPage(normalizedChannel, normalizedStatus, normalizedInstanceId, safePageSize,
+                (long) (safePage - 1) * safePageSize), total, safePage, safePageSize);
+    }
+
+    public void retryFailedDelivery(Long deliveryId) {
+        if (deliveryId == null || deliveryId <= 0) {
+            throw new org.apache.rocketmq.studio.common.exception.BusinessException(400,
+                    "Notification delivery ID is required");
+        }
+        RmqAlertNotificationOutbox row = mapper.selectById(deliveryId);
+        if (row == null || !NotificationOutboxStatus.FAILED.name().equals(row.getStatus())) {
+            throw new org.apache.rocketmq.studio.common.exception.BusinessException(400,
+                    "Only failed notification deliveries can be retried");
+        }
+        LocalDateTime now = utcNow();
+        int updated = mapper.update(null, new UpdateWrapper<RmqAlertNotificationOutbox>()
+                .set("status", NotificationOutboxStatus.PENDING.name()).set("attempt_count", 0)
+                .set("next_attempt_at", now).set("sending_started_at", null).set("claim_token", null)
+                .set("last_error", null).eq("id", deliveryId).eq("status", NotificationOutboxStatus.FAILED.name()));
+        if (updated != 1) {
+            throw new org.apache.rocketmq.studio.common.exception.BusinessException(400,
+                    "Only failed notification deliveries can be retried");
+        }
+        recordDelivery(row, "RETRY_ALERT_NOTIFICATION_MANUALLY", "SUCCESS", null);
+    }
+
+    private static String normalizeFilter(String value) {
+        String normalized = normalizeTrim(value);
+        return normalized == null ? null : normalized.toLowerCase();
+    }
+
+    private static String normalizeTrim(String value) {
+        return StringUtils.hasText(value) ? value.trim() : null;
+    }
+
+    private static String normalizeStatus(String status) {
+        String value = normalizeFilter(status);
+        if (value == null) {
+            return null;
+        }
+        try {
+            return NotificationOutboxStatus.valueOf(value.toUpperCase()).name();
+        } catch (IllegalArgumentException error) {
+            throw new org.apache.rocketmq.studio.common.exception.BusinessException(400,
+                    "Unknown notification delivery status: " + status);
+        }
     }
 
     @Scheduled(fixedDelayString = "${studio.alerting.notification-dispatch-interval:PT10S}")
@@ -187,9 +268,36 @@ public class NotificationOutboxService {
             throw new IllegalStateException("No configured " + channel + " webhook");
         }
         UrlHostGuard.check(webhook, false);
-        ResponseEntity<Void> response = restTemplate.postForEntity(webhook, payload(alert, channel), Void.class);
+        ResponseEntity<Map> response = restTemplate.postForEntity(dingTalkWebhook(webhook, settings, channel), payload(alert, channel), Map.class);
         if (!response.getStatusCode().is2xxSuccessful()) {
             throw new IllegalStateException("Webhook returned " + response.getStatusCode());
+        }
+        if ("dingtalk".equals(channel)) {
+            validateDingTalkResponse(response.getBody());
+        }
+    }
+
+    private static String dingTalkWebhook(String webhook, GeneralSettingsVO settings, String channel) {
+        if (!"dingtalk".equals(channel) || !StringUtils.hasText(settings.getDingtalkSigningSecret())) {
+            return webhook;
+        }
+        long timestamp = System.currentTimeMillis();
+        try {
+            Mac mac = Mac.getInstance("HmacSHA256");
+            mac.init(new SecretKeySpec(settings.getDingtalkSigningSecret().getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+            String sign = Base64.getEncoder().encodeToString(mac.doFinal((timestamp + "\n" + settings.getDingtalkSigningSecret()).getBytes(StandardCharsets.UTF_8)));
+            return webhook + (webhook.contains("?") ? "&" : "?") + "timestamp=" + timestamp + "&sign="
+                    + URLEncoder.encode(sign, StandardCharsets.UTF_8);
+        } catch (Exception error) {
+            throw new IllegalStateException("Unable to sign DingTalk webhook", error);
+        }
+    }
+
+    private static void validateDingTalkResponse(Map<?, ?> response) {
+        if (response == null || !(response.get("errcode") instanceof Number code) || code.intValue() != 0) {
+            Object error = response == null ? null : response.get("errmsg");
+            throw new IllegalStateException("DingTalk rejected webhook: "
+                    + (StringUtils.hasText(error == null ? null : error.toString()) ? error : "missing errcode"));
         }
     }
 

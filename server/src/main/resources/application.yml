@@ -77,7 +77,6 @@ studio:
     retention-days: ${STUDIO_QUERY_HISTORY_RETENTION_DAYS:90}
     cleanup-interval: ${STUDIO_QUERY_HISTORY_CLEANUP_INTERVAL:PT24H}
   alerting:
-    collection-enabled: ${STUDIO_ALERTING_COLLECTION_ENABLED:false}
     collection-interval: ${STUDIO_ALERTING_COLLECTION_INTERVAL:PT30S}
     collection-parallelism: ${STUDIO_ALERTING_COLLECTION_PARALLELISM:4}
     collection-timeout: ${STUDIO_ALERTING_COLLECTION_TIMEOUT:PT15S}

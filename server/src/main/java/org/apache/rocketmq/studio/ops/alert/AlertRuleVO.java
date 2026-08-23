@@ -60,4 +60,6 @@ public class AlertRuleVO {
     /** Number of consecutive matching native samples required before firing. */
     @Builder.Default
     private int consecutiveSamples = 1;
+    @Builder.Default
+    private String reminderInterval = "30m";
 }

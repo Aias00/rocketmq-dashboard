@@ -21,7 +21,8 @@ import userEvent from '@testing-library/user-event';
 import { App } from 'antd';
 import type { AlertRule, NativeAlertMetricInfo } from '../../../api/ops';
 import { LangProvider } from '../../../i18n/LangContext';
-import AlertsPage from '../alerts';
+import { formatDateTime } from '../../../utils/format';
+import AlertsPage, { supportsUnavailableOperator } from '../alerts';
 import { listInstances } from '../../../services/instanceService';
 import {
   bulkDeleteAlertRules,
@@ -72,6 +73,19 @@ const alertRules: AlertRule[] = [
     enabled: false,
     lastTriggered: null,
     description: 'consumer lag',
+  },
+  {
+    id: 3,
+    name: 'NameServer unavailable',
+    metric: 'nameserver.availability',
+    operator: 'UNAVAILABLE',
+    threshold: 0,
+    thresholdUnit: null,
+    duration: '1分钟',
+    channels: ['email'],
+    enabled: true,
+    lastTriggered: null,
+    description: 'nameserver unavailable',
   },
 ];
 
@@ -163,6 +177,31 @@ describe('AlertsPage', () => {
     });
   });
 
+  it('renders unavailable conditions without placeholder threshold values', async () => {
+    renderPage();
+
+    expect(await screen.findByText('NameServer unavailable')).toBeInTheDocument();
+    expect(screen.getByText('指标不可用时触发')).toBeInTheDocument();
+    expect(screen.queryByText('UNAVAILABLE 0null')).not.toBeInTheDocument();
+  });
+
+  it('formats the last triggered timestamp instead of rendering the raw ISO value', async () => {
+    const lastTriggered = '2026-08-23T10:35:38.590731';
+    vi.mocked(listAlertRules).mockResolvedValue([{ ...cloneRule(alertRules[0]), lastTriggered }]);
+
+    renderPage();
+
+    expect(await screen.findByText(formatDateTime(lastTriggered))).toBeInTheDocument();
+    expect(screen.queryByText(lastTriggered)).not.toBeInTheDocument();
+  });
+
+  it('allows the unavailable operator only for availability metrics', () => {
+    expect(supportsUnavailableOperator('nameserver.availability')).toBe(true);
+    expect(supportsUnavailableOperator('broker.availability')).toBe(true);
+    expect(supportsUnavailableOperator('broker.disk.usage_ratio')).toBe(false);
+    expect(supportsUnavailableOperator('consumer.lag.total')).toBe(false);
+  });
+
   it('bulk enables selected alert rules and clears the selection after success', async () => {
     const user = userEvent.setup();
     renderPage();
@@ -207,7 +246,7 @@ describe('AlertsPage', () => {
     expect(listAlertRules).toHaveBeenCalledWith('BUSINESS');
     await user.click(screen.getByRole('button', { name: '新建规则' }));
     expect(screen.getByRole('combobox', { name: '监控指标' })).toBeDisabled();
-    await user.click(screen.getByRole('combobox', { name: 'Studio 实例' }));
+    await user.click(screen.getByRole('combobox', { name: 'RocketMQ 实例' }));
     await screen.findByRole('option', { name: 'local' });
     await user.click(getSelectOption('local'));
     await waitFor(() => expect(listNativeAlertMetrics).toHaveBeenCalledWith('local', 'BUSINESS'));
@@ -230,7 +269,7 @@ describe('AlertsPage', () => {
     const user = userEvent.setup();
     renderPage('BUSINESS');
     await user.click(await screen.findByRole('button', { name: '新建规则' }));
-    await user.click(screen.getByRole('combobox', { name: 'Studio 实例' }));
+    await user.click(screen.getByRole('combobox', { name: 'RocketMQ 实例' }));
     await screen.findByRole('option', { name: 'local' });
     await user.click(getSelectOption('local'));
 
@@ -315,10 +354,10 @@ describe('AlertsPage', () => {
     renderPage('BUSINESS');
 
     await user.click(await screen.findByRole('button', { name: '新建规则' }));
-    await user.click(screen.getByRole('combobox', { name: 'Studio 实例' }));
+    await user.click(screen.getByRole('combobox', { name: 'RocketMQ 实例' }));
     await screen.findByRole('option', { name: 'local' });
     await user.click(getSelectOption('local'));
-    await user.click(screen.getByRole('combobox', { name: 'Studio 实例' }));
+    await user.click(screen.getByRole('combobox', { name: 'RocketMQ 实例' }));
     await screen.findByRole('option', { name: 'remote' });
     await user.click(getSelectOption('remote'));
 

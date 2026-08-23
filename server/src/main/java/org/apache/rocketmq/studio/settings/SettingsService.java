@@ -132,6 +132,9 @@ public class SettingsService {
         } else if (!StringUtils.hasText(settings.getApiKey()) && currentSettings != null) {
             settings.setApiKey(currentSettings.getApiKey());
         }
+        if (!StringUtils.hasText(settings.getDingtalkSigningSecret()) && currentSettings != null) {
+            settings.setDingtalkSigningSecret(currentSettings.getDingtalkSigningSecret());
+        }
         if (currentSettings != null) {
             if (!StringUtils.hasText(settings.getDeploymentName())) {
                 settings.setDeploymentName(currentSettings.getDeploymentName());

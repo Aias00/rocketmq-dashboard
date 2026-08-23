@@ -64,11 +64,12 @@ public class NativeAlertProcessor {
                         AlertFingerprint.of(rule.getId(), sample.instanceId(), sample.labels()));
                 AlertStateUpdate update = stateMachine.advance(stateRepository.find(key).orElse(null), evaluation,
                         Math.max(1, rule.getConsecutiveSamples()), AlertRuleDuration.parse(rule.getDuration()),
-                        sample.collectedAt());
+                        AlertRuleDuration.parse(rule.getReminderInterval()), sample.collectedAt());
                 if (!stateRepository.save(key, update.state())) {
                     continue;
                 }
-                if (update.transition() == AlertStateTransition.FIRING || update.transition() == AlertStateTransition.RESOLVED) {
+                if (update.transition() == AlertStateTransition.FIRING || update.transition() == AlertStateTransition.REMINDER
+                        || update.transition() == AlertStateTransition.RESOLVED) {
                     LocalDateTime eventTime = LocalDateTime.ofInstant(sample.collectedAt(), ZoneOffset.UTC);
                     SystemAlertVO event = alertRepository.saveAlert(SystemAlertVO.builder().level(level(rule.getSeverity()))
                             .title(rule.getName()).description(update.transition() + " " + sample.metricKey()

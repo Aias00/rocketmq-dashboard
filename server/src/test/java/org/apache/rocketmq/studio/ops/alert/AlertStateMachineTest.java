@@ -41,7 +41,7 @@ class AlertStateMachineTest {
 
     @Test
     void clearsFiringAlertWhenAvailableSampleRecovers() {
-        AlertRuleState firing = new AlertRuleState(AlertStateStatus.FIRING, 2, 0.9, now, now, null);
+        AlertRuleState firing = new AlertRuleState(AlertStateStatus.FIRING, 2, 0.9, now, now, now, null);
 
         AlertStateUpdate update = stateMachine.advance(firing, clear(), 2, now.plusSeconds(30));
 
@@ -51,7 +51,7 @@ class AlertStateMachineTest {
 
     @Test
     void unavailableCollectionDoesNotResolveFiringAlert() {
-        AlertRuleState firing = new AlertRuleState(AlertStateStatus.FIRING, 2, 0.9, now, now, null);
+        AlertRuleState firing = new AlertRuleState(AlertStateStatus.FIRING, 2, 0.9, now, now, now, null);
         AlertEvaluationResult unavailable = new AlertEvaluationResult(true, false, null,
                 MetricAvailability.UNAVAILABLE);
 
@@ -83,6 +83,24 @@ class AlertStateMachineTest {
         assertThat(pending.transition()).isEqualTo(AlertStateTransition.PENDING);
         assertThat(stillPending.transition()).isEqualTo(AlertStateTransition.PENDING);
         assertThat(firing.transition()).isEqualTo(AlertStateTransition.FIRING);
+    }
+
+    @Test
+    void remindsOnlyForAnUnacknowledgedFiringAlertAfterTheConfiguredInterval() {
+        AlertRuleState firing = new AlertRuleState(AlertStateStatus.FIRING, 1, 0.9, now, now, now, null);
+
+        AlertStateUpdate beforeDue = stateMachine.advance(firing, met(), 1, Duration.ZERO,
+                Duration.ofMinutes(30), now.plusSeconds(29 * 60));
+        AlertStateUpdate reminder = stateMachine.advance(firing, met(), 1, Duration.ZERO,
+                Duration.ofMinutes(30), now.plusSeconds(30 * 60));
+        AlertRuleState acknowledged = new AlertRuleState(AlertStateStatus.ACKED, 1, 0.9, now, now, now, null);
+        AlertStateUpdate noReminder = stateMachine.advance(acknowledged, met(), 1, Duration.ZERO,
+                Duration.ofMinutes(30), now.plusSeconds(60 * 60));
+
+        assertThat(beforeDue.transition()).isEqualTo(AlertStateTransition.NONE);
+        assertThat(reminder.transition()).isEqualTo(AlertStateTransition.REMINDER);
+        assertThat(reminder.state().lastNotifiedAt()).isEqualTo(now.plusSeconds(30 * 60));
+        assertThat(noReminder.transition()).isEqualTo(AlertStateTransition.NONE);
     }
 
     private static AlertEvaluationResult met() {

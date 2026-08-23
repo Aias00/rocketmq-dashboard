@@ -27,6 +27,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.PathVariable;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -68,6 +69,22 @@ public class SystemAlertController {
     @GetMapping("/{id}/deliveries")
     public Result<List<NotificationDeliveryVO>> listDeliveries(@org.springframework.web.bind.annotation.PathVariable Long id) {
         return Result.ok(notificationOutboxService.listDeliveries(id));
+    }
+
+    @GetMapping("/deliveries/page")
+    public Result<PageResult<NotificationDeliveryPageVO>> listDeliveriesPage(
+            @RequestParam(required = false) String channel,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String instanceId,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int pageSize) {
+        return Result.ok(notificationOutboxService.listDeliveries(channel, status, instanceId, page, pageSize));
+    }
+
+    @PostMapping("/deliveries/{deliveryId}/retry")
+    public Result<Void> retryFailedDelivery(@PathVariable Long deliveryId) {
+        notificationOutboxService.retryFailedDelivery(deliveryId);
+        return Result.ok();
     }
 
     @PostMapping("/acknowledge")

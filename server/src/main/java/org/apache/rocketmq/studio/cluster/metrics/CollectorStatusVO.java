@@ -16,6 +16,6 @@
  */
 package org.apache.rocketmq.studio.cluster.metrics;
 
-public record CollectorStatusVO(boolean collectionEnabled, String collectionInterval,
+public record CollectorStatusVO(String collectionInterval,
         int clusterCollectorCount, int businessCollectorCount) {
 }

@@ -296,10 +296,10 @@ describe('Ops API - System Alerts & Audit', () => {
   it('lists delivery state for an alert event', async () => {
     mock.onGet('/system-alerts/1/deliveries').reply(200, {
       code: 200,
-      data: [{ channel: 'dingtalk', status: 'DELIVERED', attemptCount: 1 }],
+      data: [{ id: 1, channel: 'dingtalk', status: 'DELIVERED', attemptCount: 1 }],
     });
     await expect(listAlertDeliveries(1)).resolves.toEqual([
-      { channel: 'dingtalk', status: 'DELIVERED', attemptCount: 1 },
+      { id: 1, channel: 'dingtalk', status: 'DELIVERED', attemptCount: 1 },
     ]);
   });
 

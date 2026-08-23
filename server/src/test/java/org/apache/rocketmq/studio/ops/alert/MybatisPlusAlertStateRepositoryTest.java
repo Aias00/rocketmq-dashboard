@@ -32,7 +32,7 @@ class MybatisPlusAlertStateRepositoryTest {
         MybatisPlusAlertStateRepository repository = new MybatisPlusAlertStateRepository(mapper);
 
         repository.save(new AlertStateKey(4L, "fingerprint"), new AlertRuleState(AlertStateStatus.FIRING, 2,
-                10D, Instant.now(), Instant.now(), null));
+                10D, Instant.now(), Instant.now(), Instant.now(), null));
 
         verify(mapper).updateIfVersion(any(RmqAlertState.class), eq(3));
     }

@@ -59,6 +59,8 @@ public class GeneralSettingsUpdateDTO {
     private String apiVersion;
     private String awsRegion;
     private String dingtalkWebhook;
+    @ToString.Exclude
+    private String dingtalkSigningSecret;
     private String emailRecipients;
     private String smsWebhook;
 
@@ -80,6 +82,7 @@ public class GeneralSettingsUpdateDTO {
                 .apiVersion(apiVersion)
                 .awsRegion(awsRegion)
                 .dingtalkWebhook(dingtalkWebhook)
+                .dingtalkSigningSecret(dingtalkSigningSecret)
                 .emailRecipients(emailRecipients)
                 .smsWebhook(smsWebhook)
                 .build();

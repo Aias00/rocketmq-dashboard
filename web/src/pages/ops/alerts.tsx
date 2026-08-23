@@ -50,6 +50,7 @@ import {
   updateAlertRule,
 } from '../../services/opsService';
 import { tableScrollX } from '../../utils/table';
+import { formatDateTime } from '../../utils/format';
 import { listInstances } from '../../services/instanceService';
 import type { Instance } from '../../api/instance';
 const { TextArea } = Input;
@@ -61,6 +62,23 @@ const channelColors: Record<string, string> = {
 };
 
 const durationOptions = ['1m', '5m', '15m', '30m'];
+const reminderIntervalOptions = ['5m', '15m', '30m', '1h', '4h'];
+const availabilityMetrics = new Set([
+  'nameserver.availability',
+  'broker.availability',
+  'proxy.availability',
+  'cloud.instance.availability',
+]);
+
+export const supportsUnavailableOperator = (metric?: string): boolean =>
+  metric != null && availabilityMetrics.has(metric);
+
+const formatThresholdCondition = (rule: AlertRule): string => {
+  if (rule.operator === 'UNAVAILABLE') {
+    return '指标不可用时触发';
+  }
+  return `${rule.operator} ${rule.threshold}${rule.thresholdUnit ?? ''}`;
+};
 
 interface AlertsPageProps {
   domain?: AlertRuleDomain;
@@ -80,11 +98,14 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
   const [selectedRuleIds, setSelectedRuleIds] = useState<Key[]>([]);
   const [bulkAction, setBulkAction] = useState<'enable' | 'disable' | 'delete' | null>(null);
   const [form] = Form.useForm();
+  const selectedMetric = Form.useWatch('metric', form);
+  const selectedOperator = Form.useWatch('operator', form);
   const [metricOptions, setMetricOptions] = useState<{ label: string; value: string }[]>([]);
   const [selectedInstanceId, setSelectedInstanceId] = useState<string>();
   const [metricLoading, setMetricLoading] = useState(false);
   const [instances, setInstances] = useState<Instance[]>([]);
   const metricRequestVersion = useRef(0);
+  const supportsUnavailableCondition = supportsUnavailableOperator(selectedMetric);
 
   const channelLabels: Record<string, string> = {
     dingtalk: 'DingTalk',
@@ -114,7 +135,7 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
   useEffect(() => {
     void listInstances()
       .then(setInstances)
-      .catch(() => message.error('Studio 实例加载失败，请稍后重试'));
+      .catch(() => message.error('RocketMQ 实例加载失败，请稍后重试'));
   }, []);
 
   const enabledCount = rules.filter((r) => r.enabled).length;
@@ -153,7 +174,7 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
       if (metrics.length === 0) message.warning('该实例暂不支持原生告警指标');
     } catch {
       if (requestVersion === metricRequestVersion.current) {
-        message.error('告警指标能力加载失败，请检查 Studio 实例');
+        message.error('告警指标能力加载失败，请检查 RocketMQ 实例');
       }
     } finally {
       if (requestVersion === metricRequestVersion.current) setMetricLoading(false);
@@ -300,12 +321,18 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
     {
       title: t('alerts.threshold'),
       sorter: (a, b) => (a.threshold ?? 0) - (b.threshold ?? 0),
-      render: (_, record) => `${record.operator} ${record.threshold}${record.thresholdUnit}`,
+      render: (_, record) => formatThresholdCondition(record),
     },
     {
       title: t('alerts.duration'),
       dataIndex: 'duration',
       sorter: (a, b) => (a.duration ?? '').localeCompare(b.duration ?? ''),
+    },
+    {
+      title: t('alerts.reminderInterval'),
+      dataIndex: 'reminderInterval',
+      width: 130,
+      render: (value) => value ?? '30m',
     },
     {
       title: t('alerts.channels'),
@@ -336,7 +363,7 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
       sorter: (a, b) => (a.lastTriggered ?? '').localeCompare(b.lastTriggered ?? ''),
       render: (_, record) =>
         record.lastTriggered ? (
-          record.lastTriggered
+          formatDateTime(record.lastTriggered)
         ) : (
           <span style={{ color: '#999' }}>{t('alerts.neverTriggered')}</span>
         ),
@@ -580,12 +607,12 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
 
           <Form.Item
             name="instanceId"
-            label="Studio 实例"
-            rules={[{ required: true, message: '请选择 Studio 实例' }]}
-            extra="原生采集规则必须绑定一个 Studio 实例。"
+            label="RocketMQ 实例"
+            rules={[{ required: true, message: '请选择 RocketMQ 实例' }]}
+            extra="原生采集规则必须绑定一个受管 RocketMQ 实例。"
           >
             <Select
-              placeholder="请选择 Studio 实例"
+              placeholder="请选择 RocketMQ 实例"
               options={instances.map((instance) => ({
                 value: instance.name,
                 label: `${instance.name}${instance.vendor && instance.vendor !== 'APACHE' ? ` (${instance.vendor})` : ''}`,
@@ -607,6 +634,14 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
               options={metricOptions}
               disabled={!selectedInstanceId || metricLoading}
               loading={metricLoading}
+              onChange={(metric) => {
+                if (
+                  form.getFieldValue('operator') === 'UNAVAILABLE' &&
+                  !supportsUnavailableOperator(metric)
+                ) {
+                  form.setFieldValue('operator', '>');
+                }
+              }}
             />
           </Form.Item>
 
@@ -656,6 +691,7 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
                 rules={[{ required: true, message: '请选择运算符' }]}
               >
                 <Select
+                  aria-label="运算符"
                   placeholder="运算符"
                   style={{ width: 100 }}
                   options={[
@@ -663,18 +699,28 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
                     { label: '<', value: '<' },
                     { label: '>=', value: '>=' },
                     { label: '<=', value: '<=' },
-                    { label: '不可用', value: 'UNAVAILABLE' },
+                    {
+                      label: '不可用',
+                      value: 'UNAVAILABLE',
+                      disabled: !supportsUnavailableCondition,
+                    },
                   ]}
+                  onChange={(operator) => {
+                    if (operator === 'UNAVAILABLE') form.setFieldValue('threshold', 0);
+                  }}
                 />
               </Form.Item>
-              <Form.Item
-                name="threshold"
-                noStyle
-                rules={[{ required: true, message: '请输入阈值' }]}
-              >
-                <InputNumber placeholder="阈值" style={{ flex: 1 }} />
-              </Form.Item>
+              {selectedOperator !== 'UNAVAILABLE' && (
+                <Form.Item
+                  name="threshold"
+                  noStyle
+                  rules={[{ required: true, message: '请输入阈值' }]}
+                >
+                  <InputNumber placeholder="阈值" style={{ flex: 1 }} />
+                </Form.Item>
+              )}
             </Flex>
+            {selectedOperator === 'UNAVAILABLE' && '采集到指标不可用状态时触发。'}
           </Form.Item>
 
           <Form.Item
@@ -686,6 +732,13 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
               placeholder="请选择持续时间"
               options={durationOptions.map((d) => ({ label: d, value: d }))}
             />
+          </Form.Item>
+          <Form.Item
+            name="reminderInterval"
+            label={t('alerts.reminderInterval')}
+            initialValue="30m"
+          >
+            <Select options={reminderIntervalOptions.map((value) => ({ label: value, value }))} />
           </Form.Item>
 
           <Flex gap={8}>

@@ -40,6 +40,7 @@ import {
   clearAcknowledgedAlerts,
   getCollectorStatus,
   listAlertDeliveries,
+  retryAlertDelivery,
   listSystemAlertsPage,
   createAlertSilence,
   deleteAlertSilence,
@@ -105,6 +106,7 @@ const SystemAlertsPage = () => {
   const [clearing, setClearing] = useState(false);
   const [deliveries, setDeliveries] = useState<Record<number, NotificationDelivery[]>>({});
   const [loadingDeliveries, setLoadingDeliveries] = useState<Set<number>>(() => new Set());
+  const [retryingDeliveryIds, setRetryingDeliveryIds] = useState<Set<number>>(() => new Set());
   const [silencesVisible, setSilencesVisible] = useState(false);
   const [silences, setSilences] = useState<AlertSilence[]>([]);
   const [loadingSilences, setLoadingSilences] = useState(false);
@@ -196,8 +198,8 @@ const SystemAlertsPage = () => {
     }
   };
 
-  const loadDeliveries = async (alertId: number) => {
-    if (deliveries[alertId] || loadingDeliveries.has(alertId)) return;
+  const loadDeliveries = async (alertId: number, force = false) => {
+    if ((!force && deliveries[alertId]) || loadingDeliveries.has(alertId)) return;
     setLoadingDeliveries((current) => new Set(current).add(alertId));
     try {
       const result = await listAlertDeliveries(alertId);
@@ -208,6 +210,23 @@ const SystemAlertsPage = () => {
       setLoadingDeliveries((current) => {
         const next = new Set(current);
         next.delete(alertId);
+        return next;
+      });
+    }
+  };
+
+  const handleRetryDelivery = async (alertId: number, deliveryId: number) => {
+    setRetryingDeliveryIds((current) => new Set(current).add(deliveryId));
+    try {
+      await retryAlertDelivery(deliveryId);
+      await loadDeliveries(alertId, true);
+      message.success('已加入重新投递队列');
+    } catch {
+      message.error('重新投递失败，请稍后重试');
+    } finally {
+      setRetryingDeliveryIds((current) => {
+        const next = new Set(current);
+        next.delete(deliveryId);
         return next;
       });
     }
@@ -396,11 +415,7 @@ const SystemAlertsPage = () => {
             { value: 'RESOLVED', label: '已恢复' },
           ]}
         />
-        {collectorStatus && (
-          <Tag color={collectorStatus.collectionEnabled ? 'success' : 'default'}>
-            {collectorStatus.collectionEnabled ? '原生采集已启用' : '原生采集未启用'}
-          </Tag>
-        )}
+        {collectorStatus && <Tag color="success">原生采集已启用</Tag>}
       </Flex>
 
       <Flex vertical gap={12}>
@@ -427,7 +442,7 @@ const SystemAlertsPage = () => {
                   opacity: alert.acknowledged ? 0.6 : 1,
                 }}
               >
-                <div style={{ flex: 1 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
                   <Flex align="center" gap={8}>
                     <Text strong style={{ fontSize: 14 }}>
                       {alert.title}
@@ -478,24 +493,52 @@ const SystemAlertsPage = () => {
                   )}
                   {loadingDeliveries.has(alert.id) && <Spin size="small" />}
                   {deliveries[alert.id] && (
-                    <Flex gap={6} wrap="wrap" style={{ marginTop: 6 }}>
+                    <Flex vertical gap={6} style={{ marginTop: 6, minWidth: 0 }}>
                       {deliveries[alert.id].length === 0 && (
-                        <Text type="secondary">未配置通知通道</Text>
+                        <Text type="secondary">
+                          {alert.ruleId == null ? '无通知投递记录' : '未配置通知通道'}
+                        </Text>
                       )}
                       {deliveries[alert.id].map((delivery) => (
-                        <Tag
-                          key={delivery.channel}
-                          color={
-                            delivery.status === 'DELIVERED'
-                              ? 'success'
-                              : delivery.status === 'FAILED'
-                                ? 'error'
-                                : 'processing'
-                          }
-                        >
-                          {delivery.channel}: {delivery.status} ({delivery.attemptCount})
-                          {delivery.lastError ? ` - ${delivery.lastError}` : ''}
-                        </Tag>
+                        <div key={delivery.id} style={{ minWidth: 0 }}>
+                          <Flex gap={6} align="center" wrap="wrap">
+                            <Tag
+                              color={
+                                delivery.status === 'DELIVERED'
+                                  ? 'success'
+                                  : delivery.status === 'FAILED'
+                                    ? 'error'
+                                    : 'processing'
+                              }
+                            >
+                              {delivery.channel}: {delivery.status} ({delivery.attemptCount})
+                            </Tag>
+                            {delivery.status === 'FAILED' && (
+                              <Button
+                                size="small"
+                                type="link"
+                                onClick={() => void handleRetryDelivery(alert.id, delivery.id)}
+                                loading={retryingDeliveryIds.has(delivery.id)}
+                              >
+                                重新投递
+                              </Button>
+                            )}
+                          </Flex>
+                          {delivery.lastError && (
+                            <Text
+                              type="secondary"
+                              title={delivery.lastError}
+                              style={{
+                                display: 'block',
+                                marginTop: 2,
+                                overflowWrap: 'anywhere',
+                                wordBreak: 'break-word',
+                              }}
+                            >
+                              {delivery.lastError}
+                            </Text>
+                          )}
+                        </div>
                       ))}
                     </Flex>
                   )}
@@ -505,7 +548,7 @@ const SystemAlertsPage = () => {
                     {alert.time}
                   </Text>
                   <Button size="small" type="link" onClick={() => void loadDeliveries(alert.id)}>
-                    通知
+                    投递记录
                   </Button>
                   {!alert.acknowledged && alert.transition !== 'RESOLVED' && (
                     <Button

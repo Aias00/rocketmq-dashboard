@@ -24,14 +24,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class CollectorStatusControllerTest {
     @Test
-    void reportsWhetherNativeCollectionIsEnabled() {
+    void reportsNativeCollectionMetadata() {
         AlertingProperties properties = new AlertingProperties();
-        properties.setCollectionEnabled(true);
         properties.setCollectionInterval("PT1M");
 
         CollectorStatusVO status = new CollectorStatusController(properties, List.of(), List.of()).status().getData();
 
-        assertThat(status.collectionEnabled()).isTrue();
         assertThat(status.collectionInterval()).isEqualTo("PT1M");
     }
 }

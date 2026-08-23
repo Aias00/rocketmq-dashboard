@@ -15,6 +15,7 @@ import org.apache.rocketmq.studio.persistence.entity.RmqAlertNotificationOutbox;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import org.apache.rocketmq.studio.ops.alert.NotificationDeliveryPageVO;
 
 public interface RmqAlertNotificationOutboxMapper extends BaseMapper<RmqAlertNotificationOutbox> {
     @Delete("DELETE FROM rmq_alert_notification_outbox WHERE alert_id IN "
@@ -35,4 +36,32 @@ public interface RmqAlertNotificationOutboxMapper extends BaseMapper<RmqAlertNot
     int claimForDispatch(@Param("id") Long id, @Param("now") LocalDateTime now,
             @Param("staleBefore") LocalDateTime staleBefore, @Param("claimedAt") LocalDateTime claimedAt,
             @Param("claimToken") String claimToken);
+
+    @Select("<script>"
+            + "SELECT o.id, o.alert_id AS alertId, o.channel, o.status, o.attempt_count AS attemptCount, "
+            + "o.next_attempt_at AS nextAttemptAt, o.last_error AS lastError, o.delivered_at AS deliveredAt, "
+            + "o.gmt_create AS createdAt, a.title AS alertTitle, a.domain AS alertDomain, "
+            + "a.transition, a.instance_id AS instanceId "
+            + "FROM rmq_alert_notification_outbox o "
+            + "JOIN rmq_system_alert a ON a.id = o.alert_id "
+            + "<where>"
+            + "<if test='channel != null and channel != \"\"'> AND o.channel = #{channel}</if>"
+            + "<if test='status != null and status != \"\"'> AND o.status = #{status}</if>"
+            + "<if test='instanceId != null and instanceId != \"\"'> AND a.instance_id = #{instanceId}</if>"
+            + "</where> ORDER BY o.id DESC LIMIT #{limit} OFFSET #{offset}"
+            + "</script>")
+    List<NotificationDeliveryPageVO> findPage(@Param("channel") String channel, @Param("status") String status,
+            @Param("instanceId") String instanceId, @Param("limit") int limit, @Param("offset") long offset);
+
+    @Select("<script>"
+            + "SELECT COUNT(*) FROM rmq_alert_notification_outbox o "
+            + "JOIN rmq_system_alert a ON a.id = o.alert_id "
+            + "<where>"
+            + "<if test='channel != null and channel != \"\"'> AND o.channel = #{channel}</if>"
+            + "<if test='status != null and status != \"\"'> AND o.status = #{status}</if>"
+            + "<if test='instanceId != null and instanceId != \"\"'> AND a.instance_id = #{instanceId}</if>"
+            + "</where>"
+            + "</script>")
+    long countPage(@Param("channel") String channel, @Param("status") String status,
+            @Param("instanceId") String instanceId);
 }

@@ -20,8 +20,8 @@ import java.time.Instant;
 
 /** Persistable state for a rule/resource fingerprint, independent from individual event rows. */
 public record AlertRuleState(AlertStateStatus status, int consecutiveHits, Double currentValue,
-        Instant firstPendingAt, Instant firedAt, Instant resolvedAt) {
+        Instant firstPendingAt, Instant firedAt, Instant lastNotifiedAt, Instant resolvedAt) {
     public static AlertRuleState initial() {
-        return new AlertRuleState(AlertStateStatus.OK, 0, null, null, null, null);
+        return new AlertRuleState(AlertStateStatus.OK, 0, null, null, null, null, null);
     }
 }

@@ -30,7 +30,7 @@ import {
   Typography,
 } from 'antd';
 import { BellOutlined, SafetyOutlined, SkinOutlined } from '@ant-design/icons';
-import { getGeneralSettings, saveGeneralSettings } from '../../api/settings';
+import { getGeneralSettings, saveGeneralSettings, testNotification } from '../../api/settings';
 import type { GeneralSettings, GeneralSettingsUpdate } from '../../api/settings';
 import { useTheme } from '../../theme/useTheme';
 import type { ThemeMode } from '../../theme/themePreference';
@@ -57,6 +57,7 @@ const buildPayload = (settings: GeneralSettings): GeneralSettingsUpdate => ({
   model: settings.model,
   baseUrl: settings.baseUrl,
   dingtalkWebhook: settings.dingtalkWebhook,
+  dingtalkSigningSecret: settings.dingtalkSigningSecret,
   emailRecipients: settings.emailRecipients,
   smsWebhook: settings.smsWebhook,
 });
@@ -69,6 +70,7 @@ export const GeneralSettingsTab = () => {
   const [savingPreference, setSavingPreference] = useState(false);
   const [savingSecurity, setSavingSecurity] = useState(false);
   const [savingNotification, setSavingNotification] = useState(false);
+  const [testingChannel, setTestingChannel] = useState<string>();
   const securityInFlightRef = useRef(false);
   const notifyInFlightRef = useRef(false);
   const [securityForm] = Form.useForm();
@@ -83,6 +85,7 @@ export const GeneralSettingsTab = () => {
         securityForm.setFieldsValue({ sessionTimeout: loaded.sessionTimeout });
         notifyForm.setFieldsValue({
           dingtalkWebhook: loaded.dingtalkWebhook,
+          dingtalkSigningSecret: '',
           emailRecipients: loaded.emailRecipients,
           smsWebhook: loaded.smsWebhook,
         });
@@ -143,6 +146,7 @@ export const GeneralSettingsTab = () => {
 
   const handleNotifyFinish = async (values: {
     dingtalkWebhook?: string;
+    dingtalkSigningSecret?: string;
     emailRecipients?: string;
     smsWebhook?: string;
   }) => {
@@ -156,6 +160,20 @@ export const GeneralSettingsTab = () => {
     } finally {
       notifyInFlightRef.current = false;
       setSavingNotification(false);
+    }
+  };
+
+  const sendTest = async (channel: 'dingtalk' | 'email' | 'sms') => {
+    setTestingChannel(channel);
+    try {
+      const values = await notifyForm.validateFields();
+      if (!(await mergeAndSave(values))) return;
+      await testNotification(channel);
+      message.success('测试消息已发送');
+    } catch (error: any) {
+      message.error(error?.response?.data?.message ?? '测试消息发送失败');
+    } finally {
+      setTestingChannel(undefined);
     }
   };
 
@@ -264,6 +282,13 @@ export const GeneralSettingsTab = () => {
           >
             <Input placeholder="https://oapi.dingtalk.com/robot/send?access_token=..." />
           </Form.Item>
+          <Form.Item
+            label="钉钉机器人 Signing Secret"
+            name="dingtalkSigningSecret"
+            extra="机器人启用加签时填写；保存后不会回显"
+          >
+            <Input.Password placeholder="SEC..." autoComplete="new-password" />
+          </Form.Item>
 
           <Form.Item
             label="邮件收件人"
@@ -281,6 +306,22 @@ export const GeneralSettingsTab = () => {
             <Input placeholder="https://sms-gateway.example.com/notify" />
           </Form.Item>
 
+          <Form.Item style={{ marginBottom: 0 }}>
+            <Space>
+              <Button
+                onClick={() => void sendTest('dingtalk')}
+                loading={testingChannel === 'dingtalk'}
+              >
+                测试钉钉
+              </Button>
+              <Button onClick={() => void sendTest('email')} loading={testingChannel === 'email'}>
+                测试邮件
+              </Button>
+              <Button onClick={() => void sendTest('sms')} loading={testingChannel === 'sms'}>
+                测试短信/Webhook
+              </Button>
+            </Space>
+          </Form.Item>
           <Form.Item style={{ marginBottom: 0 }}>
             <Button
               type="primary"

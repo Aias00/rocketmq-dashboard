@@ -22,8 +22,6 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @Data
 @ConfigurationProperties(prefix = "studio.alerting")
 public class AlertingProperties {
-    /** Native collection remains opt-in until rule evaluation and event delivery are complete. */
-    private boolean collectionEnabled = false;
     private String collectionInterval = "PT30S";
     /** Maximum number of instances collected concurrently during one pass. */
     private int collectionParallelism = 4;

@@ -8,16 +8,24 @@ package org.apache.rocketmq.studio.ops.alert;
 
 import lombok.Builder;
 import lombok.Value;
+
 import java.time.LocalDateTime;
 
+/** One notification delivery together with the alert event that produced it. */
 @Value
 @Builder
-public class NotificationDeliveryVO {
+public class NotificationDeliveryPageVO {
     Long id;
+    Long alertId;
     String channel;
     NotificationOutboxStatus status;
     int attemptCount;
     LocalDateTime nextAttemptAt;
     String lastError;
     LocalDateTime deliveredAt;
+    LocalDateTime createdAt;
+    String alertTitle;
+    AlertDomain alertDomain;
+    String transition;
+    String instanceId;
 }

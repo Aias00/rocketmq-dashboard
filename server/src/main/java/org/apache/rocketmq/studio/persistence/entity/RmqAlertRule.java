@@ -69,6 +69,7 @@ public class RmqAlertRule {
     private String topic;
 
     private Integer consecutiveSamples;
+    private String reminderInterval;
 
     private LocalDateTime gmtCreate;
 

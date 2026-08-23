@@ -13,6 +13,8 @@ import { LangProvider } from '../../../i18n/LangContext';
 import {
   acknowledgeAlert,
   createAlertSilence,
+  listAlertDeliveries,
+  retryAlertDelivery,
   listAlertSilences,
   listSystemAlertsPage,
 } from '../../../services/opsService';
@@ -22,8 +24,9 @@ vi.mock('../../../services/opsService', () => ({
   acknowledgeAlert: vi.fn(),
   clearAcknowledgedAlerts: vi.fn(),
   listSystemAlertsPage: vi.fn(),
-  getCollectorStatus: vi.fn().mockResolvedValue({ collectionEnabled: false }),
+  getCollectorStatus: vi.fn().mockResolvedValue({ collectionInterval: 'PT30S' }),
   listAlertDeliveries: vi.fn().mockResolvedValue([]),
+  retryAlertDelivery: vi.fn(),
   listAlertSilences: vi.fn(),
   createAlertSilence: vi.fn(),
   deleteAlertSilence: vi.fn(),
@@ -209,6 +212,67 @@ describe('SystemAlertsPage', () => {
 
     await screen.findByText('Recovered broker');
     expect(screen.queryByRole('button', { name: /^确认$/ })).not.toBeInTheDocument();
+  });
+
+  it('distinguishes historical alerts without a rule from rules without notification channels', async () => {
+    vi.mocked(listSystemAlertsPage).mockResolvedValue({
+      items: [
+        {
+          id: 7,
+          level: 'warning',
+          title: 'Historical disk alert',
+          description: 'created before native alert rules',
+          time: '2026-08-10 01:03',
+          acknowledged: false,
+        },
+        {
+          id: 8,
+          level: 'warning',
+          title: 'Native disk alert',
+          description: 'created by a native rule without channels',
+          time: '2026-08-10 01:04',
+          acknowledged: false,
+          ruleId: 42,
+        },
+      ],
+      total: 2,
+      page: 1,
+      size: 20,
+    });
+    const user = userEvent.setup();
+    renderPage();
+
+    await screen.findByText('Historical disk alert');
+    const notificationButtons = screen.getAllByRole('button', { name: '投递记录' });
+    await user.click(notificationButtons[0]);
+    await user.click(notificationButtons[1]);
+
+    expect(await screen.findByText('无通知投递记录')).toBeInTheDocument();
+    expect(screen.getByText('未配置通知通道')).toBeInTheDocument();
+    expect(listAlertDeliveries).toHaveBeenCalledWith(7);
+    expect(listAlertDeliveries).toHaveBeenCalledWith(8);
+  });
+
+  it('keeps delivery failures within the alert card and retries only failed deliveries', async () => {
+    const longError = 'DingTalk rejected webhook: signing mismatch '.repeat(12);
+    vi.mocked(listAlertDeliveries).mockResolvedValue([
+      { id: 9, channel: 'dingtalk', status: 'FAILED', attemptCount: 5, lastError: longError },
+      { id: 10, channel: 'email', status: 'DELIVERED', attemptCount: 1 },
+    ]);
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click((await screen.findAllByRole('button', { name: '投递记录' }))[0]);
+    const error = await screen.findByText((content) =>
+      content.includes('DingTalk rejected webhook: signing mismatch'),
+    );
+    expect(error).toHaveStyle({ overflowWrap: 'anywhere', wordBreak: 'break-word' });
+
+    await user.click(screen.getByRole('button', { name: '重新投递' }));
+    await waitFor(() => {
+      expect(retryAlertDelivery).toHaveBeenCalledWith(9);
+      expect(listAlertDeliveries).toHaveBeenCalledTimes(2);
+    });
   });
 
   it('tracks simultaneous acknowledgements independently', async () => {
