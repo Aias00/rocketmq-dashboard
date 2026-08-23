@@ -17,7 +17,7 @@
 #
 # Optional environment:
 #   E2E_DB_USERNAME=root E2E_DB_PASSWORD=studio123 E2E_MYSQL_HOST=127.0.0.1
-#   E2E_MYSQL_PORT=3306 E2E_SMTP_PORT=1025 E2E_PORT=18083
+#   E2E_MYSQL_PORT=3306 E2E_SMTP_PORT=1025 E2E_PORT=18083 E2E_SILENCE_SECONDS=10
 #   E2E_MAILPIT_API_URL=http://127.0.0.1:8025/api/v1/messages
 #   E2E_STUDIO_JAR=.../server/target/rocketmq-studio-1.0.0.jar
 #
@@ -41,6 +41,7 @@ JAVA_BIN="${JAVA_HOME:+$JAVA_HOME/bin/}java"
 STUDIO_JAR=${E2E_STUDIO_JAR:-"$SERVER_DIR/target/rocketmq-studio-1.0.0.jar"}
 PORT=${E2E_PORT:-18083}
 SMTP_PORT=${E2E_SMTP_PORT:-1025}
+SILENCE_SECONDS=${E2E_SILENCE_SECONDS:-10}
 MAILPIT_API_URL=${E2E_MAILPIT_API_URL:-http://127.0.0.1:8025/api/v1/messages}
 MYSQL_HOST=${E2E_MYSQL_HOST:-127.0.0.1}
 MYSQL_PORT=${E2E_MYSQL_PORT:-3306}
@@ -49,10 +50,13 @@ DB_PASSWORD=${E2E_DB_PASSWORD:-studio123}
 RUN_ID="e2e-native-alert-$(date -u +%Y%m%d%H%M%S)-$$"
 INSTANCE_ID="$RUN_ID-instance"
 RULE_NAME="$RUN_ID-rule"
-COOKIE=$(mktemp "${TMPDIR:-/tmp}/rocketmq-studio-e2e.XXXXXX.cookie")
+COOKIE=$(mktemp "${TMPDIR:-/tmp}/rocketmq-studio-e2e.cookie.XXXXXX")
 RUN_DIR=$(mktemp -d "${TMPDIR:-/tmp}/rocketmq-studio-e2e.XXXXXX")
 APP_LOG="$RUN_DIR/studio.log"
 APP_PID=
+
+[[ "$SILENCE_SECONDS" =~ ^[0-9]+$ && "$SILENCE_SECONDS" -ge 5 ]] \
+  || { echo 'E2E_SILENCE_SECONDS must be an integer of at least 5' >&2; exit 2; }
 
 cleanup() {
   if [[ -n "$APP_PID" ]]; then
@@ -136,7 +140,7 @@ echo "Starting Studio from $STUDIO_JAR; logs: $APP_LOG"
   STUDIO_ALERTING_SMTP_PORT="$SMTP_PORT" \
   STUDIO_ALERTING_SMTP_AUTH=false \
   STUDIO_ALERTING_SMTP_STARTTLS=false \
-  "$JAVA_BIN" -jar "$STUDIO_JAR" --server.port="$PORT" >"$APP_LOG" 2>&1
+  exec "$JAVA_BIN" -jar "$STUDIO_JAR" --server.port="$PORT" >"$APP_LOG" 2>&1
 ) &
 APP_PID=$!
 
@@ -158,7 +162,7 @@ RULE_ID=$(jq -er '.data.id' <<<"$RULE")
 
 # The silence must initially defer both channel rows, then its normal expiry releases them.
 SILENCE=$(api_post /api/alert-silences "$(jq -n --arg instance "$INSTANCE_ID" --argjson ruleId "$RULE_ID" \
-  --arg start "$(utc_after_seconds 0)" --arg end "$(utc_after_seconds 25)" \
+  --arg start "$(utc_after_seconds 0)" --arg end "$(utc_after_seconds "$SILENCE_SECONDS")" \
   '{domain:"CLUSTER",ruleId:$ruleId,instanceId:$instance,startsAt:$start,endsAt:$end,reason:"native alert e2e"}')")
 SILENCE_ID=$(jq -er '.data.id' <<<"$SILENCE")
 
@@ -176,6 +180,7 @@ MAIL_COUNT=$(curl -fsS "$MAILPIT_API_URL" | jq --arg recipient "$E2E_EMAIL_RECIP
   '[.messages[] | select((.To // [])[]?.Address == $recipient and .Subject == ("[RocketMQ Studio] " + $subject))] | length')
 [[ "$MAIL_COUNT" -ge 2 ]] || { echo "Expected FIRING and RESOLVED emails in Mailpit; saw $MAIL_COUNT" >&2; exit 1; }
 WEBHOOK_PAYLOADS=$(curl -fsS "$E2E_WEBHOOK_ASSERT_URL")
+grep -q "$RULE_NAME" <<<"$WEBHOOK_PAYLOADS" || { echo 'Webhook capture has no payload for this run' >&2; exit 1; }
 grep -q 'FIRING' <<<"$WEBHOOK_PAYLOADS" || { echo 'Webhook capture has no FIRING payload' >&2; exit 1; }
 grep -q 'RESOLVED' <<<"$WEBHOOK_PAYLOADS" || { echo 'Webhook capture has no RESOLVED payload' >&2; exit 1; }
 
