@@ -68,20 +68,17 @@ public class ApacheRocketMqClusterMetricsCollector implements ClusterMetricsColl
                     admin -> collectFromTopology(instance, admin, admin.examineBrokerClusterInfo(), collectedAt));
         } catch (RuntimeException error) {
             log.warn("Failed to collect native metrics for instance {}: {}", instance.getName(), error.getMessage());
-            return List.of(unavailable(NAMESERVER_AVAILABILITY, instance, null,
-                    Map.of("endpoint", instance.getEndpoint()), collectedAt));
+            return List.of(unavailable(NAMESERVER_AVAILABILITY, instance, null, Map.of(), collectedAt));
         }
     }
 
     private List<MetricSample> collectFromTopology(InstanceVO instance, MQAdminExt admin, ClusterInfo topology,
             Instant collectedAt) {
         if (topology == null) {
-            return List.of(unavailable(NAMESERVER_AVAILABILITY, instance, null,
-                    Map.of("endpoint", instance.getEndpoint()), collectedAt));
+            return List.of(unavailable(NAMESERVER_AVAILABILITY, instance, null, Map.of(), collectedAt));
         }
         List<MetricSample> samples = new ArrayList<>();
-        samples.add(available(NAMESERVER_AVAILABILITY, instance, null,
-                Map.of("endpoint", instance.getEndpoint()), 1D, collectedAt));
+        samples.add(available(NAMESERVER_AVAILABILITY, instance, null, Map.of(), 1D, collectedAt));
         Map<String, BrokerData> brokers = topology.getBrokerAddrTable() == null
                 ? Map.of() : topology.getBrokerAddrTable();
         for (Map.Entry<String, BrokerData> entry : brokers.entrySet()) {
