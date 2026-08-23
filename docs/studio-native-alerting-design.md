@@ -4,7 +4,7 @@
 
 Implementation in progress. Native Apache collection (including NameServer, Broker, and Proxy availability), snapshots, scheduling, evaluation, event lifecycle,
 acknowledgement, multi-replica collection lease, rule test-runs, label-scoped silence management, and
-webhook and SMTP email outbox delivery are in place. Provider capability catalogs are available for Apache,
+the DingTalk, SMS webhook, and SMTP email outbox delivery channels are in place. Provider capability catalogs are available for Apache,
 Aliyun, and Tencent; cloud consumer-lag and managed-instance lifecycle collection are available. This design does
 not require Prometheus or Alertmanager for rule evaluation or event creation.
 
@@ -33,7 +33,7 @@ The UI remains split by audience and resource type while all alerts share one ev
 | Cluster Alerts | `/ops/cluster-alerts` | `CLUSTER` | NameServer, Broker, Proxy, instance connectivity |
 | Alert Events | `/ops/system-alerts` | Both | Active, recovered, acknowledged alert events |
 
-Business Alerts own message-flow risk: consumer lag, consumption delay, DLQ growth, producer failure rate, and topic backlog. Cluster Alerts own runtime health: NameServer or Broker availability, disk pressure, JVM pressure, thread-pool rejection, Proxy availability, and collector connectivity.
+Business Alerts own message-flow risk: consumer lag, consumption delay, DLQ growth, and topic backlog. Cluster Alerts own runtime health: NameServer or Broker availability, disk pressure, JVM pressure, Broker send-queue pressure, Proxy availability, and collector connectivity. Producer failure rate and thread-pool rejection are planned metrics, not current capabilities.
 
 Alert Events are not a third rule domain. They are the shared lifecycle record emitted by either rule domain.
 
@@ -57,7 +57,7 @@ ClusterMetricsCollector      BusinessMetricsCollector
                  Event history   NotificationOutbox
                                       |
                                       v
-                         Webhook / DingTalk / Email
+                     DingTalk / SMS webhook / Email
 ```
 
 The collectors know only how to obtain metrics. The evaluator knows only typed metric samples and structured rules. Notification senders know only event payloads and channel configuration.
@@ -156,9 +156,9 @@ StudioAlertRule
   threshold
   consecutiveSamples
   severity: INFO | WARNING | CRITICAL
-  cooldownSeconds
-  notificationPolicyId
 ```
+
+`cooldownSeconds` and `notificationPolicyId` are future rule-model fields. Current notification routing uses the enabled channels configured in General Settings.
 
 `selectorJson` contains the resource boundary, for example `instanceId`, `clusterName`, `brokerName`, `topic`, `consumerGroup`, and `queueId`. A rule must always be constrained to an instance. Wildcards are only valid for resource labels beneath that instance.
 
@@ -191,7 +191,7 @@ PENDING/FIRING -- silence matches --> state unchanged, notification suppressed
 
 The fingerprint is `sha256(ruleId + instanceId + sorted(labels))`. A single rule therefore creates independent events for different Brokers, Topics, queues, or consumer groups.
 
-`cooldownSeconds` limits repeat notifications, not state transitions. A value recovery always emits a `RESOLVED` event even during cooldown.
+Current delivery emits on `FIRING` and `RESOLVED`; repeat-notification cooldown is future work. A value recovery always emits a `RESOLVED` event.
 
 ## Persistence
 
@@ -201,7 +201,7 @@ The existing `rmq_alert_rule` and `rmq_system_alert` tables can be evolved, but 
 rmq_alert_rule
   domain, scope_type, metric_key, selector_json,
   aggregation, window_seconds, consecutive_samples,
-  operator, threshold, severity, cooldown_seconds, notification_policy_id
+  operator, threshold, severity
 
 rmq_metric_snapshot
   instance_id, metric_key, labels_hash, labels_json,
@@ -211,7 +211,7 @@ rmq_alert_state
   rule_id, fingerprint, status, consecutive_hits,
   current_value, labels_json, first_pending_at, fired_at, resolved_at, version
 
-rmq_alert_event
+rmq_system_alert
   rule_id, fingerprint, transition, domain, severity,
   title, description, current_value, threshold, labels_json,
   occurred_at, acknowledged_by, acknowledged_at
@@ -219,14 +219,8 @@ rmq_alert_event
 rmq_alert_silence
   selector_json, starts_at, ends_at, created_by, reason
 
-rmq_notification_channel
-  type, name, enabled, encrypted_config
-
-rmq_notification_policy
-  domain_filter, severity_filter, selector_json, channel_ids
-
 rmq_notification_outbox
-  event_id, channel_id, state, attempt_count,
+  event_id, channel, state, attempt_count,
   next_attempt_at, last_error, delivered_at
 ```
 
@@ -234,7 +228,7 @@ Snapshots have short retention, initially 24 hours. Studio is not a replacement 
 
 ## Collection and Scheduling
 
-`CollectorScheduler` creates per-instance jobs at a default 30-second interval. Each job has a bounded timeout and concurrency limit. Collection failure records an unavailable sample and health diagnostic; it does not block other instances.
+`CollectorScheduler` creates per-instance jobs at a default 30-second interval. Each job has a bounded timeout and the scheduler uses bounded concurrency, so one slow remote instance does not indefinitely delay every other instance. Collection failure records an unavailable sample and health diagnostic; it does not block other instances.
 
 For multi-replica Studio deployment, the scheduler uses a database lease:
 
@@ -247,7 +241,7 @@ Only the active lease holder collects and evaluates. Notification outbox rows us
 
 ## Notifications and Silences
 
-The first supported notification channels are DingTalk, SMS webhook, and Email. A real event creates one or more outbox rows based on its notification policy.
+The supported notification channels are DingTalk, the SMS webhook configured in General Settings, and Email. A real event creates outbox rows for enabled supported channels. Independent notification-channel and notification-policy CRUD are future work.
 
 Email delivery uses Spring's standard SMTP configuration. Configure `STUDIO_ALERTING_SMTP_HOST`,
 `STUDIO_ALERTING_SMTP_PORT`, `STUDIO_ALERTING_SMTP_USERNAME`, `STUDIO_ALERTING_SMTP_PASSWORD`,
@@ -278,9 +272,6 @@ POST         /api/system-alerts/{id}/acknowledge
 
 GET/POST     /api/alert-silences
 DELETE       /api/alert-silences/{id}
-GET/POST     /api/notification-channels
-POST         /api/notification-channels/{id}/test
-GET/POST     /api/notification-policies
 GET          /api/alert-collector-status
 GET          /api/alert-metric-catalog?instanceId=&domain=
 ```
@@ -290,7 +281,7 @@ Existing `/api/alert-rules/export` remains as a compatibility endpoint for users
 ## Authorization and Audit
 
 - Readers can list rules, events, collector status, and notification delivery results with secrets redacted.
-- Administrators can mutate rules, silences, channels, notification policies, and acknowledgements.
+- Administrators can mutate rules, silences, and acknowledgements. Independent channel and policy administration is future work.
 - Every mutation and every notification result is written to operation audit history.
 - Event acknowledgement captures the user and timestamp.
 
@@ -312,12 +303,12 @@ An event row displays its domain badge, current value, threshold, resource ident
 
 1. Introduce the metric contract, catalog, Apache collectors, snapshots, and single-node scheduler.
 2. Implement rule evaluation, state transitions, Alert Events lifecycle, acknowledgement, and three initial rules: Broker unavailable, Broker disk pressure, Consumer lag.
-3. Implement Webhook, DingTalk, and Email through the outbox worker, plus cooldown and delivery history.
+3. Implement DingTalk, SMS webhook, and Email through the outbox worker, plus delivery history. Generic per-rule Webhook delivery and cooldown are future work.
 4. Add silences, multi-replica lease handling, rule test-run, and capability-aware forms. These are complete,
    including label-scoped silences and instance-specific metric capability forms.
 5. Add Proxy and cloud collectors, additional business rules, and optional Prometheus YAML export compatibility.
    Proxy availability, Apache consumer delay, Aliyun/Tencent consumer-lag and topic-backlog, and managed cloud-instance lifecycle collection are complete;
-   broker-level cloud health metrics and Prometheus YAML compatibility remain future work.
+   broker-level cloud health metrics remain future work. The existing Prometheus YAML export is compatibility-only; richer mapping remains future work.
 
 ## Acceptance Criteria
 

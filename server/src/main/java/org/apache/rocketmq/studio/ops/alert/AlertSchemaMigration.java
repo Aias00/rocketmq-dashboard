@@ -82,6 +82,7 @@ public class AlertSchemaMigration implements ApplicationRunner {
             new Column("rmq_system_alert", "instance_id", "VARCHAR(128)"),
             new Column("rmq_system_alert", "current_value", "DOUBLE"),
             new Column("rmq_system_alert", "labels_json", "TEXT"),
+            new Column("rmq_alert_notification_outbox", "sending_started_at", "DATETIME"),
             new Column("rmq_alert_notification_outbox", "claim_token", "VARCHAR(64)"));
     private static final List<Index> INDEXES = List.of(
             new Index("rmq_metric_snapshot", "idx_metric_snapshot_lookup", "instance_id, metric_key, collected_at"),

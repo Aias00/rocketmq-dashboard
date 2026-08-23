@@ -16,23 +16,29 @@
  */
 package org.apache.rocketmq.studio.cluster.metrics;
 
-import lombok.RequiredArgsConstructor;
+import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.rocketmq.studio.instance.InstanceRepository;
 import org.apache.rocketmq.studio.instance.InstanceVO;
 import org.apache.rocketmq.studio.ops.alert.NativeAlertProcessor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.time.Duration;
 import java.time.Instant;
 
-/** Runs native collectors independently for each configured instance. */
+/** Runs independent, bounded collection jobs for each configured instance. */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 @EnableConfigurationProperties(AlertingProperties.class)
 public class CollectorScheduler {
     private final AlertingProperties properties;
@@ -42,6 +48,30 @@ public class CollectorScheduler {
     private final MetricSnapshotRepository snapshotRepository;
     private final NativeAlertProcessor alertProcessor;
     private final AlertCollectionLease collectionLease;
+    private final ExecutorService collectionExecutor;
+
+    @Autowired
+    public CollectorScheduler(AlertingProperties properties, InstanceRepository instanceRepository,
+            List<ClusterMetricsCollector> clusterCollectors, List<BusinessMetricsCollector> businessCollectors,
+            MetricSnapshotRepository snapshotRepository, NativeAlertProcessor alertProcessor,
+            AlertCollectionLease collectionLease) {
+        this(properties, instanceRepository, clusterCollectors, businessCollectors, snapshotRepository, alertProcessor,
+                collectionLease, newCollectionExecutor(properties));
+    }
+
+    CollectorScheduler(AlertingProperties properties, InstanceRepository instanceRepository,
+            List<ClusterMetricsCollector> clusterCollectors, List<BusinessMetricsCollector> businessCollectors,
+            MetricSnapshotRepository snapshotRepository, NativeAlertProcessor alertProcessor,
+            AlertCollectionLease collectionLease, ExecutorService collectionExecutor) {
+        this.properties = properties;
+        this.instanceRepository = instanceRepository;
+        this.clusterCollectors = clusterCollectors;
+        this.businessCollectors = businessCollectors;
+        this.snapshotRepository = snapshotRepository;
+        this.alertProcessor = alertProcessor;
+        this.collectionLease = collectionLease;
+        this.collectionExecutor = collectionExecutor;
+    }
 
     @Scheduled(fixedDelayString = "${studio.alerting.collection-interval:PT30S}")
     public void collect() {
@@ -52,9 +82,35 @@ public class CollectorScheduler {
             log.debug("Skipping native alert collection because another Studio replica holds the lease");
             return;
         }
-        for (InstanceVO instance : instanceRepository.findAll()) {
-            collectClusterMetrics(instance);
-            collectBusinessMetrics(instance);
+        List<Future<?>> jobs = instanceRepository.findAll().stream()
+                .map(this::submitCollection)
+                .filter(java.util.Objects::nonNull)
+                .toList();
+        Duration timeout = parsePositiveDuration(properties.getCollectionTimeout(), Duration.ofSeconds(15));
+        for (Future<?> job : jobs) {
+            try {
+                job.get(timeout.toMillis(), TimeUnit.MILLISECONDS);
+            } catch (java.util.concurrent.TimeoutException error) {
+                job.cancel(true);
+                log.warn("Native metric collection exceeded {} for one instance and was cancelled", timeout);
+            } catch (InterruptedException error) {
+                Thread.currentThread().interrupt();
+                return;
+            } catch (java.util.concurrent.ExecutionException error) {
+                log.warn("Native metric collection job failed: {}", error.getCause().getMessage());
+            }
+        }
+    }
+
+    private Future<?> submitCollection(InstanceVO instance) {
+        try {
+            return collectionExecutor.submit(() -> {
+                collectClusterMetrics(instance);
+                collectBusinessMetrics(instance);
+            });
+        } catch (java.util.concurrent.RejectedExecutionException error) {
+            log.warn("Skipping native metric collection for instance {} because the collector is saturated", instance.getName());
+            return null;
         }
     }
 
@@ -96,6 +152,32 @@ public class CollectorScheduler {
             }
             snapshotRepository.saveAll(samples);
             alertProcessor.process(samples);
+        }
+    }
+
+    @PreDestroy
+    void stopCollectionExecutor() {
+        collectionExecutor.shutdownNow();
+    }
+
+    private static ExecutorService newCollectionExecutor(AlertingProperties properties) {
+        int parallelism = Math.max(1, properties.getCollectionParallelism());
+        ThreadFactory threadFactory = task -> {
+            Thread thread = new Thread(task, "studio-native-metric-collector");
+            thread.setDaemon(true);
+            return thread;
+        };
+        return new ThreadPoolExecutor(parallelism, parallelism, 0, TimeUnit.MILLISECONDS,
+                new ArrayBlockingQueue<>(parallelism), threadFactory, new ThreadPoolExecutor.AbortPolicy());
+    }
+
+    private static Duration parsePositiveDuration(String value, Duration fallback) {
+        try {
+            Duration duration = Duration.parse(value);
+            return duration.isPositive() ? duration : fallback;
+        } catch (RuntimeException error) {
+            log.warn("Invalid native metric collection timeout '{}'; using {}", value, fallback);
+            return fallback;
         }
     }
 }

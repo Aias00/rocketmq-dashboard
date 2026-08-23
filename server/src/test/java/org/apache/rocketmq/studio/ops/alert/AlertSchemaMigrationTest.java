@@ -25,6 +25,8 @@ class AlertSchemaMigrationTest {
         try (Connection connection = dataSource.getConnection(); Statement statement = connection.createStatement()) {
             statement.execute("CREATE TABLE rmq_alert_rule (id BIGINT PRIMARY KEY, name VARCHAR(128))");
             statement.execute("CREATE TABLE rmq_system_alert (id BIGINT PRIMARY KEY, time TIMESTAMP)");
+            statement.execute("CREATE TABLE rmq_alert_notification_outbox (id BIGINT PRIMARY KEY, alert_id BIGINT, "
+                    + "channel VARCHAR(32), status VARCHAR(16), next_attempt_at TIMESTAMP)");
         }
 
         AlertSchemaMigration migration = new AlertSchemaMigration(dataSource);
@@ -46,6 +48,14 @@ class AlertSchemaMigrationTest {
                         + "'rmq_alert_state', 'rmq_alert_silence', 'rmq_alert_notification_outbox')")) {
             result.next();
             assertThat(result.getInt(1)).isEqualTo(5);
+        }
+
+        try (Connection connection = dataSource.getConnection(); Statement statement = connection.createStatement();
+                ResultSet result = statement.executeQuery("SELECT COUNT(*) FROM information_schema.columns "
+                        + "WHERE table_name = 'rmq_alert_notification_outbox' AND column_name IN "
+                        + "('sending_started_at', 'claim_token')")) {
+            result.next();
+            assertThat(result.getInt(1)).isEqualTo(2);
         }
     }
 }

@@ -222,6 +222,30 @@ class NativeAlertProcessorTest {
         verify(alerts).markRuleTriggered(org.mockito.ArgumentMatchers.eq(1L), any(String.class));
     }
 
+    @Test
+    void enqueuesNotificationForLifecycleTransitions() {
+        AlertService service = mock(AlertService.class);
+        AlertRuleVO rule = rule("local", "orders", 1);
+        rule.setChannels(List.of("sms"));
+        when(service.listRules(AlertDomain.BUSINESS)).thenReturn(List.of(rule));
+        AlertStateRepository states = mock(AlertStateRepository.class);
+        when(states.find(any(AlertStateKey.class))).thenReturn(Optional.empty());
+        when(states.save(any(AlertStateKey.class), any(AlertRuleState.class))).thenReturn(true);
+        AlertRepository alerts = mock(AlertRepository.class);
+        when(alerts.saveAlert(any(SystemAlertVO.class))).thenAnswer(invocation -> {
+            SystemAlertVO event = invocation.getArgument(0);
+            event.setId(9L);
+            return event;
+        });
+        NotificationOutboxService outbox = mock(NotificationOutboxService.class);
+
+        new NativeAlertProcessor(service, new AlertRuleEvaluator(), new AlertStateMachine(), states,
+                mock(MetricSnapshotRepository.class), alerts, outbox).process(List.of(sample("orders")));
+
+        verify(outbox).enqueue(any(SystemAlertVO.class), org.mockito.ArgumentMatchers.same(rule),
+                org.mockito.ArgumentMatchers.anyMap());
+    }
+
     private static NativeAlertProcessor processor(AlertService service, AlertStateRepository states,
             AlertRepository alerts) {
         return new NativeAlertProcessor(service, new AlertRuleEvaluator(), new AlertStateMachine(), states,

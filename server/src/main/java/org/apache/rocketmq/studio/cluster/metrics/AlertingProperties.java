@@ -25,6 +25,10 @@ public class AlertingProperties {
     /** Native collection remains opt-in until rule evaluation and event delivery are complete. */
     private boolean collectionEnabled = false;
     private String collectionInterval = "PT30S";
+    /** Maximum number of instances collected concurrently during one pass. */
+    private int collectionParallelism = 4;
+    /** Maximum time that one instance may consume during a collection pass. */
+    private String collectionTimeout = "PT15S";
     /**
      * A shared database lease prevents multiple Studio replicas from evaluating the same
      * native samples and emitting duplicate alert events.
