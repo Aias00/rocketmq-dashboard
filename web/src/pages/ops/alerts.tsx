@@ -140,7 +140,7 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
     setModalVisible(true);
   };
 
-  const loadMetricCapabilities = async (instanceId?: string) => {
+  const loadMetricCapabilities = async (instanceId?: string, resetMetric = true) => {
     if (!instanceId?.trim()) return;
     const requestVersion = ++metricRequestVersion.current;
     setMetricLoading(true);
@@ -149,7 +149,7 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
       const metrics = await listNativeAlertMetrics(instanceId.trim(), domain);
       if (requestVersion !== metricRequestVersion.current) return;
       setMetricOptions(metrics.map((metric) => ({ label: metric.label, value: metric.key })));
-      form.setFieldValue('metric', undefined);
+      if (resetMetric) form.setFieldValue('metric', undefined);
       if (metrics.length === 0) message.warning('该实例暂不支持原生告警指标');
     } catch {
       if (requestVersion === metricRequestVersion.current) {
@@ -164,7 +164,7 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
     setEditingRule(rule);
     form.setFieldsValue(rule);
     setSelectedInstanceId(rule.instanceId);
-    void loadMetricCapabilities(rule.instanceId);
+    void loadMetricCapabilities(rule.instanceId, false);
     setModalVisible(true);
   };
 

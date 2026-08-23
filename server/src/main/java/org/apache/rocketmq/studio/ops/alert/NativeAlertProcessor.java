@@ -22,6 +22,7 @@ import org.apache.rocketmq.studio.cluster.metrics.MetricSnapshotRepository;
 import org.apache.rocketmq.studio.cluster.metrics.MetricAvailability;
 import org.apache.rocketmq.studio.common.domain.enums.AlertLevel;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.Duration;
@@ -43,6 +44,7 @@ public class NativeAlertProcessor {
     private final AlertRepository alertRepository;
     private final NotificationOutboxService notificationOutboxService;
 
+    @Transactional
     public void process(List<MetricSample> samples) {
         Map<AlertDomain, List<AlertRuleVO>> rulesByDomain = new EnumMap<>(AlertDomain.class);
         for (MetricSample sample : samples) {
@@ -67,13 +69,17 @@ public class NativeAlertProcessor {
                     continue;
                 }
                 if (update.transition() == AlertStateTransition.FIRING || update.transition() == AlertStateTransition.RESOLVED) {
+                    LocalDateTime eventTime = LocalDateTime.ofInstant(sample.collectedAt(), ZoneOffset.UTC);
                     SystemAlertVO event = alertRepository.saveAlert(SystemAlertVO.builder().level(level(rule.getSeverity()))
                             .title(rule.getName()).description(update.transition() + " " + sample.metricKey()
-                                    + " on " + sample.instanceId()).time(LocalDateTime.ofInstant(sample.collectedAt(), ZoneOffset.UTC))
+                                    + " on " + sample.instanceId()).time(eventTime)
                             .acknowledged(false).domain(sample.domain()).ruleId(rule.getId())
                             .fingerprint(key.fingerprint()).transition(update.transition().name())
                             .instanceId(sample.instanceId()).currentValue(update.state().currentValue())
                             .labels(Map.copyOf(new TreeMap<>(sample.labels()))).build());
+                    if (update.transition() == AlertStateTransition.FIRING) {
+                        alertRepository.markRuleTriggered(rule.getId(), eventTime.toString());
+                    }
                     notificationOutboxService.enqueue(event, rule, sample.labels());
                 }
             }

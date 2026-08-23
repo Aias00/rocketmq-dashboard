@@ -9,6 +9,7 @@ package org.apache.rocketmq.studio.persistence.mapper;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Update;
 import org.apache.rocketmq.studio.persistence.entity.RmqAlertNotificationOutbox;
 
@@ -16,6 +17,10 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 public interface RmqAlertNotificationOutboxMapper extends BaseMapper<RmqAlertNotificationOutbox> {
+    @Delete("DELETE FROM rmq_alert_notification_outbox WHERE alert_id IN "
+            + "(SELECT id FROM rmq_system_alert WHERE acknowledged = 1)")
+    int deleteForAcknowledgedAlerts();
+
     @Select("SELECT * FROM rmq_alert_notification_outbox WHERE "
             + "(status IN ('PENDING', 'RETRY_WAIT') AND next_attempt_at <= #{now}) "
             + "OR (status = 'SENDING' AND (sending_started_at IS NULL OR sending_started_at <= #{staleBefore})) "

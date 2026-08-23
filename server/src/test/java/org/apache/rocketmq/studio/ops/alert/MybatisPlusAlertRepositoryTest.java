@@ -22,6 +22,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.apache.rocketmq.studio.persistence.entity.RmqAlertRule;
 import org.apache.rocketmq.studio.persistence.entity.RmqSystemAlert;
 import org.apache.rocketmq.studio.persistence.mapper.RmqAlertRuleMapper;
+import org.apache.rocketmq.studio.persistence.mapper.RmqAlertNotificationOutboxMapper;
 import org.apache.rocketmq.studio.persistence.mapper.RmqSystemAlertMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -50,6 +51,9 @@ class MybatisPlusAlertRepositoryTest {
 
     @Mock
     private RmqSystemAlertMapper alertMapper;
+
+    @Mock
+    private RmqAlertNotificationOutboxMapper notificationOutboxMapper;
 
     @InjectMocks
     private MybatisPlusAlertRepository repository;
@@ -140,6 +144,17 @@ class MybatisPlusAlertRepositoryTest {
 
         verify(alertMapper).insert(argThat((RmqSystemAlert entity) -> entity != null
                 && "{\"brokerName\":\"broker-a\",\"topic\":\"orders\"}".equals(entity.getLabelsJson())));
+    }
+
+    @Test
+    void deleteAcknowledgedAlertsShouldRemovePendingDeliveriesFirst() {
+        when(alertMapper.delete(any())).thenReturn(2);
+
+        assertThat(repository.deleteAcknowledgedAlerts()).isEqualTo(2);
+
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(notificationOutboxMapper, alertMapper);
+        order.verify(notificationOutboxMapper).deleteForAcknowledgedAlerts();
+        order.verify(alertMapper).delete(any());
     }
 
     @Test

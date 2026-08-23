@@ -64,8 +64,19 @@ public class MybatisPlusAlertStateRepository implements AlertStateRepository {
     }
 
     @Override
-    public boolean acknowledge(AlertStateKey key) {
-        return mapper.acknowledgeFiring(key.ruleId(), key.fingerprint(), LocalDateTime.now(ZoneOffset.UTC)) > 0;
+    public boolean acknowledge(AlertStateKey key, Instant firedAt) {
+        if (firedAt == null) {
+            return false;
+        }
+        return mapper.acknowledgeFiring(key.ruleId(), key.fingerprint(), toLocal(firedAt),
+                LocalDateTime.now(ZoneOffset.UTC)) > 0;
+    }
+
+    @Override
+    public void deleteByRuleId(Long ruleId) {
+        if (ruleId != null) {
+            mapper.delete(new QueryWrapper<RmqAlertState>().eq("rule_id", ruleId));
+        }
     }
 
     private static void apply(RmqAlertState entity, AlertRuleState state) {

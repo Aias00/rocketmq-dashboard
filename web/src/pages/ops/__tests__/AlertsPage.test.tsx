@@ -237,6 +237,32 @@ describe('AlertsPage', () => {
     await waitFor(() => expect(listNativeAlertMetrics).toHaveBeenCalledWith('local', 'BUSINESS'));
   });
 
+  it('preserves the existing metric while opening the edit dialog', async () => {
+    vi.mocked(listAlertRules).mockResolvedValue([
+      {
+        ...cloneRule(alertRules[0]),
+        instanceId: 'local',
+        metric: 'broker.disk.usage_ratio',
+      },
+    ]);
+    vi.mocked(listNativeAlertMetrics).mockResolvedValue([
+      {
+        key: 'broker.disk.usage_ratio',
+        label: 'Broker disk usage ratio',
+        thresholdUnit: 'ratio',
+        supportsConsumerGroup: false,
+      },
+    ]);
+    const user = userEvent.setup();
+    renderPage();
+
+    await screen.findByText('Broker disk usage');
+    await user.click(within(getRuleRow('Broker disk usage')).getByRole('button', { name: '编辑' }));
+    await waitFor(() => expect(listNativeAlertMetrics).toHaveBeenCalledWith('local', 'CLUSTER'));
+
+    expect(await screen.findByText('Broker disk usage ratio')).toBeInTheDocument();
+  });
+
   it('exposes optional cluster and broker scopes for cluster rules', async () => {
     const user = userEvent.setup();
     renderPage();

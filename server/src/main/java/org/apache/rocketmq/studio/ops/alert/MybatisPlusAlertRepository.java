@@ -25,6 +25,7 @@ import org.apache.rocketmq.studio.common.domain.enums.AlertLevel;
 import org.apache.rocketmq.studio.persistence.entity.RmqAlertRule;
 import org.apache.rocketmq.studio.persistence.entity.RmqSystemAlert;
 import org.apache.rocketmq.studio.persistence.mapper.RmqAlertRuleMapper;
+import org.apache.rocketmq.studio.persistence.mapper.RmqAlertNotificationOutboxMapper;
 import org.apache.rocketmq.studio.persistence.mapper.RmqSystemAlertMapper;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
@@ -51,6 +52,7 @@ public class MybatisPlusAlertRepository implements AlertRepository {
 
     private final RmqAlertRuleMapper ruleMapper;
     private final RmqSystemAlertMapper alertMapper;
+    private final RmqAlertNotificationOutboxMapper notificationOutboxMapper;
 
     @Override
     public List<AlertRuleVO> findAllRules() {
@@ -78,6 +80,13 @@ public class MybatisPlusAlertRepository implements AlertRepository {
             return false;
         }
         return ruleMapper.updateById(toRuleEntity(rule)) > 0;
+    }
+
+    @Override
+    public void markRuleTriggered(Long id, String triggeredAt) {
+        if (id != null) {
+            ruleMapper.updateLastTriggered(id, triggeredAt);
+        }
     }
 
     @Override
@@ -133,6 +142,7 @@ public class MybatisPlusAlertRepository implements AlertRepository {
 
     @Override
     public int deleteAcknowledgedAlerts() {
+        notificationOutboxMapper.deleteForAcknowledgedAlerts();
         return Math.toIntExact(alertMapper.delete(
                 new QueryWrapper<RmqSystemAlert>().eq("acknowledged", true)));
     }

@@ -27,6 +27,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -123,6 +125,27 @@ class AlertServiceTest {
 
         assertThat(updated.isEnabled()).isTrue();
         verify(alertRepository).replaceRule(cluster);
+        verify(alertStateRepository).deleteByRuleId(2L);
+    }
+
+    @Test
+    void updatingRuleShouldResetItsPreviousEvaluationState() {
+        AlertRuleVO rule = AlertRuleVO.builder().id(4L).name("Lag").metric("consumer.lag.total")
+                .operator(">").threshold(100).instanceId("local").build();
+        when(alertRepository.replaceRule(rule)).thenReturn(true);
+
+        alertService.updateRule(rule);
+
+        verify(alertStateRepository).deleteByRuleId(4L);
+    }
+
+    @Test
+    void deletingRuleShouldRemoveItsStoredEvaluationState() {
+        when(alertRepository.deleteRule(4L)).thenReturn(true);
+
+        alertService.deleteRule(4L);
+
+        verify(alertStateRepository).deleteByRuleId(4L);
     }
 
     @Test
@@ -858,13 +881,15 @@ class AlertServiceTest {
     @Test
     void acknowledgeNativeAlertShouldAcknowledgeItsActiveRuleState() {
         SystemAlertVO alert = SystemAlertVO.builder().id(1L).ruleId(7L).fingerprint("fingerprint")
+                .time(LocalDateTime.of(2026, 8, 22, 12, 0))
                 .transition("FIRING").acknowledged(false).build();
         when(alertRepository.findAlertById(1L)).thenReturn(Optional.of(alert));
         when(alertRepository.acknowledgeAlert(any(SystemAlertVO.class))).thenReturn(true);
 
         alertService.acknowledgeAlert(1L);
 
-        verify(alertStateRepository).acknowledge(new AlertStateKey(7L, "fingerprint"));
+        verify(alertStateRepository).acknowledge(new AlertStateKey(7L, "fingerprint"),
+                LocalDateTime.of(2026, 8, 22, 12, 0).toInstant(ZoneOffset.UTC));
     }
 
     @Test
@@ -876,7 +901,7 @@ class AlertServiceTest {
 
         alertService.acknowledgeAlert(1L);
 
-        verify(alertStateRepository, never()).acknowledge(any(AlertStateKey.class));
+        verify(alertStateRepository, never()).acknowledge(any(AlertStateKey.class), any());
     }
 
     @Test

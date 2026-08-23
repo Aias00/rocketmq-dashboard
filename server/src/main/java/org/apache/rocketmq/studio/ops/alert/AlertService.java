@@ -23,6 +23,7 @@ import org.apache.rocketmq.studio.auth.AuthenticatedUserContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -127,6 +128,7 @@ public class AlertService {
     }
 
 
+    @Transactional
     public AlertRuleVO updateRule(AlertRuleVO rule) {
         if (rule == null) {
             throw new BusinessException(400, "Alert rule request is required");
@@ -142,10 +144,12 @@ public class AlertService {
         if (!alertRepository.replaceRule(rule)) {
             throw ruleNotFound(id);
         }
+        alertStateRepository.deleteByRuleId(id);
         auditRule("UPDATE_ALERT_RULE", rule, null);
         return rule;
     }
 
+    @Transactional
     public AlertRuleVO updateRule(AlertDomain domain, AlertRuleVO rule) {
         requireDomain(domain);
         validateRuleId(rule == null ? null : rule.getId());
@@ -171,6 +175,7 @@ public class AlertService {
     }
 
 
+    @Transactional
     public AlertRuleVO toggleRule(Long id, boolean enabled) {
         log.info("Toggling alert rule id={}, enabled={}", id, enabled);
         validateRuleId(id);
@@ -181,10 +186,12 @@ public class AlertService {
                 .orElseThrow(() -> new org.apache.rocketmq.studio.common.exception.BusinessException(404, "Alert rule not found: " + id));
         rule.setEnabled(enabled);
         AlertRuleVO saved = alertRepository.saveRule(rule);
+        alertStateRepository.deleteByRuleId(id);
         auditRule("TOGGLE_ALERT_RULE", saved, "enabled=" + enabled);
         return saved;
     }
 
+    @Transactional
     public AlertRuleVO toggleRule(AlertDomain domain, Long id, boolean enabled) {
         requireDomain(domain);
         AlertRuleVO rule = findRuleInDomain(domain, id);
@@ -192,29 +199,35 @@ public class AlertService {
         if (!alertRepository.replaceRule(rule)) {
             throw ruleNotFound(id);
         }
+        alertStateRepository.deleteByRuleId(id);
         auditRule("TOGGLE_ALERT_RULE", rule, "enabled=" + enabled);
         return rule;
     }
 
 
+    @Transactional
     public void deleteRule(Long id) {
         log.info("Deleting alert rule id={}", id);
         validateRuleId(id);
         if (!alertRepository.deleteRule(id)) {
             throw ruleNotFound(id);
         }
+        alertStateRepository.deleteByRuleId(id);
         recordAudit("DELETE_ALERT_RULE", "ALERT_RULE", String.valueOf(id), null, null);
     }
 
+    @Transactional
     public void deleteRule(AlertDomain domain, Long id) {
         requireDomain(domain);
         findRuleInDomain(domain, id);
         if (!alertRepository.deleteRule(id)) {
             throw ruleNotFound(id);
         }
+        alertStateRepository.deleteByRuleId(id);
         recordAudit("DELETE_ALERT_RULE", "ALERT_RULE", String.valueOf(id), null, null);
     }
 
+    @Transactional
     public AlertRuleBulkResultVO bulkToggleRules(List<Long> ids, boolean enabled) {
         List<Long> normalizedIds = normalizeBulkIds(ids);
         Map<Long, AlertRuleVO> rulesById = new LinkedHashMap<>();
@@ -238,6 +251,7 @@ public class AlertService {
                     failures.put(id, "Alert rule not found");
                     continue;
                 }
+                alertStateRepository.deleteByRuleId(id);
                 auditRule("TOGGLE_ALERT_RULE", rule, "enabled=" + enabled + ", bulk=true");
                 succeeded.add(id);
                 updated.add(rule);
@@ -418,8 +432,9 @@ public class AlertService {
             throw new BusinessException(404, "System alert not found: " + id);
         }
         if ("FIRING".equalsIgnoreCase(alert.getTransition())
-                && alert.getRuleId() != null && hasText(alert.getFingerprint())) {
-            alertStateRepository.acknowledge(new AlertStateKey(alert.getRuleId(), alert.getFingerprint()));
+                && alert.getRuleId() != null && hasText(alert.getFingerprint()) && alert.getTime() != null) {
+            alertStateRepository.acknowledge(new AlertStateKey(alert.getRuleId(), alert.getFingerprint()),
+                    alert.getTime().toInstant(ZoneOffset.UTC));
         }
         recordAudit("ACKNOWLEDGE_SYSTEM_ALERT", "SYSTEM_ALERT", String.valueOf(alert.getId()), null,
                 "acknowledged=true");
@@ -427,6 +442,7 @@ public class AlertService {
     }
 
 
+    @Transactional
     public int clearAcknowledged() {
         log.info("Clearing acknowledged system alerts");
         int deleted = alertRepository.deleteAcknowledgedAlerts();

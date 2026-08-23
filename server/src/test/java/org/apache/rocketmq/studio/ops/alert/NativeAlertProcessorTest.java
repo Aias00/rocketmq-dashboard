@@ -68,8 +68,12 @@ class NativeAlertProcessorTest {
             }
 
             @Override
-            public boolean acknowledge(AlertStateKey key) {
+            public boolean acknowledge(AlertStateKey key, Instant firedAt) {
                 return false;
+            }
+
+            @Override
+            public void deleteByRuleId(Long ruleId) {
             }
         };
         AlertRepository alerts = mock(AlertRepository.class);
@@ -138,8 +142,12 @@ class NativeAlertProcessorTest {
             }
 
             @Override
-            public boolean acknowledge(AlertStateKey key) {
+            public boolean acknowledge(AlertStateKey key, Instant firedAt) {
                 return false;
+            }
+
+            @Override
+            public void deleteByRuleId(Long ruleId) {
             }
         };
 
@@ -150,6 +158,25 @@ class NativeAlertProcessorTest {
             assertThat(state.status()).isEqualTo(AlertStateStatus.FIRING);
             assertThat(state.currentValue()).isEqualTo(30D);
         });
+    }
+
+    @Test
+    void recordsTheRuleTriggerTimeWhenEmittingAFiringEvent() {
+        AlertService service = mock(AlertService.class);
+        when(service.listRules(AlertDomain.BUSINESS)).thenReturn(List.of(rule("local", "orders", 1)));
+        AlertStateRepository states = mock(AlertStateRepository.class);
+        when(states.find(any(AlertStateKey.class))).thenReturn(Optional.empty());
+        when(states.save(any(AlertStateKey.class), any(AlertRuleState.class))).thenReturn(true);
+        AlertRepository alerts = mock(AlertRepository.class);
+        when(alerts.saveAlert(any(SystemAlertVO.class))).thenAnswer(invocation -> {
+            SystemAlertVO event = invocation.getArgument(0);
+            event.setId(8L);
+            return event;
+        });
+
+        processor(service, states, alerts).process(List.of(sample("orders")));
+
+        verify(alerts).markRuleTriggered(org.mockito.ArgumentMatchers.eq(1L), any(String.class));
     }
 
     private static NativeAlertProcessor processor(AlertService service, AlertStateRepository states,

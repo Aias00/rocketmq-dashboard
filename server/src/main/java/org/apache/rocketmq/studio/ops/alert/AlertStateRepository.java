@@ -16,6 +16,7 @@
  */
 package org.apache.rocketmq.studio.ops.alert;
 
+import java.time.Instant;
 import java.util.Optional;
 
 public interface AlertStateRepository {
@@ -27,5 +28,11 @@ public interface AlertStateRepository {
      */
     boolean save(AlertStateKey key, AlertRuleState state);
 
-    boolean acknowledge(AlertStateKey key);
+    /**
+     * Acknowledges the currently firing incident only when it is the same firing
+     * occurrence represented by the alert event being acknowledged.
+     */
+    boolean acknowledge(AlertStateKey key, Instant firedAt);
+
+    void deleteByRuleId(Long ruleId);
 }

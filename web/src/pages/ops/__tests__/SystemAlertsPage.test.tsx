@@ -181,8 +181,8 @@ describe('SystemAlertsPage', () => {
           instanceId: 'local',
           labelKey: 'brokerName',
           labelValue: 'broker-a',
-          from: '2026-08-01T00:00',
-          to: '2026-08-02T00:00',
+          from: new Date('2026-08-01T00:00:00').toISOString().replace('Z', ''),
+          to: new Date('2026-08-02T00:00:00').toISOString().replace('Z', ''),
         }),
       );
     });

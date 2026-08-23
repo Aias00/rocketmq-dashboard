@@ -72,6 +72,8 @@ const parseSilenceLabels = (value?: string): Record<string, string> | undefined 
 };
 
 const localDateTimeToUtc = (value: string) => new Date(`${value}:00`).toISOString();
+const localDateTimeToUtcDatabaseValue = (value: string) =>
+  new Date(`${value}:00`).toISOString().replace('Z', '');
 
 const SystemAlertsPage = () => {
   const { t } = useLang();
@@ -123,8 +125,8 @@ const SystemAlertsPage = () => {
       instanceId: instanceFilter.trim() || undefined,
       labelKey: labelKey && labelValue ? labelKey : undefined,
       labelValue: labelKey && labelValue ? labelValue : undefined,
-      from: fromFilter || undefined,
-      to: toFilter || undefined,
+      from: fromFilter ? localDateTimeToUtcDatabaseValue(fromFilter) : undefined,
+      to: toFilter ? localDateTimeToUtcDatabaseValue(toFilter) : undefined,
       page,
       pageSize,
     })
