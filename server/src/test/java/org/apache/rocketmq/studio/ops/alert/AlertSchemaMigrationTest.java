@@ -25,7 +25,6 @@ class AlertSchemaMigrationTest {
         try (Connection connection = dataSource.getConnection(); Statement statement = connection.createStatement()) {
             statement.execute("CREATE TABLE rmq_alert_rule (id BIGINT PRIMARY KEY, name VARCHAR(128))");
             statement.execute("CREATE TABLE rmq_system_alert (id BIGINT PRIMARY KEY, time TIMESTAMP)");
-            statement.execute("CREATE TABLE rmq_alert_notification_outbox (id BIGINT PRIMARY KEY)");
         }
 
         AlertSchemaMigration migration = new AlertSchemaMigration(dataSource);
@@ -39,6 +38,14 @@ class AlertSchemaMigrationTest {
                         + "'consecutive_samples')")) {
             result.next();
             assertThat(result.getInt(1)).isEqualTo(7);
+        }
+
+        try (Connection connection = dataSource.getConnection(); Statement statement = connection.createStatement();
+                ResultSet result = statement.executeQuery("SELECT COUNT(*) FROM information_schema.tables "
+                        + "WHERE table_name IN ('rmq_metric_snapshot', 'rmq_alert_collection_lease', "
+                        + "'rmq_alert_state', 'rmq_alert_silence', 'rmq_alert_notification_outbox')")) {
+            result.next();
+            assertThat(result.getInt(1)).isEqualTo(5);
         }
     }
 }

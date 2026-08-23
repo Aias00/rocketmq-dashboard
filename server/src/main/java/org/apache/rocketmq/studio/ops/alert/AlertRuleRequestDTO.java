@@ -40,7 +40,9 @@ public class AlertRuleRequestDTO {
     private String aggregation;
     @Min(value = 0, message = "windowSeconds must not be negative")
     private Integer windowSeconds;
-    private List<@NotBlank(message = "channel must not be blank") String> channels;
+    private List<@NotBlank(message = "channel must not be blank")
+            @Pattern(regexp = "dingtalk|sms|email", flags = Pattern.Flag.CASE_INSENSITIVE,
+                    message = "channel is unsupported") String> channels;
     private boolean enabled;
     private String description;
     private String brokerName;

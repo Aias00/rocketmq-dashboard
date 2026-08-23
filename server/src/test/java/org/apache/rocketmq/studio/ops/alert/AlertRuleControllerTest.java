@@ -148,6 +148,20 @@ class AlertRuleControllerTest {
     }
 
     @Test
+    void createRuleShouldRejectUnsupportedNotificationChannels() throws Exception {
+        AlertRuleVO request = AlertRuleVO.builder().name("High Lag").metric("consumer.lag.total")
+                .channels(List.of("webhook")).enabled(true).build();
+
+        mockMvc.perform(post("/api/alert-rules/create")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("channel is unsupported"));
+
+        verifyNoInteractions(alertService);
+    }
+
+    @Test
     void createRuleShouldRejectInvalidDuration() throws Exception {
         mockMvc.perform(post("/api/alert-rules/create")
                         .contentType(MediaType.APPLICATION_JSON)

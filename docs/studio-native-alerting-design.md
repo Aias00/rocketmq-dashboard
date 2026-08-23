@@ -247,7 +247,7 @@ Only the active lease holder collects and evaluates. Notification outbox rows us
 
 ## Notifications and Silences
 
-The first supported notification channels are Webhook, DingTalk, and Email. A real event creates one or more outbox rows based on its notification policy.
+The first supported notification channels are DingTalk, SMS webhook, and Email. A real event creates one or more outbox rows based on its notification policy.
 
 Email delivery uses Spring's standard SMTP configuration. Configure `STUDIO_ALERTING_SMTP_HOST`,
 `STUDIO_ALERTING_SMTP_PORT`, `STUDIO_ALERTING_SMTP_USERNAME`, `STUDIO_ALERTING_SMTP_PASSWORD`,

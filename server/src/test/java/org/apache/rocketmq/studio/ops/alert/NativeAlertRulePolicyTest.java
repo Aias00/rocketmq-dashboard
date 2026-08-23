@@ -19,6 +19,8 @@ package org.apache.rocketmq.studio.ops.alert;
 import org.apache.rocketmq.studio.common.exception.BusinessException;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -82,6 +84,13 @@ class NativeAlertRulePolicyTest {
     void leavesLegacyPrometheusRulesCompatible() {
         assertThatCode(() -> NativeAlertRulePolicy.validate(rule(AlertDomain.BUSINESS,
                 "rocketmq_consumer_lag_messages").build())).doesNotThrowAnyException();
+    }
+
+    @Test
+    void rejectsUnsupportedNotificationChannelsOutsideTheHttpApi() {
+        assertThatThrownBy(() -> NativeAlertRulePolicy.validate(rule(AlertDomain.BUSINESS,
+                "rocketmq_consumer_lag_messages").channels(List.of("webhook")).build()))
+                .isInstanceOf(BusinessException.class).hasMessageContaining("Unsupported notification channel");
     }
 
     private static AlertRuleVO.AlertRuleVOBuilder rule(AlertDomain domain, String metric) {

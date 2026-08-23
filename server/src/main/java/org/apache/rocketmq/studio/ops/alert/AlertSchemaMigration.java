@@ -35,6 +35,36 @@ import java.util.List;
 @Component
 @RequiredArgsConstructor
 public class AlertSchemaMigration implements ApplicationRunner {
+    private static final List<Table> TABLES = List.of(
+            new Table("rmq_metric_snapshot", "CREATE TABLE rmq_metric_snapshot ("
+                    + "id BIGINT AUTO_INCREMENT PRIMARY KEY, instance_id VARCHAR(128) NOT NULL, "
+                    + "metric_key VARCHAR(128) NOT NULL, domain VARCHAR(16) NOT NULL, cluster_id VARCHAR(128), "
+                    + "labels_hash CHAR(64) NOT NULL, labels_json TEXT NOT NULL, `value` DOUBLE, "
+                    + "availability VARCHAR(16) NOT NULL, collected_at DATETIME NOT NULL, "
+                    + "gmt_create DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)"),
+            new Table("rmq_alert_collection_lease", "CREATE TABLE rmq_alert_collection_lease ("
+                    + "id BIGINT AUTO_INCREMENT PRIMARY KEY, lease_name VARCHAR(128) NOT NULL, "
+                    + "holder_id VARCHAR(64) NOT NULL, expires_at DATETIME NOT NULL, "
+                    + "gmt_modified DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "
+                    + "CONSTRAINT uk_alert_collection_lease_name UNIQUE (lease_name))"),
+            new Table("rmq_alert_state", "CREATE TABLE rmq_alert_state ("
+                    + "id BIGINT AUTO_INCREMENT PRIMARY KEY, rule_id BIGINT NOT NULL, fingerprint CHAR(64) NOT NULL, "
+                    + "status VARCHAR(16) NOT NULL, consecutive_hits INT NOT NULL DEFAULT 0, current_value DOUBLE, "
+                    + "first_pending_at DATETIME, fired_at DATETIME, resolved_at DATETIME, version INT NOT NULL DEFAULT 0, "
+                    + "gmt_modified DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "
+                    + "CONSTRAINT uk_alert_state_rule_fingerprint UNIQUE (rule_id, fingerprint))"),
+            new Table("rmq_alert_silence", "CREATE TABLE rmq_alert_silence ("
+                    + "id BIGINT AUTO_INCREMENT PRIMARY KEY, domain VARCHAR(16), rule_id BIGINT, instance_id VARCHAR(128), "
+                    + "labels_json TEXT, starts_at DATETIME NOT NULL, ends_at DATETIME NOT NULL, reason VARCHAR(512), "
+                    + "created_by VARCHAR(128) NOT NULL, gmt_create DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "
+                    + "gmt_modified DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)"),
+            new Table("rmq_alert_notification_outbox", "CREATE TABLE rmq_alert_notification_outbox ("
+                    + "id BIGINT AUTO_INCREMENT PRIMARY KEY, alert_id BIGINT NOT NULL, channel VARCHAR(32) NOT NULL, "
+                    + "status VARCHAR(16) NOT NULL, attempt_count INT NOT NULL DEFAULT 0, next_attempt_at DATETIME NOT NULL, "
+                    + "sending_started_at DATETIME, claim_token VARCHAR(64), last_error VARCHAR(1000), delivered_at DATETIME, "
+                    + "gmt_create DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "
+                    + "gmt_modified DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "
+                    + "CONSTRAINT uk_alert_notification_outbox UNIQUE (alert_id, channel))"));
     private static final List<Column> COLUMNS = List.of(
             new Column("rmq_alert_rule", "aggregation", "VARCHAR(16) NOT NULL DEFAULT 'LAST'"),
             new Column("rmq_alert_rule", "window_seconds", "INT NOT NULL DEFAULT 0"),
@@ -54,6 +84,11 @@ public class AlertSchemaMigration implements ApplicationRunner {
             new Column("rmq_system_alert", "labels_json", "TEXT"),
             new Column("rmq_alert_notification_outbox", "claim_token", "VARCHAR(64)"));
     private static final List<Index> INDEXES = List.of(
+            new Index("rmq_metric_snapshot", "idx_metric_snapshot_lookup", "instance_id, metric_key, collected_at"),
+            new Index("rmq_metric_snapshot", "idx_metric_snapshot_retention", "collected_at"),
+            new Index("rmq_alert_silence", "idx_alert_silence_active", "starts_at, ends_at"),
+            new Index("rmq_alert_silence", "idx_alert_silence_scope", "domain, rule_id, instance_id"),
+            new Index("rmq_alert_notification_outbox", "idx_alert_notification_ready", "status, next_attempt_at"),
             new Index("rmq_system_alert", "idx_system_alert_domain_time", "domain, time"),
             new Index("rmq_system_alert", "idx_system_alert_feed", "domain, instance_id, transition, time"));
 
@@ -63,11 +98,29 @@ public class AlertSchemaMigration implements ApplicationRunner {
     public void run(ApplicationArguments args) throws Exception {
         try (Connection connection = dataSource.getConnection(); Statement statement = connection.createStatement()) {
             DatabaseMetaData metadata = connection.getMetaData();
+            for (Table table : TABLES) {
+                ensureTable(metadata, connection.getCatalog(), statement, table);
+            }
             for (Column column : COLUMNS) {
                 ensureColumn(metadata, connection.getCatalog(), statement, column);
             }
             for (Index index : INDEXES) {
                 ensureIndex(metadata, connection.getCatalog(), statement, index);
+            }
+        }
+    }
+
+    private static void ensureTable(DatabaseMetaData metadata, String catalog, Statement statement, Table table)
+            throws Exception {
+        if (hasTable(metadata, catalog, table.name())) {
+            return;
+        }
+        try {
+            log.info("Creating native alerting table {}", table.name());
+            statement.executeUpdate(table.definition());
+        } catch (SQLException failure) {
+            if (!hasTable(metadata, catalog, table.name())) {
+                throw failure;
             }
         }
     }
@@ -111,6 +164,12 @@ public class AlertSchemaMigration implements ApplicationRunner {
         }
     }
 
+    private static boolean hasTable(DatabaseMetaData metadata, String catalog, String table) throws Exception {
+        try (ResultSet tables = metadata.getTables(catalog, null, table, new String[] {"TABLE"})) {
+            return tables.next();
+        }
+    }
+
     private static boolean hasIndex(DatabaseMetaData metadata, String catalog, String table, String index)
             throws Exception {
         try (ResultSet indexes = metadata.getIndexInfo(catalog, null, table, false, false)) {
@@ -124,6 +183,9 @@ public class AlertSchemaMigration implements ApplicationRunner {
     }
 
     private record Column(String table, String name, String definition) {
+    }
+
+    private record Table(String name, String definition) {
     }
 
     private record Index(String table, String name, String columns) {

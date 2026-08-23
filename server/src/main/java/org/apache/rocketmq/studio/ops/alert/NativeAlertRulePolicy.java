@@ -43,11 +43,13 @@ final class NativeAlertRulePolicy {
     private static final Set<String> TOPIC_SCOPED_METRICS = Set.of("topic.backlog.total");
     private static final Set<String> AVAILABILITY_METRICS = Set.of(
             "nameserver.availability", "broker.availability", "proxy.availability", "cloud.instance.availability");
+    private static final Set<String> NOTIFICATION_CHANNELS = Set.of("dingtalk", "sms", "email");
 
     private NativeAlertRulePolicy() {
     }
 
     static void validate(AlertRuleVO rule) {
+        validateChannels(rule);
         if (!StringUtils.hasText(rule.getMetric())) {
             return;
         }
@@ -73,6 +75,17 @@ final class NativeAlertRulePolicy {
         }
         if (rule.getConsecutiveSamples() < 1) {
             throw new BusinessException(400, "consecutiveSamples must be at least 1");
+        }
+    }
+
+    private static void validateChannels(AlertRuleVO rule) {
+        if (rule.getChannels() == null) {
+            return;
+        }
+        for (String channel : rule.getChannels()) {
+            if (!StringUtils.hasText(channel) || !NOTIFICATION_CHANNELS.contains(channel.trim().toLowerCase())) {
+                throw new BusinessException(400, "Unsupported notification channel: " + channel);
+            }
         }
     }
 }
