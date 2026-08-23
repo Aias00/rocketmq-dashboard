@@ -336,6 +336,7 @@ CREATE TABLE IF NOT EXISTS rmq_alert_notification_outbox (
   `attempt_count` INT NOT NULL DEFAULT 0,
   `next_attempt_at` DATETIME NOT NULL,
   `sending_started_at` DATETIME NULL,
+  `claim_token` VARCHAR(64) NULL,
   `last_error` VARCHAR(1000) NULL,
   `delivered_at` DATETIME NULL,
   `gmt_create` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -393,3 +394,6 @@ CREATE TABLE IF NOT EXISTS rmq_cloud_credential (
 ALTER TABLE rmq_instance_message MODIFY queried_by VARCHAR(128);
 ALTER TABLE rmq_instance_trace MODIFY queried_by VARCHAR(128);
 ALTER TABLE rmq_operation_audit MODIFY operator VARCHAR(128);
+
+-- Existing deployments are upgraded by AlertSchemaMigration after the application
+-- connects, because this schema is also parsed by H2 in the development profile.

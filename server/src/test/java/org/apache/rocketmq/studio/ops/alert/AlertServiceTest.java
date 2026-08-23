@@ -799,6 +799,21 @@ class AlertServiceTest {
         assertThat(result.getUpdatedRules()).singleElement()
                 .extracting(AlertRuleVO::isEnabled).isEqualTo(true);
         verify(alertRepository).replaceRule(rule);
+        verify(alertStateRepository).deleteByRuleId(1L);
+    }
+
+    @Test
+    void domainBulkOperationsShouldResetEachMutatedRuleState() {
+        AlertRuleVO rule = AlertRuleVO.builder().id(1L).name("Broker unavailable")
+                .domain(AlertDomain.CLUSTER).enabled(false).build();
+        when(alertRepository.findAllRules()).thenReturn(List.of(rule));
+        when(alertRepository.replaceRule(rule)).thenReturn(true);
+        when(alertRepository.deleteRule(1L)).thenReturn(true);
+
+        alertService.bulkToggleRules(AlertDomain.CLUSTER, List.of(1L), true);
+        alertService.bulkDeleteRules(AlertDomain.CLUSTER, List.of(1L));
+
+        verify(alertStateRepository, org.mockito.Mockito.times(2)).deleteByRuleId(1L);
     }
 
     @Test
@@ -830,6 +845,7 @@ class AlertServiceTest {
                 .containsEntry(999L, "Alert rule not found")
                 .containsEntry(2L, "database unavailable");
         assertThat(result.getUpdatedRules()).isEmpty();
+        verify(alertStateRepository).deleteByRuleId(1L);
     }
 
     @Test

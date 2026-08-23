@@ -20,16 +20,21 @@ import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+import java.time.Duration;
+import java.util.TimeZone;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.client.ExpectedCount.once;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
@@ -37,6 +42,31 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 class NotificationOutboxServiceTest {
+    @Test
+    void schedulesOutboxWorkInUtcRegardlessOfTheJvmDefaultTimeZone() {
+        TimeZone previous = TimeZone.getDefault();
+        try {
+            TimeZone.setDefault(TimeZone.getTimeZone("Asia/Shanghai"));
+            RmqAlertNotificationOutboxMapper mapper = mock(RmqAlertNotificationOutboxMapper.class);
+            RmqAlertNotificationOutbox row = new RmqAlertNotificationOutbox();
+            row.setId(8L);
+            when(mapper.findDispatchable(any(LocalDateTime.class), any(LocalDateTime.class), any(Integer.class)))
+                    .thenReturn(List.of(row));
+            when(mapper.claimForDispatch(any(), any(LocalDateTime.class), any(LocalDateTime.class),
+                    any(LocalDateTime.class), anyString())).thenReturn(0);
+
+            new NotificationOutboxService(mapper, mock(SettingsRepository.class), mock(AlertSilenceService.class),
+                    mock(AlertRepository.class), mock(OperationAuditService.class)).dispatch();
+
+            org.mockito.ArgumentCaptor<LocalDateTime> now = org.mockito.ArgumentCaptor.forClass(LocalDateTime.class);
+            verify(mapper).findDispatchable(now.capture(), any(LocalDateTime.class), any(Integer.class));
+            assertThat(Duration.between(now.getValue().toInstant(ZoneOffset.UTC), java.time.Instant.now()).abs())
+                    .isLessThan(Duration.ofSeconds(2));
+        } finally {
+            TimeZone.setDefault(previous);
+        }
+    }
+
     @Test
     void enqueuesEachSupportedChannelOnceUnlessTheEventIsSilenced() {
         RmqAlertNotificationOutboxMapper mapper = mock(RmqAlertNotificationOutboxMapper.class);
@@ -71,7 +101,7 @@ class NotificationOutboxServiceTest {
         when(mapper.findDispatchable(any(LocalDateTime.class), any(LocalDateTime.class), any(Integer.class)))
                 .thenReturn(List.of(row));
         when(mapper.claimForDispatch(any(), any(LocalDateTime.class), any(LocalDateTime.class),
-                any(LocalDateTime.class))).thenReturn(1);
+                any(LocalDateTime.class), anyString())).thenReturn(1);
         LocalDateTime silenceEndsAt = LocalDateTime.now().plusHours(1);
         when(alerts.findAlertById(9L)).thenReturn(Optional.of(SystemAlertVO.builder().id(9L).ruleId(4L)
                 .domain(AlertDomain.BUSINESS).instanceId("local").build()));
@@ -102,7 +132,7 @@ class NotificationOutboxServiceTest {
         when(mapper.findDispatchable(any(LocalDateTime.class), any(LocalDateTime.class), any(Integer.class)))
                 .thenReturn(List.of(row));
         when(mapper.claimForDispatch(any(), any(LocalDateTime.class), any(LocalDateTime.class),
-                any(LocalDateTime.class))).thenReturn(1);
+                any(LocalDateTime.class), anyString())).thenReturn(1);
         when(mapper.update(any(), any())).thenReturn(1);
         when(alerts.findAlertById(9L)).thenReturn(Optional.of(SystemAlertVO.builder().id(9L)
                 .level(AlertLevel.warning).title("Lag").description("high").instanceId("local")
@@ -136,7 +166,7 @@ class NotificationOutboxServiceTest {
         when(mapper.findDispatchable(any(LocalDateTime.class), any(LocalDateTime.class), any(Integer.class)))
                 .thenReturn(List.of(row));
         when(mapper.claimForDispatch(any(), any(LocalDateTime.class), any(LocalDateTime.class),
-                any(LocalDateTime.class))).thenReturn(1);
+                any(LocalDateTime.class), anyString())).thenReturn(1);
         when(mapper.update(any(), any())).thenReturn(1);
         AlertRepository alerts = mock(AlertRepository.class);
         OperationAuditService audit = mock(OperationAuditService.class);
@@ -166,7 +196,7 @@ class NotificationOutboxServiceTest {
         when(mapper.findDispatchable(any(LocalDateTime.class), any(LocalDateTime.class), any(Integer.class)))
                 .thenReturn(List.of(row));
         when(mapper.claimForDispatch(any(), any(LocalDateTime.class), any(LocalDateTime.class),
-                any(LocalDateTime.class))).thenReturn(1);
+                any(LocalDateTime.class), anyString())).thenReturn(1);
         when(mapper.update(any(), any())).thenReturn(1);
         when(alerts.findAlertById(9L)).thenReturn(Optional.of(SystemAlertVO.builder().id(9L)
                 .level(AlertLevel.warning).title("Lag").description("high").instanceId("local").build()));
@@ -195,12 +225,12 @@ class NotificationOutboxServiceTest {
         when(mapper.findDispatchable(any(LocalDateTime.class), any(LocalDateTime.class), any(Integer.class)))
                 .thenReturn(List.of(row));
         when(mapper.claimForDispatch(any(), any(LocalDateTime.class), any(LocalDateTime.class),
-                any(LocalDateTime.class))).thenReturn(0);
+                any(LocalDateTime.class), anyString())).thenReturn(0);
 
         new NotificationOutboxService(mapper, mock(SettingsRepository.class), mock(AlertSilenceService.class),
                 mock(AlertRepository.class), mock(OperationAuditService.class)).dispatch();
 
         verify(mapper).claimForDispatch(org.mockito.ArgumentMatchers.eq(8L), any(LocalDateTime.class),
-                any(LocalDateTime.class), any(LocalDateTime.class));
+                any(LocalDateTime.class), any(LocalDateTime.class), anyString());
     }
 }

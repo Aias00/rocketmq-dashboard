@@ -17,6 +17,7 @@
 package org.apache.rocketmq.studio.ops.alert;
 
 import org.apache.rocketmq.studio.common.domain.Result;
+import jakarta.servlet.http.HttpServletRequest;
 import org.apache.rocketmq.studio.common.exception.BusinessException;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -38,7 +39,12 @@ public class AlertRuleController {
     private final NativeAlertMetricCatalogService metricCatalogService;
 
     @GetMapping
-    public Result<List<AlertRuleVO>> listRules() {
+    public Result<List<AlertRuleVO>> listRules(HttpServletRequest request) {
+        // Keep the original read endpoint complete for existing API clients while the
+        // domain-specific route powers the Business Alerts page.
+        if (request.getRequestURI().endsWith("/api/alert-rules")) {
+            return Result.ok(alertService.listRules());
+        }
         return Result.ok(alertService.listRules(AlertDomain.BUSINESS));
     }
 

@@ -134,7 +134,6 @@ record MetricSample(
 | Business | `consumer.delay.seconds` | Consumer Group | Apache broker consume stats; emitted only when a consumption timestamp is available |
 | Business | `topic.backlog.total` | Topic / Consumer Group | Topic and consumer offsets; each sample is scoped to one Topic and consumer group to avoid cross-group double counting |
 | Business | `dlq.message.count` | Consumer Group / DLQ | DLQ provider |
-| Business | `producer.send.failure_ratio` | Topic / producer flow | Provider runtime data where supported |
 
 The metric catalog is capability-aware. The rule editor must query the selected instance capability and hide unsupported metrics instead of allowing rules that can never run.
 
@@ -151,7 +150,7 @@ StudioAlertRule
   scopeType: INSTANCE | CLUSTER | BROKER | PROXY | TOPIC | CONSUMER_GROUP | QUEUE | DLQ
   metricKey
   selectorJson
-  aggregation: LAST | MAX | AVG | SUM
+  aggregation: LAST | MAX | MIN | AVG | SUM
   windowSeconds
   operator: GT | GTE | LT | LTE | EQ | NE | UNAVAILABLE
   threshold
@@ -244,7 +243,7 @@ rmq_metric_collector_lease
   collector_name, owner_id, expires_at
 ```
 
-Only the active lease holder collects and evaluates. Notification outbox rows use atomic state transitions so a failover cannot double-send a notification.
+Only the active lease holder collects and evaluates. Notification outbox rows use claimant-bound state transitions so a stale worker cannot overwrite a newer claimant. Delivery is at-least-once: receivers should use the event and channel identity to deduplicate a request that times out after reaching the remote service.
 
 ## Notifications and Silences
 
@@ -326,5 +325,5 @@ An event row displays its domain badge, current value, threshold, resource ident
 - A rule never treats failed collection as zero.
 - A business rule and a cluster rule share the same event, acknowledgement, silence, notification, and audit pipeline.
 - The three existing menus remain distinct and usable.
-- Notifications are deduplicated, retryable, auditable, and do not expose secrets.
+- Notifications are claimant-safe, retryable, auditable, and do not expose secrets; external delivery is at-least-once.
 - Unsupported provider metrics cannot be selected in the corresponding rule editor.

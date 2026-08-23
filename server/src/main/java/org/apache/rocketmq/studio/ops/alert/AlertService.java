@@ -263,12 +263,14 @@ public class AlertService {
                 .succeededIds(succeeded).failures(failures).updatedRules(updated).build();
     }
 
+    @Transactional
     public AlertRuleBulkResultVO bulkToggleRules(AlertDomain domain, List<Long> ids, boolean enabled) {
         requireDomain(domain);
         return bulkUpdateRules(domain, ids, rule -> rule.setEnabled(enabled),
                 "TOGGLE_ALERT_RULE", "enabled=" + enabled + ", bulk=true");
     }
 
+    @Transactional
     public AlertRuleBulkResultVO bulkDeleteRules(List<Long> ids) {
         List<Long> normalizedIds = normalizeBulkIds(ids);
         List<Long> succeeded = new ArrayList<>();
@@ -279,6 +281,7 @@ public class AlertService {
                     failures.put(id, "Alert rule not found");
                     continue;
                 }
+                alertStateRepository.deleteByRuleId(id);
                 recordAudit("DELETE_ALERT_RULE", "ALERT_RULE", String.valueOf(id), null, "bulk=true");
                 succeeded.add(id);
             } catch (RuntimeException failure) {
@@ -289,6 +292,7 @@ public class AlertService {
                 .succeededIds(succeeded).failures(failures).updatedRules(List.of()).build();
     }
 
+    @Transactional
     public AlertRuleBulkResultVO bulkDeleteRules(AlertDomain domain, List<Long> ids) {
         requireDomain(domain);
         List<Long> normalizedIds = normalizeBulkIds(ids);
@@ -306,6 +310,7 @@ public class AlertService {
                     failures.put(id, "Alert rule not found");
                     continue;
                 }
+                alertStateRepository.deleteByRuleId(id);
                 recordAudit("DELETE_ALERT_RULE", "ALERT_RULE", String.valueOf(id), null, "bulk=true");
                 succeeded.add(id);
             } catch (RuntimeException failure) {
@@ -335,6 +340,7 @@ public class AlertService {
                     failures.put(id, "Alert rule not found");
                     continue;
                 }
+                alertStateRepository.deleteByRuleId(id);
                 auditRule(auditOperation, rule, auditDetail);
                 succeeded.add(id);
                 updated.add(rule);

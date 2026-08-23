@@ -35,7 +35,7 @@ public class AlertRuleRequestDTO {
     private String thresholdUnit;
     @Pattern(regexp = "(?:[0-9]+(?:ms|s|m|h|d|w|y))+", message = "duration is invalid")
     private String duration;
-    @Pattern(regexp = "LAST|MAX|MIN|AVG", flags = Pattern.Flag.CASE_INSENSITIVE,
+    @Pattern(regexp = "LAST|MAX|MIN|AVG|SUM", flags = Pattern.Flag.CASE_INSENSITIVE,
             message = "aggregation is invalid")
     private String aggregation;
     @Min(value = 0, message = "windowSeconds must not be negative")

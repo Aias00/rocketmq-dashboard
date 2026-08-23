@@ -691,7 +691,10 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
           <Flex gap={8}>
             <Form.Item name="aggregation" label="窗口聚合" initialValue="LAST" style={{ flex: 1 }}>
               <Select
-                options={['LAST', 'MAX', 'MIN', 'AVG'].map((value) => ({ label: value, value }))}
+                options={['LAST', 'MAX', 'MIN', 'AVG', 'SUM'].map((value) => ({
+                  label: value,
+                  value,
+                }))}
               />
             </Form.Item>
             <Form.Item name="windowSeconds" label="窗口秒数" initialValue={0} style={{ flex: 1 }}>

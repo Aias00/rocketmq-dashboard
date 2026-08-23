@@ -28,12 +28,14 @@ import org.springframework.web.client.RestTemplate;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.ArrayList;
 import java.util.function.Supplier;
+import java.util.UUID;
 import jakarta.mail.internet.AddressException;
 import jakarta.mail.internet.InternetAddress;
 
@@ -113,7 +115,7 @@ public class NotificationOutboxService {
             row.setChannel(channel);
             row.setStatus(NotificationOutboxStatus.PENDING.name());
             row.setAttemptCount(0);
-            row.setNextAttemptAt(silenceEndsAt == null ? LocalDateTime.now() : silenceEndsAt);
+            row.setNextAttemptAt(silenceEndsAt == null ? utcNow() : silenceEndsAt);
             mapper.insert(row);
         }
     }
@@ -133,25 +135,26 @@ public class NotificationOutboxService {
 
     @Scheduled(fixedDelayString = "${studio.alerting.notification-dispatch-interval:PT10S}")
     public void dispatch() {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = utcNow();
         LocalDateTime staleBefore = now.minus(CLAIM_TIMEOUT);
         List<RmqAlertNotificationOutbox> due = mapper.findDispatchable(now, staleBefore, BATCH_SIZE);
         for (RmqAlertNotificationOutbox row : due) {
-            if (mapper.claimForDispatch(row.getId(), now, staleBefore, now) != 1) {
+            String claimToken = UUID.randomUUID().toString();
+            if (mapper.claimForDispatch(row.getId(), now, staleBefore, now, claimToken) != 1) {
                 continue;
             }
-            send(row, now);
+            send(row, now, claimToken);
         }
     }
 
-    private void send(RmqAlertNotificationOutbox row, LocalDateTime now) {
+    private void send(RmqAlertNotificationOutbox row, LocalDateTime now, String claimToken) {
         try {
             SystemAlertVO alert = loadAlert(row.getAlertId());
             LocalDateTime silenceEndsAt = silenceService.activeUntil(
                     AlertRuleVO.builder().id(alert.getRuleId()).domain(alert.getDomain()).build(),
                     alert.getInstanceId(), alert.getLabels(), now);
             if (silenceEndsAt != null) {
-                deferUntilSilenceEnds(row, silenceEndsAt);
+                deferUntilSilenceEnds(row, silenceEndsAt, claimToken);
                 return;
             }
             GeneralSettingsVO settings = settingsRepository.loadGeneralSettings();
@@ -160,18 +163,20 @@ public class NotificationOutboxService {
             } else {
                 sendWebhook(settings, alert, row.getChannel());
             }
-            mapper.update(null, new UpdateWrapper<RmqAlertNotificationOutbox>().eq("id", row.getId())
+            if (!updateClaimed(row, claimToken, new UpdateWrapper<RmqAlertNotificationOutbox>()
                     .set("status", NotificationOutboxStatus.DELIVERED.name()).set("delivered_at", now)
                     .set("sending_started_at", null)
-                    .set("last_error", null));
+                    .set("last_error", null))) {
+                return;
+            }
             recordDelivery(row, "DELIVER_ALERT_NOTIFICATION", "SUCCESS", null);
         } catch (Exception error) {
-            retry(row, now, error.getMessage());
+            retry(row, now, claimToken, error.getMessage());
         }
     }
 
-    private void deferUntilSilenceEnds(RmqAlertNotificationOutbox row, LocalDateTime silenceEndsAt) {
-        mapper.update(null, new UpdateWrapper<RmqAlertNotificationOutbox>().eq("id", row.getId())
+    private void deferUntilSilenceEnds(RmqAlertNotificationOutbox row, LocalDateTime silenceEndsAt, String claimToken) {
+        updateClaimed(row, claimToken, new UpdateWrapper<RmqAlertNotificationOutbox>()
                 .set("status", NotificationOutboxStatus.PENDING.name()).set("next_attempt_at", silenceEndsAt)
                 .set("sending_started_at", null));
     }
@@ -254,15 +259,17 @@ public class NotificationOutboxService {
                 .map(entry -> entry.getKey() + "=" + entry.getValue()).collect(java.util.stream.Collectors.joining(", "));
     }
 
-    private void retry(RmqAlertNotificationOutbox row, LocalDateTime now, String error) {
+    private void retry(RmqAlertNotificationOutbox row, LocalDateTime now, String claimToken, String error) {
         int attempts = (row.getAttemptCount() == null ? 0 : row.getAttemptCount()) + 1;
         boolean exhausted = attempts >= MAX_ATTEMPTS;
-        mapper.update(null, new UpdateWrapper<RmqAlertNotificationOutbox>().eq("id", row.getId())
+        if (!updateClaimed(row, claimToken, new UpdateWrapper<RmqAlertNotificationOutbox>()
                 .set("attempt_count", attempts).set("status", (exhausted ? NotificationOutboxStatus.FAILED
                         : NotificationOutboxStatus.RETRY_WAIT).name())
                 .set("next_attempt_at", now.plusSeconds(Math.min(300, 5L << Math.min(attempts - 1, 5))))
                 .set("sending_started_at", null)
-                .set("last_error", abbreviate(error)));
+                .set("last_error", abbreviate(error)))) {
+            return;
+        }
         recordDelivery(row, exhausted ? "FAIL_ALERT_NOTIFICATION" : "RETRY_ALERT_NOTIFICATION",
                 exhausted ? "FAILURE" : "RETRYING", abbreviate(error));
         log.warn("Alert notification {} for event {}: {}", exhausted ? "failed" : "will retry", row.getAlertId(), error);
@@ -276,6 +283,15 @@ public class NotificationOutboxService {
     private static String abbreviate(String value) {
         if (value == null) return "Delivery failed";
         return value.length() > 1000 ? value.substring(0, 1000) : value;
+    }
+
+    private boolean updateClaimed(RmqAlertNotificationOutbox row, String claimToken,
+            UpdateWrapper<RmqAlertNotificationOutbox> updates) {
+        return mapper.update(null, updates.eq("id", row.getId()).eq("claim_token", claimToken)) == 1;
+    }
+
+    private static LocalDateTime utcNow() {
+        return LocalDateTime.now(ZoneOffset.UTC);
     }
 
     private static RestTemplate newClient() {

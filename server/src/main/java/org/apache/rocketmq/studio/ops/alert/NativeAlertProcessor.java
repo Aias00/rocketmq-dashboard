@@ -99,6 +99,7 @@ public class NativeAlertProcessor {
             case "MAX" -> window.stream().mapToDouble(item -> item.value()).max().orElse(sample.value());
             case "MIN" -> window.stream().mapToDouble(item -> item.value()).min().orElse(sample.value());
             case "AVG" -> window.stream().mapToDouble(item -> item.value()).average().orElse(sample.value());
+            case "SUM" -> window.stream().mapToDouble(item -> item.value()).sum();
             default -> window.get(window.size() - 1).value();
         };
         return new MetricSample(sample.metricKey(), sample.domain(), sample.instanceId(), sample.clusterId(), sample.labels(),

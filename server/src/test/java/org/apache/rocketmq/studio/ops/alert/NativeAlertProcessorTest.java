@@ -161,6 +161,49 @@ class NativeAlertProcessorTest {
     }
 
     @Test
+    void evaluatesSumAggregationAcrossTheConfiguredSnapshotWindow() {
+        AlertService service = mock(AlertService.class);
+        AlertRuleVO rule = AlertRuleVO.builder().id(1L).domain(AlertDomain.BUSINESS).name("Orders lag")
+                .metric("consumer.lag.total").operator(">").threshold(50).enabled(true).instanceId("local")
+                .consumerGroup("orders").aggregation("SUM").windowSeconds(300).build();
+        when(service.listRules(AlertDomain.BUSINESS)).thenReturn(List.of(rule));
+        MetricSnapshotRepository snapshots = mock(MetricSnapshotRepository.class);
+        MetricSample current = sample("orders");
+        when(snapshots.findRecent(any(MetricSample.class), any(Instant.class)))
+                .thenReturn(List.of(sample("orders", 10D), sample("orders", 30D), current));
+        Map<AlertStateKey, AlertRuleState> saved = new HashMap<>();
+        AlertStateRepository states = new AlertStateRepository() {
+            @Override
+            public Optional<AlertRuleState> find(AlertStateKey key) {
+                return Optional.empty();
+            }
+
+            @Override
+            public boolean save(AlertStateKey key, AlertRuleState state) {
+                saved.put(key, state);
+                return true;
+            }
+
+            @Override
+            public boolean acknowledge(AlertStateKey key, Instant firedAt) {
+                return false;
+            }
+
+            @Override
+            public void deleteByRuleId(Long ruleId) {
+            }
+        };
+
+        new NativeAlertProcessor(service, new AlertRuleEvaluator(), new AlertStateMachine(), states, snapshots,
+                mock(AlertRepository.class), mock(NotificationOutboxService.class)).process(List.of(current));
+
+        assertThat(saved.values()).singleElement().satisfies(state -> {
+            assertThat(state.status()).isEqualTo(AlertStateStatus.FIRING);
+            assertThat(state.currentValue()).isEqualTo(60D);
+        });
+    }
+
+    @Test
     void recordsTheRuleTriggerTimeWhenEmittingAFiringEvent() {
         AlertService service = mock(AlertService.class);
         when(service.listRules(AlertDomain.BUSINESS)).thenReturn(List.of(rule("local", "orders", 1)));

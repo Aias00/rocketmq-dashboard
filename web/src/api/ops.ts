@@ -9,7 +9,7 @@ export interface AlertRule {
   threshold: number;
   thresholdUnit: string;
   duration: string;
-  aggregation?: 'LAST' | 'MAX' | 'MIN' | 'AVG';
+  aggregation?: 'LAST' | 'MAX' | 'MIN' | 'AVG' | 'SUM';
   windowSeconds?: number;
   channels: string[];
   enabled: boolean;

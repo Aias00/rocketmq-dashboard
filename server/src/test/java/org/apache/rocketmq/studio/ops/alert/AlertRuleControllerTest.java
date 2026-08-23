@@ -58,7 +58,7 @@ class AlertRuleControllerTest {
     private NativeAlertMetricCatalogService metricCatalogService;
 
     @Test
-    void listRulesShouldReturnRules() throws Exception {
+    void businessRulesEndpointShouldReturnBusinessRules() throws Exception {
         AlertRuleVO rule = AlertRuleVO.builder()
                 .id(1L)
                 .name("High Lag")
@@ -67,11 +67,27 @@ class AlertRuleControllerTest {
                 .build();
         when(alertService.listRules(AlertDomain.BUSINESS)).thenReturn(List.of(rule));
 
-        mockMvc.perform(get("/api/alert-rules"))
+        mockMvc.perform(get("/api/business-alert-rules"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data[0].id").value(1))
                 .andExpect(jsonPath("$.data[0].enabled").value(true));
+    }
+
+    @Test
+    void legacyRulesEndpointShouldContinueToReturnAllRules() throws Exception {
+        AlertRuleVO business = AlertRuleVO.builder().id(1L).name("High Lag")
+                .domain(AlertDomain.BUSINESS).enabled(true).build();
+        AlertRuleVO cluster = AlertRuleVO.builder().id(2L).name("Broker down")
+                .domain(AlertDomain.CLUSTER).enabled(true).build();
+        when(alertService.listRules()).thenReturn(List.of(business, cluster));
+
+        mockMvc.perform(get("/api/alert-rules"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(2))
+                .andExpect(jsonPath("$.data[1].domain").value("CLUSTER"));
+
+        verify(alertService).listRules();
     }
 
     @Test
