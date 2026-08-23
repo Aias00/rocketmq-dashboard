@@ -96,7 +96,7 @@ public class NotificationOutboxService {
 
     public void enqueue(SystemAlertVO alert, AlertRuleVO rule, Map<String, String> labels) {
         if (alert.getId() == null) {
-            return;
+            throw new IllegalStateException("Cannot enqueue notification for an alert without a persistent ID");
         }
         Map<String, String> effectiveLabels = labels == null ? Map.of() : labels;
         LocalDateTime silenceEndsAt = silenceService.activeUntil(rule, alert.getInstanceId(), effectiveLabels,

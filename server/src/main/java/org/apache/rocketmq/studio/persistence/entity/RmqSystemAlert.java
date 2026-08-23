@@ -27,7 +27,7 @@ import java.time.LocalDateTime;
 @TableName("rmq_system_alert")
 public class RmqSystemAlert {
 
-    @TableId(type = IdType.AUTO)
+    @TableId(value = "id", type = IdType.AUTO)
     private Long id;
 
     private String level;
