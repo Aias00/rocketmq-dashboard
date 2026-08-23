@@ -2,11 +2,20 @@
 
 ## Status
 
-Implementation in progress. Native Apache collection (including NameServer, Broker, and Proxy availability), snapshots, scheduling, evaluation, event lifecycle,
+The native alerting execution path is implemented. Native Apache collection (including NameServer, Broker, and Proxy availability), snapshots, scheduling, evaluation, event lifecycle,
 acknowledgement, multi-replica collection lease, rule test-runs, label-scoped silence management, and
 the DingTalk, SMS webhook, and SMTP email outbox delivery channels are in place. Provider capability catalogs are available for Apache,
 Aliyun, and Tencent; cloud consumer-lag and managed-instance lifecycle collection are available. This design does
 not require Prometheus or Alertmanager for rule evaluation or event creation.
+
+### Implemented and Deferred Scope
+
+| Area | Current implementation | Explicitly deferred |
+| --- | --- | --- |
+| Notification routing | Per-rule channel selection for DingTalk, configured SMS webhook, and SMTP email. Delivery uses the durable outbox. | Independent channel and notification-policy CRUD, generic per-rule Webhook endpoints. |
+| Notification frequency | One delivery attempt sequence for `FIRING` and another for `RESOLVED`; retries have bounded exponential backoff. | Repeat-notification and `cooldownSeconds` policy. |
+| Collector health | Per-instance bounded collection, timeout, database lease, and delivery audit history. | Producer failure-rate, thread-pool rejection, and cloud Broker-level health metrics. |
+| Validation | Unit and controller tests plus `server/scripts/native-alert-e2e.sh` for a real RocketMQ, MySQL, SMTP, and webhook receiver environment. | A CI-owned shared RocketMQ/SMTP/webhook environment; production SLO dashboards for collector or delivery failure rate. |
 
 ## Goals
 
@@ -309,6 +318,34 @@ An event row displays its domain badge, current value, threshold, resource ident
 5. Add Proxy and cloud collectors, additional business rules, and optional Prometheus YAML export compatibility.
    Proxy availability, Apache consumer delay, Aliyun/Tencent consumer-lag and topic-backlog, and managed cloud-instance lifecycle collection are complete;
    broker-level cloud health metrics remain future work. The existing Prometheus YAML export is compatibility-only; richer mapping remains future work.
+
+## Real Environment Verification
+
+`server/scripts/native-alert-e2e.sh` verifies the native lifecycle against an isolated, already-initialized MySQL database and a real RocketMQ NameServer. It creates a temporary unavailable instance, applies a label-free silence, verifies that the `FIRING` event is persisted while both notification rows remain pending, waits for the silence to expire, then changes the same instance to a reachable NameServer. The script requires the following evidence before succeeding:
+
+1. `FIRING` and `RESOLVED` events for the same rule and instance.
+2. Delivered Email and SMS-webhook outbox rows for both lifecycle transitions.
+3. At least two Mailpit messages for the configured recipient.
+4. A webhook capture response containing both `FIRING` and `RESOLVED`.
+
+The script intentionally requires an isolated MySQL database with `rmq_studio_user` and `rmq_settings` already initialized, plus an administrator account supplied through environment variables. It never uses an operator's development database or deletes any existing records. Its required environment, receiver contract, and invocation guidance are documented in the script header.
+
+For example, after building the server jar, run it against a dedicated validation database:
+
+```bash
+export E2E_DB_JDBC_URL='jdbc:mysql://127.0.0.1:3306/rocketmq_alert_e2e?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC'
+export E2E_MYSQL_DATABASE=rocketmq_alert_e2e
+export E2E_ADMIN_USERNAME=e2e-admin
+export E2E_ADMIN_PASSWORD='***'
+export E2E_NAMESRV_ADDR=127.0.0.1:9876
+export E2E_SMTP_HOST=127.0.0.1
+export E2E_EMAIL_RECIPIENT=native-alert-e2e@example.test
+export E2E_WEBHOOK_URL='http://127.0.0.1:18090/alerts'
+export E2E_WEBHOOK_ASSERT_URL='http://127.0.0.1:18090/received'
+server/scripts/native-alert-e2e.sh
+```
+
+The webhook receiver must accept the configured `POST` endpoint and expose captured request bodies from the assertion URL. This keeps the production delivery client unchanged while allowing the script to verify both lifecycle payloads.
 
 ## Acceptance Criteria
 
