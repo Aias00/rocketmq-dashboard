@@ -196,7 +196,6 @@ function App() {
             <Route path="studio/lite-topic" element={<LiteTopicPage />} />
             <Route path="studio/group-management" element={<GroupManagementPage />} />
             <Route path="studio/broker-cluster" element={<BrokerClusterPage />} />
-            <Route path="studio/ssl-settings" element={<SslSettingsPage />} />
             <Route
               path="studio/alert-management"
               element={<Navigate to="/ops/business-alerts" replace />}
