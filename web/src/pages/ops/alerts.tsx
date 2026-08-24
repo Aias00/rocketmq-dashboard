@@ -760,6 +760,8 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
       <Modal
         title={editingRule ? t('common.edit') : t('alerts.newRule')}
         open={modalVisible}
+        width={920}
+        style={{ maxWidth: 'calc(100vw - 32px)' }}
         onOk={handleSubmit}
         confirmLoading={submitting}
         onCancel={() => {
@@ -800,174 +802,181 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
         }
       >
         <Form form={form} layout="vertical">
-          <Form.Item
-            name="name"
-            label={t('alerts.ruleName')}
-            rules={[{ required: true, message: '请输入规则名称' }]}
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+              gap: '0 16px',
+            }}
           >
-            <Input placeholder="请输入规则名称" />
-          </Form.Item>
+            <Form.Item
+              name="name"
+              label={t('alerts.ruleName')}
+              rules={[{ required: true, message: '请输入规则名称' }]}
+              style={{ gridColumn: '1 / -1' }}
+            >
+              <Input placeholder="请输入规则名称" />
+            </Form.Item>
 
-          <Form.Item
-            name="instanceId"
-            label={t('alerts.instance')}
-            rules={[{ required: true, message: '请选择 RocketMQ 实例' }]}
-            extra="原生采集规则必须绑定一个受管 RocketMQ 实例。"
-          >
-            <Select
-              placeholder="请选择 RocketMQ 实例"
-              options={instances.map((instance) => ({
-                value: instance.name,
-                label: `${instance.name}${instance.vendor && instance.vendor !== 'APACHE' ? ` (${instance.vendor})` : ''}`,
-              }))}
-              onChange={(instanceId) => {
-                setSelectedInstanceId(instanceId);
-                if (instanceId) void loadMetricCapabilities(instanceId);
-                else setMetricOptions([]);
-              }}
-            />
-          </Form.Item>
+            <Form.Item
+              name="instanceId"
+              label={t('alerts.instance')}
+              rules={[{ required: true, message: '请选择 RocketMQ 实例' }]}
+              extra="原生采集规则必须绑定一个受管 RocketMQ 实例。"
+            >
+              <Select
+                placeholder="请选择 RocketMQ 实例"
+                options={instances.map((instance) => ({
+                  value: instance.name,
+                  label: `${instance.name}${instance.vendor && instance.vendor !== 'APACHE' ? ` (${instance.vendor})` : ''}`,
+                }))}
+                onChange={(instanceId) => {
+                  setSelectedInstanceId(instanceId);
+                  if (instanceId) void loadMetricCapabilities(instanceId);
+                  else setMetricOptions([]);
+                }}
+              />
+            </Form.Item>
 
-          <Form.Item
-            name="metric"
-            label={t('alerts.metric')}
-            rules={[{ required: true, message: '请选择监控指标' }]}
-          >
-            <Select
-              placeholder={metricLoading ? '正在加载监控指标' : '请选择监控指标'}
-              options={metricOptions.map((metric) => ({
-                label: metricLabel(metric.key, metric.label),
-                value: metric.key,
-              }))}
-              disabled={!selectedInstanceId || metricLoading}
-              loading={metricLoading}
-              onChange={(metric) => {
-                const metricInfo = metricOptions.find((option) => option.key === metric);
-                form.setFieldValue(
-                  'thresholdUnit',
-                  nativeRatioMetrics.has(metric) ? '%' : (metricInfo?.thresholdUnit ?? ''),
-                );
-                if (
-                  form.getFieldValue('operator') === 'UNAVAILABLE' &&
-                  !supportsUnavailableOperator(metric)
-                ) {
-                  form.setFieldValue('operator', '>');
-                }
-              }}
-            />
-          </Form.Item>
+            <Form.Item
+              name="metric"
+              label={t('alerts.metric')}
+              rules={[{ required: true, message: '请选择监控指标' }]}
+            >
+              <Select
+                placeholder={metricLoading ? '正在加载监控指标' : '请选择监控指标'}
+                options={metricOptions.map((metric) => ({
+                  label: metricLabel(metric.key, metric.label),
+                  value: metric.key,
+                }))}
+                disabled={!selectedInstanceId || metricLoading}
+                loading={metricLoading}
+                onChange={(metric) => {
+                  const metricInfo = metricOptions.find((option) => option.key === metric);
+                  form.setFieldValue(
+                    'thresholdUnit',
+                    nativeRatioMetrics.has(metric) ? '%' : (metricInfo?.thresholdUnit ?? ''),
+                  );
+                  if (
+                    form.getFieldValue('operator') === 'UNAVAILABLE' &&
+                    !supportsUnavailableOperator(metric)
+                  ) {
+                    form.setFieldValue('operator', '>');
+                  }
+                }}
+              />
+            </Form.Item>
 
-          {domain === 'BUSINESS' && (
-            <>
-              <Form.Item
-                name="consumerGroup"
-                label="消费组（可选）"
-                extra="留空时，对该实例中的所有消费组分别评估规则。"
-              >
-                <Input placeholder="例如 order-consumer" />
-              </Form.Item>
-              <Form.Item
-                name="topic"
-                label="Topic（可选）"
-                extra="仅适用于 Topic backlog 指标；留空时匹配所有 Topic。"
-              >
-                <Input placeholder="例如 order-topic" />
-              </Form.Item>
-            </>
-          )}
-
-          {domain === 'CLUSTER' && (
-            <>
-              <Form.Item
-                name="clusterName"
-                label="集群（可选）"
-                extra="留空或填写 * 时匹配该实例中的所有集群。"
-              >
-                <Input placeholder="例如 DefaultCluster" />
-              </Form.Item>
-              <Form.Item
-                name="brokerName"
-                label="Broker（可选）"
-                extra="留空或填写 * 时匹配所选集群中的所有 Broker。"
-              >
-                <Input placeholder="例如 broker-a" />
-              </Form.Item>
-            </>
-          )}
-
-          <Form.Item name="thresholdUnit" hidden>
-            <Input />
-          </Form.Item>
-          <Form.Item label={t('alerts.threshold')}>
-            <Flex gap={8}>
-              <Form.Item
-                name="operator"
-                noStyle
-                rules={[{ required: true, message: '请选择运算符' }]}
-              >
-                <Select
-                  aria-label="运算符"
-                  placeholder="运算符"
-                  style={{ width: 100 }}
-                  options={[
-                    { label: '>', value: '>' },
-                    { label: '<', value: '<' },
-                    { label: '>=', value: '>=' },
-                    { label: '<=', value: '<=' },
-                    {
-                      label: '不可用',
-                      value: 'UNAVAILABLE',
-                      disabled: !supportsUnavailableCondition,
-                    },
-                  ]}
-                  onChange={(operator) => {
-                    if (operator === 'UNAVAILABLE') form.setFieldValue('threshold', 0);
-                  }}
-                />
-              </Form.Item>
-              {selectedOperator !== 'UNAVAILABLE' && (
+            {domain === 'BUSINESS' && (
+              <>
                 <Form.Item
-                  name="threshold"
-                  noStyle
-                  rules={[{ required: true, message: '请输入阈值' }]}
+                  name="consumerGroup"
+                  label="消费组（可选）"
+                  extra="留空时，对该实例中的所有消费组分别评估规则。"
                 >
-                  <InputNumber
-                    placeholder="阈值"
-                    style={{ flex: 1 }}
-                    addonAfter={thresholdUnitSuffix || undefined}
-                    min={selectedMetricUsesPercentage ? 0 : undefined}
-                    max={selectedMetricUsesPercentage ? 100 : undefined}
-                    precision={selectedMetricUsesPercentage ? 2 : undefined}
+                  <Input placeholder="例如 order-consumer" />
+                </Form.Item>
+                <Form.Item
+                  name="topic"
+                  label="Topic（可选）"
+                  extra="仅适用于 Topic backlog 指标；留空时匹配所有 Topic。"
+                >
+                  <Input placeholder="例如 order-topic" />
+                </Form.Item>
+              </>
+            )}
+
+            {domain === 'CLUSTER' && (
+              <>
+                <Form.Item
+                  name="clusterName"
+                  label="集群（可选）"
+                  extra="留空或填写 * 时匹配该实例中的所有集群。"
+                >
+                  <Input placeholder="例如 DefaultCluster" />
+                </Form.Item>
+                <Form.Item
+                  name="brokerName"
+                  label="Broker（可选）"
+                  extra="留空或填写 * 时匹配所选集群中的所有 Broker。"
+                >
+                  <Input placeholder="例如 broker-a" />
+                </Form.Item>
+              </>
+            )}
+
+            <Form.Item name="thresholdUnit" hidden>
+              <Input />
+            </Form.Item>
+            <Form.Item label={t('alerts.threshold')}>
+              <Flex gap={8}>
+                <Form.Item
+                  name="operator"
+                  noStyle
+                  rules={[{ required: true, message: '请选择运算符' }]}
+                >
+                  <Select
+                    aria-label="运算符"
+                    placeholder="运算符"
+                    style={{ width: 100 }}
+                    options={[
+                      { label: '>', value: '>' },
+                      { label: '<', value: '<' },
+                      { label: '>=', value: '>=' },
+                      { label: '<=', value: '<=' },
+                      {
+                        label: '不可用',
+                        value: 'UNAVAILABLE',
+                        disabled: !supportsUnavailableCondition,
+                      },
+                    ]}
+                    onChange={(operator) => {
+                      if (operator === 'UNAVAILABLE') form.setFieldValue('threshold', 0);
+                    }}
                   />
                 </Form.Item>
+                {selectedOperator !== 'UNAVAILABLE' && (
+                  <Form.Item
+                    name="threshold"
+                    noStyle
+                    rules={[{ required: true, message: '请输入阈值' }]}
+                  >
+                    <InputNumber
+                      placeholder="阈值"
+                      style={{ flex: 1 }}
+                      addonAfter={thresholdUnitSuffix || undefined}
+                      min={selectedMetricUsesPercentage ? 0 : undefined}
+                      max={selectedMetricUsesPercentage ? 100 : undefined}
+                      precision={selectedMetricUsesPercentage ? 2 : undefined}
+                    />
+                  </Form.Item>
+                )}
+              </Flex>
+              {selectedOperator === 'UNAVAILABLE' && '采集到指标不可用状态时触发。'}
+              {selectedOperator !== 'UNAVAILABLE' && selectedMetricUsesPercentage && (
+                <span>比例指标以百分比填写，例如 85 表示 85%。</span>
               )}
-            </Flex>
-            {selectedOperator === 'UNAVAILABLE' && '采集到指标不可用状态时触发。'}
-            {selectedOperator !== 'UNAVAILABLE' && selectedMetricUsesPercentage && (
-              <span>比例指标以百分比填写，例如 85 表示 85%。</span>
-            )}
-          </Form.Item>
+            </Form.Item>
 
-          <Form.Item
-            name="duration"
-            label={t('alerts.duration')}
-            rules={[{ required: true, message: '请选择持续时间' }]}
-          >
-            <Select
-              placeholder="请选择持续时间"
-              options={durationOptions.map((d) => ({ label: d, value: d }))}
-            />
-          </Form.Item>
-          <Form.Item
-            name="reminderInterval"
-            label={t('alerts.reminderInterval')}
-            initialValue="30m"
-          >
-            <Select options={reminderIntervalOptions.map((value) => ({ label: value, value }))} />
-          </Form.Item>
+            <Form.Item
+              name="duration"
+              label={t('alerts.duration')}
+              rules={[{ required: true, message: '请选择持续时间' }]}
+            >
+              <Select
+                placeholder="请选择持续时间"
+                options={durationOptions.map((d) => ({ label: d, value: d }))}
+              />
+            </Form.Item>
+            <Form.Item
+              name="reminderInterval"
+              label={t('alerts.reminderInterval')}
+              initialValue="30m"
+            >
+              <Select options={reminderIntervalOptions.map((value) => ({ label: value, value }))} />
+            </Form.Item>
 
-          <Flex gap={8}>
-            <Form.Item name="aggregation" label="窗口聚合" initialValue="LAST" style={{ flex: 1 }}>
+            <Form.Item name="aggregation" label="窗口聚合" initialValue="LAST">
               <Select
                 options={['LAST', 'MAX', 'MIN', 'AVG', 'SUM'].map((value) => ({
                   label: value,
@@ -975,116 +984,120 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
                 }))}
               />
             </Form.Item>
-            <Form.Item name="windowSeconds" label="窗口秒数" initialValue={0} style={{ flex: 1 }}>
+            <Form.Item name="windowSeconds" label="窗口秒数" initialValue={0}>
               <InputNumber min={0} precision={0} style={{ width: '100%' }} />
             </Form.Item>
-          </Flex>
 
-          <Form.Item
-            name="consecutiveSamples"
-            label="连续采样次数"
-            initialValue={1}
-            rules={[{ required: true, message: '请输入连续采样次数' }]}
-          >
-            <InputNumber min={1} precision={0} style={{ width: '100%' }} />
-          </Form.Item>
+            <Form.Item
+              name="consecutiveSamples"
+              label="连续采样次数"
+              initialValue={1}
+              rules={[{ required: true, message: '请输入连续采样次数' }]}
+            >
+              <InputNumber min={1} precision={0} style={{ width: '100%' }} />
+            </Form.Item>
 
-          {testResult && testResult.samples.length > 0 && (
-            <Table
-              title={() => '规则试运行结果'}
-              rowKey={({ labels, currentValue, availability }) =>
-                `${JSON.stringify(labels)}-${currentValue}-${availability}`
-              }
-              size="small"
-              pagination={false}
-              dataSource={testResult.samples}
-              columns={[
-                {
-                  title: '标签',
-                  dataIndex: 'labels',
-                  render: (labels: Record<string, string>) =>
-                    Object.entries(labels)
-                      .map(([key, value]) => `${key}=${value}`)
-                      .join(', '),
-                },
-                {
-                  title: '采集状态',
-                  dataIndex: 'availability',
-                  render: (availability: string) => (
-                    <Tag color={availability === 'AVAILABLE' ? 'green' : 'orange'}>
-                      {availability}
-                    </Tag>
-                  ),
-                },
-                {
-                  title: '当前值',
-                  dataIndex: 'currentValue',
-                  render: (value: number | null) => value ?? '不可用',
-                },
-                {
-                  title: '阈值命中',
-                  dataIndex: 'conditionMet',
-                  render: (matched: boolean) => (
-                    <Tag color={matched ? 'red' : 'green'}>{matched ? '命中' : '未命中'}</Tag>
-                  ),
-                },
-              ]}
-            />
-          )}
-
-          <Form.Item
-            name="channels"
-            label={t('alerts.channels')}
-            rules={[{ required: true, message: '请选择通知渠道' }]}
-          >
-            <Checkbox.Group
-              options={[
-                { label: 'DingTalk', value: 'dingtalk' },
-                { label: 'Email', value: 'email' },
-                { label: 'SMS', value: 'sms' },
-              ]}
-            />
-          </Form.Item>
-
-          <Form.Item name="description" label="规则描述">
-            <TextArea placeholder="请输入规则描述" rows={3} />
-          </Form.Item>
-          <Form.Item
-            name="notificationTemplate"
-            label={t('alerts.notificationTemplate')}
-            extra={
-              <div style={{ paddingTop: 24 }}>
-                <div style={{ marginBottom: 8 }}>{t('alerts.notificationTemplateVariables')}</div>
-                <Flex gap={6} wrap="wrap">
-                  {notificationTemplateVariables.map((variable) => (
-                    <Tag
-                      key={variable}
-                      role="button"
-                      tabIndex={0}
-                      style={{ cursor: 'pointer' }}
-                      onClick={() => insertNotificationTemplateVariable(variable)}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter' || event.key === ' ') {
-                          event.preventDefault();
-                          insertNotificationTemplateVariable(variable);
-                        }
-                      }}
-                    >
-                      {`$\{${variable}}`}
-                    </Tag>
-                  ))}
-                </Flex>
+            {testResult && testResult.samples.length > 0 && (
+              <div style={{ gridColumn: '1 / -1' }}>
+                <Table
+                  title={() => '规则试运行结果'}
+                  rowKey={({ labels, currentValue, availability }) =>
+                    `${JSON.stringify(labels)}-${currentValue}-${availability}`
+                  }
+                  size="small"
+                  pagination={false}
+                  dataSource={testResult.samples}
+                  columns={[
+                    {
+                      title: '标签',
+                      dataIndex: 'labels',
+                      render: (labels: Record<string, string>) =>
+                        Object.entries(labels)
+                          .map(([key, value]) => `${key}=${value}`)
+                          .join(', '),
+                    },
+                    {
+                      title: '采集状态',
+                      dataIndex: 'availability',
+                      render: (availability: string) => (
+                        <Tag color={availability === 'AVAILABLE' ? 'green' : 'orange'}>
+                          {availability}
+                        </Tag>
+                      ),
+                    },
+                    {
+                      title: '当前值',
+                      dataIndex: 'currentValue',
+                      render: (value: number | null) => value ?? '不可用',
+                    },
+                    {
+                      title: '阈值命中',
+                      dataIndex: 'conditionMet',
+                      render: (matched: boolean) => (
+                        <Tag color={matched ? 'red' : 'green'}>{matched ? '命中' : '未命中'}</Tag>
+                      ),
+                    },
+                  ]}
+                />
               </div>
-            }
-          >
-            <TextArea
-              ref={notificationTemplateRef}
-              placeholder="[${level}] ${title} - ${description}\nLabels: ${labels}"
-              rows={4}
-              maxLength={4000}
-              showCount
-            />
-          </Form.Item>
+            )}
+
+            <Form.Item
+              name="channels"
+              label={t('alerts.channels')}
+              rules={[{ required: true, message: '请选择通知渠道' }]}
+              style={{ gridColumn: '1 / -1' }}
+            >
+              <Checkbox.Group
+                options={[
+                  { label: 'DingTalk', value: 'dingtalk' },
+                  { label: 'Email', value: 'email' },
+                  { label: 'SMS', value: 'sms' },
+                ]}
+              />
+            </Form.Item>
+
+            <Form.Item name="description" label="规则描述" style={{ gridColumn: '1 / -1' }}>
+              <TextArea placeholder="请输入规则描述" rows={3} />
+            </Form.Item>
+            <Form.Item
+              name="notificationTemplate"
+              label={t('alerts.notificationTemplate')}
+              style={{ gridColumn: '1 / -1' }}
+              extra={
+                <div style={{ paddingTop: 24 }}>
+                  <div style={{ marginBottom: 8 }}>{t('alerts.notificationTemplateVariables')}</div>
+                  <Flex gap={6} wrap="wrap">
+                    {notificationTemplateVariables.map((variable) => (
+                      <Tag
+                        key={variable}
+                        role="button"
+                        tabIndex={0}
+                        style={{ cursor: 'pointer' }}
+                        onClick={() => insertNotificationTemplateVariable(variable)}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault();
+                            insertNotificationTemplateVariable(variable);
+                          }
+                        }}
+                      >
+                        {`$\{${variable}}`}
+                      </Tag>
+                    ))}
+                  </Flex>
+                </div>
+              }
+            >
+              <TextArea
+                ref={notificationTemplateRef}
+                placeholder="[${level}] ${title} - ${description}\nLabels: ${labels}"
+                rows={4}
+                maxLength={4000}
+                showCount
+              />
+            </Form.Item>
+          </div>
         </Form>
       </Modal>
     </div>
