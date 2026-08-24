@@ -62,6 +62,7 @@ import { formatDateTime } from '../../utils/format';
 import { listInstances } from '../../services/instanceService';
 import type { Instance } from '../../api/instance';
 import { downloadBlob } from '../../utils/download';
+import type { TextAreaRef } from 'antd/es/input/TextArea';
 const { TextArea } = Input;
 
 const channelColors: Record<string, string> = {
@@ -157,6 +158,7 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
   const [transferringRules, setTransferringRules] = useState(false);
   const metricRequestVersion = useRef(0);
   const importInputRef = useRef<HTMLInputElement>(null);
+  const notificationTemplateRef = useRef<TextAreaRef>(null);
   const supportsUnavailableCondition = supportsUnavailableOperator(selectedMetric);
   const selectedMetricIsRatio = selectedMetric != null && nativeRatioMetrics.has(selectedMetric);
   const editingLegacyRule = Boolean(editingRule && !editingRule.instanceId?.trim());
@@ -579,6 +581,23 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
     }
   };
 
+  const insertNotificationTemplateVariable = (variable: string) => {
+    const placeholder = `\${${variable}}`;
+    const input = notificationTemplateRef.current?.resizableTextArea?.textArea;
+    const currentValue = String(form.getFieldValue('notificationTemplate') ?? '');
+    const selectionStart = input?.selectionStart ?? currentValue.length;
+    const selectionEnd = input?.selectionEnd ?? selectionStart;
+    const nextValue =
+      currentValue.slice(0, selectionStart) + placeholder + currentValue.slice(selectionEnd);
+
+    form.setFieldValue('notificationTemplate', nextValue);
+    input?.focus();
+    input?.setSelectionRange(
+      selectionStart + placeholder.length,
+      selectionStart + placeholder.length,
+    );
+  };
+
   return (
     <div style={{ padding: 24 }}>
       {/* ─── Header ─── */}
@@ -996,13 +1015,28 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
                 <div style={{ marginBottom: 8 }}>{t('alerts.notificationTemplateVariables')}</div>
                 <Flex gap={6} wrap="wrap">
                   {notificationTemplateVariables.map((variable) => (
-                    <Tag key={variable}>{`$\{${variable}}`}</Tag>
+                    <Tag
+                      key={variable}
+                      role="button"
+                      tabIndex={0}
+                      style={{ cursor: 'pointer' }}
+                      onClick={() => insertNotificationTemplateVariable(variable)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          insertNotificationTemplateVariable(variable);
+                        }
+                      }}
+                    >
+                      {`$\{${variable}}`}
+                    </Tag>
                   ))}
                 </Flex>
               </div>
             }
           >
             <TextArea
+              ref={notificationTemplateRef}
               placeholder="[${level}] ${title} - ${description}\nLabels: ${labels}"
               rows={4}
               maxLength={4000}

@@ -383,6 +383,18 @@ describe('AlertsPage', () => {
     expect(screen.getByText('${thresholdUnit}')).toBeInTheDocument();
   });
 
+  it('inserts a selected notification template variable into the template', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: '新建规则' }));
+    const template = screen.getByRole('textbox', { name: '通知模板' });
+    await user.type(template, 'Alert: ');
+    await user.click(screen.getByText('${ruleName}'));
+
+    expect(template).toHaveValue('Alert: ${ruleName}');
+  });
+
   it('exposes optional cluster and broker scopes for cluster rules', async () => {
     const user = userEvent.setup();
     renderPage();
