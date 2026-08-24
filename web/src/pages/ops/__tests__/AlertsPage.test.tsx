@@ -320,12 +320,13 @@ describe('AlertsPage', () => {
     expect((await screen.findAllByText('Broker 磁盘使用率')).length).toBeGreaterThan(1);
   });
 
-  it('keeps the instance field visible while editing a legacy business rule', async () => {
+  it('uses the native instance and metric selectors while editing a business rule', async () => {
     vi.mocked(listAlertRules).mockResolvedValue([
       {
         id: 99,
         name: 'Legacy disk usage',
-        metric: 'rocketmq_disk_use_ratio',
+        instanceId: 'local',
+        metric: 'consumer.lag.total',
         operator: '>',
         threshold: 80,
         thresholdUnit: '%',
@@ -336,19 +337,23 @@ describe('AlertsPage', () => {
         description: '',
       },
     ]);
+    vi.mocked(listNativeAlertMetrics).mockResolvedValue([
+      {
+        key: 'consumer.lag.total',
+        label: 'Consumer lag total',
+        thresholdUnit: 'messages',
+        supportsConsumerGroup: true,
+      },
+    ]);
     const user = userEvent.setup();
     renderPage('BUSINESS');
 
     await screen.findByText('Legacy disk usage');
     await user.click(within(getRuleRow('Legacy disk usage')).getByRole('button', { name: '编辑' }));
 
-    expect(await screen.findByRole('textbox', { name: '监控指标' })).toHaveValue(
-      'rocketmq_disk_use_ratio',
-    );
+    expect(await screen.findByRole('combobox', { name: '监控指标' })).toBeEnabled();
     expect(screen.getByRole('combobox', { name: 'RocketMQ 实例' })).toBeInTheDocument();
-    expect(
-      screen.getByText('历史 Prometheus 规则可不绑定 Studio 实例；留空将保持兼容模式。'),
-    ).toBeInTheDocument();
+    expect((await screen.findAllByText('消费积压总量')).length).toBeGreaterThan(1);
   });
 
   it('uses English metric labels when English is selected', async () => {

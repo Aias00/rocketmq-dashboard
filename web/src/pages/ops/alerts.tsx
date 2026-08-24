@@ -164,7 +164,6 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
   const notificationTemplateRef = useRef<TextAreaRef>(null);
   const supportsUnavailableCondition = supportsUnavailableOperator(selectedMetric);
   const selectedMetricIsRatio = selectedMetric != null && nativeRatioMetrics.has(selectedMetric);
-  const editingLegacyRule = Boolean(editingRule && !editingRule.instanceId?.trim());
 
   const metricLabel = (metric: string, fallback = metric) => {
     const key = nativeMetricTranslationKeys[metric] ?? legacyMetricTranslationKeys[metric];
@@ -808,64 +807,46 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
           <Form.Item
             name="instanceId"
             label={t('alerts.instance')}
-            rules={
-              editingLegacyRule ? undefined : [{ required: true, message: '请选择 RocketMQ 实例' }]
-            }
-            extra={
-              editingLegacyRule
-                ? '历史 Prometheus 规则可不绑定 Studio 实例；留空将保持兼容模式。'
-                : '原生采集规则必须绑定一个受管 RocketMQ 实例。'
-            }
+            rules={[{ required: true, message: '请选择 RocketMQ 实例' }]}
+            extra="原生采集规则必须绑定一个受管 RocketMQ 实例。"
           >
             <Select
-              allowClear={editingLegacyRule}
-              placeholder={editingLegacyRule ? '历史规则可留空' : '请选择 RocketMQ 实例'}
+              placeholder="请选择 RocketMQ 实例"
               options={instances.map((instance) => ({
                 value: instance.name,
                 label: `${instance.name}${instance.vendor && instance.vendor !== 'APACHE' ? ` (${instance.vendor})` : ''}`,
               }))}
               onChange={(instanceId) => {
                 setSelectedInstanceId(instanceId);
-                if (instanceId) void loadMetricCapabilities(instanceId, !editingLegacyRule);
+                if (instanceId) void loadMetricCapabilities(instanceId);
                 else setMetricOptions([]);
               }}
             />
           </Form.Item>
 
-          {editingLegacyRule ? (
-            <Form.Item
-              name="metric"
-              label={t('alerts.metric')}
-              rules={[{ required: true, message: '请输入监控指标' }]}
-              extra="历史 Prometheus 规则保留原始指标表达式；可在上方保留为空的实例范围。"
-            >
-              <Input placeholder="例如 rocketmq_consumer_lag_messages" />
-            </Form.Item>
-          ) : (
-            <Form.Item
-              name="metric"
-              label={t('alerts.metric')}
-              rules={[{ required: true, message: '请选择监控指标' }]}
-            >
-              <Select
-                placeholder={metricLoading ? '正在加载监控指标' : '请选择监控指标'}
-                options={metricOptions.map((metric) => ({
-                  label: metricLabel(metric.key, metric.label),
-                  value: metric.key,
-                }))}
-                disabled={!selectedInstanceId || metricLoading}
-                loading={metricLoading}
-                onChange={(metric) => {
-                  if (
-                    form.getFieldValue('operator') === 'UNAVAILABLE' &&
-                    !supportsUnavailableOperator(metric)
-                  ) {
-                    form.setFieldValue('operator', '>');
-                  }
-                }}
-              />
-            </Form.Item>
-          )}
+          <Form.Item
+            name="metric"
+            label={t('alerts.metric')}
+            rules={[{ required: true, message: '请选择监控指标' }]}
+          >
+            <Select
+              placeholder={metricLoading ? '正在加载监控指标' : '请选择监控指标'}
+              options={metricOptions.map((metric) => ({
+                label: metricLabel(metric.key, metric.label),
+                value: metric.key,
+              }))}
+              disabled={!selectedInstanceId || metricLoading}
+              loading={metricLoading}
+              onChange={(metric) => {
+                if (
+                  form.getFieldValue('operator') === 'UNAVAILABLE' &&
+                  !supportsUnavailableOperator(metric)
+                ) {
+                  form.setFieldValue('operator', '>');
+                }
+              }}
+            />
+          </Form.Item>
 
           {domain === 'BUSINESS' && (
             <>
