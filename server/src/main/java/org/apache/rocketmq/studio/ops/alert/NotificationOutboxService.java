@@ -6,6 +6,9 @@
  */
 package org.apache.rocketmq.studio.ops.alert;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import lombok.extern.slf4j.Slf4j;
@@ -52,6 +55,7 @@ public class NotificationOutboxService {
     private static final int MAX_ATTEMPTS = 5;
     private static final int BATCH_SIZE = 20;
     private static final Duration CLAIM_TIMEOUT = Duration.ofMinutes(1);
+    private static final ObjectMapper JSON = new ObjectMapper();
 
     private final RmqAlertNotificationOutboxMapper mapper;
     private final SettingsRepository settingsRepository;
@@ -288,8 +292,8 @@ public class NotificationOutboxService {
             throw new IllegalStateException("No configured " + channel + " webhook");
         }
         UrlHostGuard.check(webhook, false);
-        ResponseEntity<Map> response = restTemplate.postForEntity(dingTalkWebhook(webhook, settings, channel),
-                payload(alert, channel, content), Map.class);
+        ResponseEntity<String> response = restTemplate.postForEntity(dingTalkWebhook(webhook, settings, channel),
+                payload(alert, channel, content), String.class);
         if (!response.getStatusCode().is2xxSuccessful()) {
             throw new IllegalStateException("Webhook returned " + response.getStatusCode());
         }
@@ -314,11 +318,17 @@ public class NotificationOutboxService {
         }
     }
 
-    private static void validateDingTalkResponse(Map<?, ?> response) {
-        if (response == null || !(response.get("errcode") instanceof Number code) || code.intValue() != 0) {
-            Object error = response == null ? null : response.get("errmsg");
+    private static void validateDingTalkResponse(String response) {
+        try {
+            JsonNode body = JSON.readTree(response);
+            if (body != null && body.path("errcode").canConvertToInt() && body.path("errcode").asInt() == 0) {
+                return;
+            }
+            String error = body == null ? null : body.path("errmsg").asText(null);
             throw new IllegalStateException("DingTalk rejected webhook: "
                     + (StringUtils.hasText(error == null ? null : error.toString()) ? error : "missing errcode"));
+        } catch (JsonProcessingException error) {
+            throw new IllegalStateException("DingTalk returned an invalid JSON response", error);
         }
     }
 

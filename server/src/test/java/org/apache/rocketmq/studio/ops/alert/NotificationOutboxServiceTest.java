@@ -212,6 +212,39 @@ class NotificationOutboxServiceTest {
     }
 
     @Test
+    void treatsPlainTextSuccessFromAnSmsWebhookAsDelivered() {
+        RmqAlertNotificationOutboxMapper mapper = mock(RmqAlertNotificationOutboxMapper.class);
+        SettingsRepository settings = mock(SettingsRepository.class);
+        AlertRepository alerts = mock(AlertRepository.class);
+        OperationAuditService audit = mock(OperationAuditService.class);
+        RestTemplate client = new RestTemplate();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(client).build();
+        RmqAlertNotificationOutbox row = new RmqAlertNotificationOutbox();
+        row.setId(8L);
+        row.setAlertId(9L);
+        row.setChannel("sms");
+        row.setStatus("PENDING");
+        row.setAttemptCount(0);
+        when(mapper.findDispatchable(any(LocalDateTime.class), any(LocalDateTime.class), any(Integer.class)))
+                .thenReturn(List.of(row));
+        when(mapper.claimForDispatch(any(), any(LocalDateTime.class), any(LocalDateTime.class),
+                any(LocalDateTime.class), anyString())).thenReturn(1);
+        when(mapper.update(any(), any())).thenReturn(1);
+        when(alerts.findAlertById(9L)).thenReturn(Optional.of(SystemAlertVO.builder().id(9L)
+                .level(AlertLevel.warning).title("Lag").description("high").instanceId("local").build()));
+        when(settings.loadGeneralSettings()).thenReturn(GeneralSettingsVO.builder()
+                .smsWebhook("https://example.com/sms").build());
+        server.expect(once(), requestTo("https://example.com/sms"))
+                .andRespond(withSuccess("accepted", MediaType.TEXT_PLAIN));
+
+        new NotificationOutboxService(mapper, settings, mock(AlertSilenceService.class), alerts, audit, client).dispatch();
+
+        server.verify();
+        verify(audit).record("DELIVER_ALERT_NOTIFICATION", "ALERT_NOTIFICATION", "8", null,
+                "alertId=9, channel=sms", "SUCCESS", null);
+    }
+
+    @Test
     void retriesAClaimedDeliveryWhenNoWebhookIsConfigured() {
         RmqAlertNotificationOutboxMapper mapper = mock(RmqAlertNotificationOutboxMapper.class);
         RmqAlertNotificationOutbox row = new RmqAlertNotificationOutbox();
