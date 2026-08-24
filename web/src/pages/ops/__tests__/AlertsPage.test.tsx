@@ -21,6 +21,7 @@ import userEvent from '@testing-library/user-event';
 import { App } from 'antd';
 import type { AlertRule, NativeAlertMetricInfo } from '../../../api/ops';
 import { LangProvider } from '../../../i18n/LangContext';
+import { LANGUAGE_STORAGE_KEY } from '../../../i18n/languagePreference';
 import { formatDateTime } from '../../../utils/format';
 import AlertsPage, { supportsUnavailableOperator } from '../alerts';
 import { listInstances } from '../../../services/instanceService';
@@ -141,6 +142,7 @@ describe('AlertsPage', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.setItem(LANGUAGE_STORAGE_KEY, 'zh');
     vi.mocked(listAlertRules).mockResolvedValue(alertRules.map(cloneRule));
     vi.mocked(listNativeAlertMetrics).mockResolvedValue([]);
     vi.mocked(listInstances).mockResolvedValue([
@@ -253,8 +255,8 @@ describe('AlertsPage', () => {
     expect(screen.getByRole('textbox', { name: '消费组（可选）' })).toBeInTheDocument();
     await user.click(screen.getByRole('combobox', { name: '监控指标' }));
 
-    expect(await screen.findByText('Consumer lag total')).toBeInTheDocument();
-    expect(screen.queryByText('Broker disk usage ratio')).not.toBeInTheDocument();
+    expect(await screen.findByText('消费积压总量')).toBeInTheDocument();
+    expect(screen.queryByText('Broker 磁盘使用率')).not.toBeInTheDocument();
   });
 
   it('refreshes metric options from the selected instance capabilities', async () => {
@@ -299,7 +301,29 @@ describe('AlertsPage', () => {
     await user.click(within(getRuleRow('Broker disk usage')).getByRole('button', { name: '编辑' }));
     await waitFor(() => expect(listNativeAlertMetrics).toHaveBeenCalledWith('local', 'CLUSTER'));
 
-    expect(await screen.findByText('Broker disk usage ratio')).toBeInTheDocument();
+    expect((await screen.findAllByText('Broker 磁盘使用率')).length).toBeGreaterThan(1);
+  });
+
+  it('uses English metric labels when English is selected', async () => {
+    localStorage.setItem(LANGUAGE_STORAGE_KEY, 'en');
+    vi.mocked(listNativeAlertMetrics).mockResolvedValue([
+      {
+        key: 'broker.availability',
+        label: 'Broker availability',
+        thresholdUnit: '',
+        supportsConsumerGroup: false,
+      },
+    ]);
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: 'New Rule' }));
+    await user.click(screen.getByRole('combobox', { name: 'RocketMQ Instance' }));
+    await screen.findByRole('option', { name: 'local' });
+    await user.click(getSelectOption('local'));
+    await user.click(screen.getByRole('combobox', { name: 'Metric' }));
+
+    expect(await screen.findByText('Broker availability')).toBeInTheDocument();
   });
 
   it('exposes optional cluster and broker scopes for cluster rules', async () => {
@@ -370,7 +394,7 @@ describe('AlertsPage', () => {
       },
     ]);
     await user.click(screen.getByRole('combobox', { name: '监控指标' }));
-    expect(await screen.findByText('Remote consumer lag')).toBeInTheDocument();
+    expect(await screen.findByText('消费积压总量')).toBeInTheDocument();
 
     resolveLocal!([
       {
@@ -380,7 +404,7 @@ describe('AlertsPage', () => {
         supportsConsumerGroup: true,
       },
     ]);
-    await waitFor(() => expect(screen.queryByText('Local DLQ count')).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByText('死信队列消息数')).not.toBeInTheDocument());
   });
 
   it('keeps only failed alert rules selected after a partial bulk failure', async () => {

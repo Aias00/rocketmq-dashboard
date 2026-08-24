@@ -70,6 +70,21 @@ const availabilityMetrics = new Set([
   'cloud.instance.availability',
 ]);
 
+const nativeMetricTranslationKeys: Record<string, string> = {
+  'nameserver.availability': 'alerts.metrics.nameserverAvailability',
+  'broker.availability': 'alerts.metrics.brokerAvailability',
+  'proxy.availability': 'alerts.metrics.proxyAvailability',
+  'broker.disk.usage_ratio': 'alerts.metrics.brokerDiskUsageRatio',
+  'broker.jvm.heap.usage_ratio': 'alerts.metrics.brokerJvmHeapUsageRatio',
+  'broker.send_queue.usage_ratio': 'alerts.metrics.brokerSendQueueUsageRatio',
+  'consumer.lag.total': 'alerts.metrics.consumerLagTotal',
+  'consumer.lag.max_queue': 'alerts.metrics.consumerLagMaxQueue',
+  'consumer.delay.seconds': 'alerts.metrics.consumerDelay',
+  'topic.backlog.total': 'alerts.metrics.topicBacklogTotal',
+  'dlq.message.count': 'alerts.metrics.dlqMessageCount',
+  'cloud.instance.availability': 'alerts.metrics.cloudInstanceAvailability',
+};
+
 export const supportsUnavailableOperator = (metric?: string): boolean =>
   metric != null && availabilityMetrics.has(metric);
 
@@ -106,6 +121,13 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
   const [instances, setInstances] = useState<Instance[]>([]);
   const metricRequestVersion = useRef(0);
   const supportsUnavailableCondition = supportsUnavailableOperator(selectedMetric);
+
+  const metricLabel = (metric: string, fallback = metric) => {
+    const key = nativeMetricTranslationKeys[metric];
+    if (!key) return fallback;
+    const translated = t(key);
+    return translated === key ? fallback : translated;
+  };
 
   const channelLabels: Record<string, string> = {
     dingtalk: 'DingTalk',
@@ -169,7 +191,12 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
     try {
       const metrics = await listNativeAlertMetrics(instanceId.trim(), domain);
       if (requestVersion !== metricRequestVersion.current) return;
-      setMetricOptions(metrics.map((metric) => ({ label: metric.label, value: metric.key })));
+      setMetricOptions(
+        metrics.map((metric) => ({
+          label: metricLabel(metric.key, metric.label),
+          value: metric.key,
+        })),
+      );
       if (resetMetric) form.setFieldValue('metric', undefined);
       if (metrics.length === 0) message.warning('该实例暂不支持原生告警指标');
     } catch {
@@ -317,6 +344,7 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
       title: t('alerts.metric'),
       dataIndex: 'metric',
       sorter: (a, b) => (a.metric ?? '').localeCompare(b.metric ?? ''),
+      render: (metric: string) => metricLabel(metric),
     },
     {
       title: t('alerts.threshold'),
@@ -607,7 +635,7 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
 
           <Form.Item
             name="instanceId"
-            label="RocketMQ 实例"
+            label={t('alerts.instance')}
             rules={[{ required: true, message: '请选择 RocketMQ 实例' }]}
             extra="原生采集规则必须绑定一个受管 RocketMQ 实例。"
           >
