@@ -109,8 +109,9 @@ public class NotificationOutboxService {
                 .title("RocketMQ Studio test notification").description("DingTalk notification configuration is working.")
                 .build();
         try {
-            if ("email".equals(channel)) sendEmail(settings, alert);
-            else sendWebhook(settings, alert, channel);
+            String content = AlertNotificationTemplate.render(null, alert, null);
+            if ("email".equals(channel)) sendEmail(settings, alert, content);
+            else sendWebhook(settings, alert, channel, content);
         } catch (Exception error) {
             throw new IllegalStateException("Test notification failed: " + error.getMessage(), error);
         }
@@ -137,6 +138,7 @@ public class NotificationOutboxService {
             row.setChannel(channel);
             row.setStatus(NotificationOutboxStatus.PENDING.name());
             row.setAttemptCount(0);
+            row.setMessageContent(AlertNotificationTemplate.render(rule.getNotificationTemplate(), alert, rule));
             row.setNextAttemptAt(silenceEndsAt == null ? utcNow() : silenceEndsAt);
             mapper.insert(row);
         }
@@ -240,9 +242,9 @@ public class NotificationOutboxService {
             }
             GeneralSettingsVO settings = settingsRepository.loadGeneralSettings();
             if ("email".equals(row.getChannel())) {
-                sendEmail(settings, alert);
+                sendEmail(settings, alert, message(row, alert));
             } else {
-                sendWebhook(settings, alert, row.getChannel());
+                sendWebhook(settings, alert, row.getChannel(), message(row, alert));
             }
             if (!updateClaimed(row, claimToken, new UpdateWrapper<RmqAlertNotificationOutbox>()
                     .set("status", NotificationOutboxStatus.DELIVERED.name()).set("delivered_at", now)
@@ -262,13 +264,14 @@ public class NotificationOutboxService {
                 .set("sending_started_at", null));
     }
 
-    private void sendWebhook(GeneralSettingsVO settings, SystemAlertVO alert, String channel) {
+    private void sendWebhook(GeneralSettingsVO settings, SystemAlertVO alert, String channel, String content) {
         String webhook = webhook(settings, channel);
         if (!StringUtils.hasText(webhook)) {
             throw new IllegalStateException("No configured " + channel + " webhook");
         }
         UrlHostGuard.check(webhook, false);
-        ResponseEntity<Map> response = restTemplate.postForEntity(dingTalkWebhook(webhook, settings, channel), payload(alert, channel), Map.class);
+        ResponseEntity<Map> response = restTemplate.postForEntity(dingTalkWebhook(webhook, settings, channel),
+                payload(alert, channel, content), Map.class);
         if (!response.getStatusCode().is2xxSuccessful()) {
             throw new IllegalStateException("Webhook returned " + response.getStatusCode());
         }
@@ -311,7 +314,7 @@ public class NotificationOutboxService {
                 ? settings.getDingtalkWebhook() : settings.getSmsWebhook());
     }
 
-    private void sendEmail(GeneralSettingsVO settings, SystemAlertVO alert) throws AddressException {
+    private void sendEmail(GeneralSettingsVO settings, SystemAlertVO alert, String content) throws AddressException {
         if (settings == null || !StringUtils.hasText(settings.getEmailRecipients())) {
             throw new IllegalStateException("No configured email recipients");
         }
@@ -322,8 +325,7 @@ public class NotificationOutboxService {
         SimpleMailMessage message = new SimpleMailMessage();
         message.setTo(parseRecipients(settings.getEmailRecipients()));
         message.setSubject("[RocketMQ Studio] " + alert.getTitle());
-        message.setText("[" + alert.getLevel() + "] " + alert.getTitle() + " - " + alert.getDescription()
-                + formatLabels(alert));
+        message.setText(content);
         sender.send(message);
     }
 
@@ -343,15 +345,15 @@ public class NotificationOutboxService {
         return recipients.toArray(String[]::new);
     }
 
-    private Map<String, Object> payload(SystemAlertVO alert, String channel) {
-        String content = "[" + alert.getLevel() + "] " + alert.getTitle() + " - " + alert.getDescription()
-                + formatLabels(alert);
+    private Map<String, Object> payload(SystemAlertVO alert, String channel, String content) {
         if ("dingtalk".equals(channel)) {
             return Map.of("msgtype", "text", "text", Map.of("content", content));
         }
         Map<String, Object> payload = new java.util.LinkedHashMap<>();
         payload.put("title", alert.getTitle());
-        payload.put("description", alert.getDescription());
+        payload.put("description", content);
+        payload.put("eventDescription", alert.getDescription());
+        payload.put("content", content);
         payload.put("level", alert.getLevel());
         payload.put("transition", alert.getTransition());
         payload.put("instanceId", alert.getInstanceId());
@@ -359,12 +361,9 @@ public class NotificationOutboxService {
         return payload;
     }
 
-    private static String formatLabels(SystemAlertVO alert) {
-        if (alert.getLabels() == null || alert.getLabels().isEmpty()) {
-            return "";
-        }
-        return "\nLabels: " + alert.getLabels().entrySet().stream().sorted(Map.Entry.comparingByKey())
-                .map(entry -> entry.getKey() + "=" + entry.getValue()).collect(java.util.stream.Collectors.joining(", "));
+    private static String message(RmqAlertNotificationOutbox row, SystemAlertVO alert) {
+        return StringUtils.hasText(row.getMessageContent()) ? row.getMessageContent()
+                : AlertNotificationTemplate.render(null, alert, null);
     }
 
     private void retry(RmqAlertNotificationOutbox row, LocalDateTime now, String claimToken, String error) {

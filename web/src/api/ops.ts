@@ -20,6 +20,7 @@ export interface AlertRule {
   consumerGroup?: string;
   topic?: string;
   consecutiveSamples?: number;
+  notificationTemplate?: string;
 }
 
 export type AlertRuleDomain = 'BUSINESS' | 'CLUSTER';

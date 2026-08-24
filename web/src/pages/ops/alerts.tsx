@@ -916,6 +916,18 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
           <Form.Item name="description" label="规则描述">
             <TextArea placeholder="请输入规则描述" rows={3} />
           </Form.Item>
+          <Form.Item
+            name="notificationTemplate"
+            label={t('alerts.notificationTemplate')}
+            extra={t('alerts.notificationTemplateHelp')}
+          >
+            <TextArea
+              placeholder="[${level}] ${title} - ${description}\nLabels: ${labels}"
+              rows={4}
+              maxLength={4000}
+              showCount
+            />
+          </Form.Item>
         </Form>
       </Modal>
     </div>

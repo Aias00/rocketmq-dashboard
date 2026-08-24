@@ -25,6 +25,7 @@ public class RmqAlertNotificationOutbox {
     private LocalDateTime sendingStartedAt;
     private String claimToken;
     private String lastError;
+    private String messageContent;
     private LocalDateTime deliveredAt;
     private LocalDateTime gmtModified;
 }

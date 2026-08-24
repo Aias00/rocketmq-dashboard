@@ -265,6 +265,7 @@ CREATE TABLE IF NOT EXISTS rmq_alert_rule (
   topic VARCHAR(255) COMMENT 'Optional topic selector for topic backlog metrics',
   consecutive_samples INT NOT NULL DEFAULT 1 COMMENT 'Consecutive native samples required before firing',
   reminder_interval VARCHAR(32) NOT NULL DEFAULT '30m' COMMENT 'Repeat notification interval while unacknowledged',
+  notification_template TEXT COMMENT 'Optional notification body template',
   semantic_fingerprint CHAR(64) NOT NULL COMMENT 'SHA-256 identity of the rule evaluation conditions',
   UNIQUE KEY uk_alert_rule_semantic_fingerprint (semantic_fingerprint),
   PRIMARY KEY (`id`)
@@ -342,6 +343,7 @@ CREATE TABLE IF NOT EXISTS rmq_alert_notification_outbox (
   `sending_started_at` DATETIME NULL,
   `claim_token` VARCHAR(64) NULL,
   `last_error` VARCHAR(1000) NULL,
+  `message_content` TEXT NULL COMMENT 'Rendered notification body snapshot',
   `delivered_at` DATETIME NULL,
   `gmt_create` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `gmt_modified` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,

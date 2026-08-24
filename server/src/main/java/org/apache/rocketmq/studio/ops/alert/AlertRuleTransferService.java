@@ -80,6 +80,7 @@ public class AlertRuleTransferService {
         request.setTopic(rule.getTopic());
         request.setConsecutiveSamples(rule.getConsecutiveSamples());
         request.setReminderInterval(rule.getReminderInterval());
+        request.setNotificationTemplate(rule.getNotificationTemplate());
         return request;
     }
 }

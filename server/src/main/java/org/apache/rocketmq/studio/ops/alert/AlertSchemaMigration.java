@@ -74,6 +74,7 @@ public class AlertSchemaMigration implements ApplicationRunner {
             new Column("rmq_alert_rule", "topic", "VARCHAR(255)"),
             new Column("rmq_alert_rule", "consecutive_samples", "INT NOT NULL DEFAULT 1"),
             new Column("rmq_alert_rule", "reminder_interval", "VARCHAR(32) NOT NULL DEFAULT '30m'"),
+            new Column("rmq_alert_rule", "notification_template", "TEXT"),
             new Column("rmq_alert_rule", "semantic_fingerprint", "CHAR(64)"),
             new Column("rmq_alert_state", "last_notified_at", "DATETIME"),
             new Column("rmq_system_alert", "acknowledged_by", "VARCHAR(128)"),
@@ -86,7 +87,8 @@ public class AlertSchemaMigration implements ApplicationRunner {
             new Column("rmq_system_alert", "current_value", "DOUBLE"),
             new Column("rmq_system_alert", "labels_json", "TEXT"),
             new Column("rmq_alert_notification_outbox", "sending_started_at", "DATETIME"),
-            new Column("rmq_alert_notification_outbox", "claim_token", "VARCHAR(64)"));
+            new Column("rmq_alert_notification_outbox", "claim_token", "VARCHAR(64)"),
+            new Column("rmq_alert_notification_outbox", "message_content", "TEXT"));
     private static final List<Index> INDEXES = List.of(
             new Index("rmq_metric_snapshot", "idx_metric_snapshot_lookup", "instance_id, metric_key, collected_at"),
             new Index("rmq_metric_snapshot", "idx_metric_snapshot_retention", "collected_at"),

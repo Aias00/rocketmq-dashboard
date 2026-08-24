@@ -19,6 +19,7 @@ package org.apache.rocketmq.studio.ops.alert;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 import java.util.List;
@@ -57,6 +58,8 @@ public class AlertRuleRequestDTO {
     private Integer consecutiveSamples;
     @Pattern(regexp = "(?:[0-9]+(?:ms|s|m|h|d|w|y))+", message = "reminderInterval is invalid")
     private String reminderInterval;
+    @Size(max = 4000, message = "notificationTemplate must not exceed 4000 characters")
+    private String notificationTemplate;
 
     public AlertRuleVO toAlertRuleVO() {
         return AlertRuleVO.builder()
@@ -80,6 +83,7 @@ public class AlertRuleRequestDTO {
                 .topic(topic)
                 .consecutiveSamples(consecutiveSamples == null ? 1 : consecutiveSamples)
                 .reminderInterval(reminderInterval == null ? "30m" : reminderInterval)
+                .notificationTemplate(notificationTemplate)
                 .build();
     }
 

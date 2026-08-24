@@ -53,6 +53,7 @@ class AlertRuleTransferServiceTest {
                 .channels(List.of("dingtalk"))
                 .enabled(true)
                 .lastTriggered("2026-08-23T10:35:38Z")
+                .notificationTemplate("${ruleName}: ${value}")
                 .build();
         when(alertService.listRules(AlertDomain.CLUSTER)).thenReturn(List.of(rule));
 
@@ -61,6 +62,7 @@ class AlertRuleTransferServiceTest {
         assertEquals(AlertRuleTransferDTO.VERSION, transfer.getVersion());
         assertEquals(AlertDomain.CLUSTER, transfer.getDomain());
         assertEquals("Broker disk usage", transfer.getRules().get(0).getName());
+        assertEquals("${ruleName}: ${value}", transfer.getRules().get(0).getNotificationTemplate());
         assertNull(transfer.getRules().get(0).getId());
     }
 
@@ -99,6 +101,7 @@ class AlertRuleTransferServiceTest {
     void importsRulesAsNewRulesInTheRequestedDomain() {
         AlertRuleRequestDTO request = request("Broker unavailable");
         request.setId(99L);
+        request.setNotificationTemplate("${transition} ${metric}");
         when(alertService.createRule(eq(AlertDomain.CLUSTER), any(AlertRuleVO.class)))
                 .thenAnswer(invocation -> invocation.getArgument(1));
 
@@ -109,6 +112,7 @@ class AlertRuleTransferServiceTest {
         verify(alertService).createRule(eq(AlertDomain.CLUSTER), captor.capture());
         assertNull(captor.getValue().getId());
         assertEquals(AlertDomain.CLUSTER, captor.getValue().getDomain());
+        assertEquals("${transition} ${metric}", captor.getValue().getNotificationTemplate());
         assertEquals("Broker unavailable", imported.get(0).getName());
     }
 

@@ -237,6 +237,11 @@ const translations: Record<string, Record<Lang, string>> = {
   'alerts.enabled': { zh: '已启用', en: 'Enabled' },
   'alerts.triggered24h': { zh: '24h 触发', en: 'Triggered (24h)' },
   'alerts.newRule': { zh: '新建规则', en: 'New Rule' },
+  'alerts.notificationTemplate': { zh: '通知模板', en: 'Notification Template' },
+  'alerts.notificationTemplateHelp': {
+    zh: '支持 ${ruleName}、${title}、${description}、${transition}、${metric}、${instanceId}、${value}、${threshold}、${thresholdUnit}、${level}、${time}、${labels}',
+    en: 'Supports ${ruleName}, ${title}, ${description}, ${transition}, ${metric}, ${instanceId}, ${value}, ${threshold}, ${thresholdUnit}, ${level}, ${time}, and ${labels}',
+  },
   'alerts.exportSuccess': { zh: '告警规则已导出', en: 'Alert rules exported' },
   'alerts.exportFailed': { zh: '导出告警规则失败', en: 'Failed to export alert rules' },
   'alerts.importSuccess': { zh: '已导入 {count} 条告警规则', en: 'Imported {count} alert rules' },

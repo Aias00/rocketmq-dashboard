@@ -91,6 +91,26 @@ class NotificationOutboxServiceTest {
     }
 
     @Test
+    void snapshotsTheRenderedRuleTemplateWhenEnqueuing() {
+        RmqAlertNotificationOutboxMapper mapper = mock(RmqAlertNotificationOutboxMapper.class);
+        AlertRuleVO rule = AlertRuleVO.builder().id(4L).domain(AlertDomain.CLUSTER).name("Disk warning")
+                .metric("broker.disk.usage_ratio").threshold(85).channels(List.of("dingtalk"))
+                .notificationTemplate("${ruleName}: ${value}${thresholdUnit} on ${instanceId}").build();
+        SystemAlertVO alert = SystemAlertVO.builder().id(9L).title("Disk warning").instanceId("local")
+                .currentValue(86.0).labels(java.util.Map.of()).time(LocalDateTime.now()).build();
+        AlertSilenceService silences = mock(AlertSilenceService.class);
+        when(silences.activeUntil(rule, "local", java.util.Map.of(), alert.getTime())).thenReturn(null);
+
+        new NotificationOutboxService(mapper, mock(SettingsRepository.class), silences,
+                mock(AlertRepository.class), mock(OperationAuditService.class)).enqueue(alert, rule);
+
+        org.mockito.ArgumentCaptor<RmqAlertNotificationOutbox> row =
+                org.mockito.ArgumentCaptor.forClass(RmqAlertNotificationOutbox.class);
+        verify(mapper).insert(row.capture());
+        assertThat(row.getValue().getMessageContent()).isEqualTo("Disk warning: 86.0 on local");
+    }
+
+    @Test
     void defersDeliveryUntilTheActiveSilenceEnds() {
         RmqAlertNotificationOutboxMapper mapper = mock(RmqAlertNotificationOutboxMapper.class);
         AlertSilenceService silences = mock(AlertSilenceService.class);

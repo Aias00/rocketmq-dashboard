@@ -62,4 +62,6 @@ public class AlertRuleVO {
     private int consecutiveSamples = 1;
     @Builder.Default
     private String reminderInterval = "30m";
+    /** Optional per-rule notification body template. */
+    private String notificationTemplate;
 }
