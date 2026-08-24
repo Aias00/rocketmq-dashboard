@@ -52,11 +52,38 @@ class NativeAlertRuleTestServiceTest {
             assertThat(sample.labels()).containsEntry("consumerGroup", "orders");
             assertThat(sample.currentValue()).isEqualTo(20);
             assertThat(sample.conditionMet()).isTrue();
+            assertThat(sample.unavailableReason()).isNull();
+        });
+    }
+
+    @Test
+    void excludesSamplesForOtherMetricsFromTheTestResult() {
+        InstanceRepository instances = mock(InstanceRepository.class);
+        BusinessMetricsCollector collector = mock(BusinessMetricsCollector.class);
+        InstanceVO instance = InstanceVO.builder().name("local").build();
+        when(instances.findByIdentifier("local")).thenReturn(Optional.of(instance));
+        when(collector.supports(instance)).thenReturn(true);
+        when(collector.collect(instance)).thenReturn(List.of(
+                sample("consumer.lag.total", "orders", 20),
+                sample("consumer.delay.seconds", "orders", 5)));
+        AlertRuleVO rule = AlertRuleVO.builder().domain(AlertDomain.BUSINESS).metric("consumer.lag.total")
+                .instanceId("local").consumerGroup("orders").operator(">").threshold(10).build();
+
+        AlertRuleTestResultVO result = new NativeAlertRuleTestService(instances, List.of(), List.of(collector),
+                new AlertRuleEvaluator()).test(rule);
+
+        assertThat(result.samples()).singleElement().satisfies(sample -> {
+            assertThat(sample.currentValue()).isEqualTo(20);
+            assertThat(sample.conditionMet()).isTrue();
         });
     }
 
     private static MetricSample sample(String group, double value) {
-        return new MetricSample("consumer.lag.total", AlertDomain.BUSINESS, "local", null,
+        return sample("consumer.lag.total", group, value);
+    }
+
+    private static MetricSample sample(String metric, String group, double value) {
+        return new MetricSample(metric, AlertDomain.BUSINESS, "local", null,
                 Map.of("consumerGroup", group), value, MetricAvailability.AVAILABLE, Instant.now());
     }
 }

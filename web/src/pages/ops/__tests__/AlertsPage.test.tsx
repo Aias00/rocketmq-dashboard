@@ -192,6 +192,19 @@ describe('AlertsPage', () => {
     expect(screen.queryByText('UNAVAILABLE 0null')).not.toBeInTheDocument();
   });
 
+  it('renders rule configuration labels in English', async () => {
+    localStorage.setItem(LANGUAGE_STORAGE_KEY, 'en');
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: 'New Rule' }));
+
+    expect(screen.getByRole('button', { name: 'Test Run' })).toBeInTheDocument();
+    expect(screen.getByText('Window aggregation')).toBeInTheDocument();
+    expect(screen.getByText('Consecutive samples')).toBeInTheDocument();
+    expect(screen.queryByText('窗口聚合')).not.toBeInTheDocument();
+  });
+
   it('formats the last triggered timestamp instead of rendering the raw ISO value', async () => {
     const lastTriggered = '2026-08-23T10:35:38.590731';
     vi.mocked(listAlertRules).mockResolvedValue([{ ...cloneRule(alertRules[0]), lastTriggered }]);

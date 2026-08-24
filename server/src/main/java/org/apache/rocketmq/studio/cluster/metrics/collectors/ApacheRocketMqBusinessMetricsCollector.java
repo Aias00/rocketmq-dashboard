@@ -68,10 +68,14 @@ public class ApacheRocketMqBusinessMetricsCollector implements BusinessMetricsCo
                 }
                 if (!group.isConsumeStatsAvailable()) {
                     Map<String, String> labels = Map.of("consumerGroup", group.getName());
-                    samples.add(unavailable(CONSUMER_LAG_TOTAL, instance, labels, collectedAt));
-                    samples.add(unavailable(CONSUMER_LAG_MAX_QUEUE, instance, labels, collectedAt));
-                    samples.add(unavailable(CONSUMER_DELAY_SECONDS, instance, labels, collectedAt));
-                    samples.add(unavailable(TOPIC_BACKLOG_TOTAL, instance, labels, collectedAt));
+                    samples.add(unavailable(CONSUMER_LAG_TOTAL, instance, labels, collectedAt,
+                            "CONSUMER_STATS_UNAVAILABLE"));
+                    samples.add(unavailable(CONSUMER_LAG_MAX_QUEUE, instance, labels, collectedAt,
+                            "CONSUMER_STATS_UNAVAILABLE"));
+                    samples.add(unavailable(CONSUMER_DELAY_SECONDS, instance, labels, collectedAt,
+                            "CONSUMER_STATS_UNAVAILABLE"));
+                    samples.add(unavailable(TOPIC_BACKLOG_TOTAL, instance, labels, collectedAt,
+                            "CONSUMER_STATS_UNAVAILABLE"));
                     continue;
                 }
                 samples.add(totalLagSample(instance, group, collectedAt));
@@ -83,10 +87,14 @@ public class ApacheRocketMqBusinessMetricsCollector implements BusinessMetricsCo
             return samples;
         } catch (RuntimeException error) {
             log.warn("Failed to collect consumer lag for instance {}: {}", instance.getName(), error.getMessage());
-            return List.of(unavailable(CONSUMER_LAG_TOTAL, instance, Map.of(), collectedAt),
-                    unavailable(CONSUMER_LAG_MAX_QUEUE, instance, Map.of(), collectedAt),
-                    unavailable(CONSUMER_DELAY_SECONDS, instance, Map.of(), collectedAt),
-                    unavailable(TOPIC_BACKLOG_TOTAL, instance, Map.of(), collectedAt));
+            return List.of(unavailable(CONSUMER_LAG_TOTAL, instance, Map.of(), collectedAt,
+                    "BUSINESS_METRICS_COLLECTION_FAILED"),
+                    unavailable(CONSUMER_LAG_MAX_QUEUE, instance, Map.of(), collectedAt,
+                            "BUSINESS_METRICS_COLLECTION_FAILED"),
+                    unavailable(CONSUMER_DELAY_SECONDS, instance, Map.of(), collectedAt,
+                            "BUSINESS_METRICS_COLLECTION_FAILED"),
+                    unavailable(TOPIC_BACKLOG_TOTAL, instance, Map.of(), collectedAt,
+                            "BUSINESS_METRICS_COLLECTION_FAILED"));
         }
     }
 
@@ -123,14 +131,16 @@ public class ApacheRocketMqBusinessMetricsCollector implements BusinessMetricsCo
         } catch (RuntimeException error) {
             log.warn("Failed to collect queue lag for group {} on instance {}: {}", group.getName(),
                     instance.getName(), error.getMessage());
-            return List.of(unavailable(CONSUMER_LAG_MAX_QUEUE, instance, labels, collectedAt),
-                    unavailable(TOPIC_BACKLOG_TOTAL, instance, labels, collectedAt));
+            return List.of(unavailable(CONSUMER_LAG_MAX_QUEUE, instance, labels, collectedAt,
+                    "CONSUMER_PROGRESS_UNAVAILABLE"),
+                    unavailable(TOPIC_BACKLOG_TOTAL, instance, labels, collectedAt,
+                            "CONSUMER_PROGRESS_UNAVAILABLE"));
         }
     }
 
     private static MetricSample unavailable(String metric, InstanceVO instance, Map<String, String> labels,
-            Instant collectedAt) {
+            Instant collectedAt, String reason) {
         return new MetricSample(metric, AlertDomain.BUSINESS, instance.getName(), null, labels, null,
-                MetricAvailability.UNAVAILABLE, collectedAt);
+                MetricAvailability.UNAVAILABLE, collectedAt, reason);
     }
 }

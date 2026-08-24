@@ -48,6 +48,7 @@ export interface AlertRuleTestResult {
   samples: Array<{
     labels: Record<string, string>;
     availability: string;
+    unavailableReason?: string | null;
     currentValue: number | null;
     conditionMet: boolean;
   }>;

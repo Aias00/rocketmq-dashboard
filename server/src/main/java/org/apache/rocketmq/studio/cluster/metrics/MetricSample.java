@@ -34,7 +34,13 @@ public record MetricSample(
         Map<String, String> labels,
         Double value,
         MetricAvailability availability,
-        Instant collectedAt) {
+        Instant collectedAt,
+        String unavailableReason) {
+
+    public MetricSample(String metricKey, AlertDomain domain, String instanceId, String clusterId,
+            Map<String, String> labels, Double value, MetricAvailability availability, Instant collectedAt) {
+        this(metricKey, domain, instanceId, clusterId, labels, value, availability, collectedAt, null);
+    }
 
     public MetricSample {
         requireText(metricKey, "metricKey");
@@ -48,6 +54,9 @@ public record MetricSample(
         }
         if (availability == MetricAvailability.AVAILABLE && value == null) {
             throw new IllegalArgumentException("Available metric samples require a value");
+        }
+        if (availability == MetricAvailability.AVAILABLE && unavailableReason != null) {
+            throw new IllegalArgumentException("Available metric samples cannot have an unavailable reason");
         }
     }
 

@@ -61,19 +61,26 @@ import { buildCsv, downloadCsv, type CsvColumn } from '../../utils/download';
 const { Text } = Typography;
 
 const normalizeAlertLevel = (level?: string | null) => (level ?? '').toLowerCase();
-const formatAlertTransition = (transition?: SystemAlert['transition']) => {
-  if (transition === 'FIRING') return '触发中';
-  if (transition === 'RESOLVED') return '已恢复';
+const formatAlertTransition = (
+  transition: SystemAlert['transition'] | undefined,
+  firingLabel: string,
+  resolvedLabel: string,
+) => {
+  if (transition === 'FIRING') return firingLabel;
+  if (transition === 'RESOLVED') return resolvedLabel;
   return transition;
 };
 
-const parseSilenceLabels = (value?: string): Record<string, string> | undefined => {
+const parseSilenceLabels = (
+  value: string | undefined,
+  invalidMessage: string,
+): Record<string, string> | undefined => {
   if (!value?.trim()) return undefined;
   const labels: Record<string, string> = {};
   for (const pair of value.split(',')) {
     const separator = pair.indexOf('=');
     if (separator <= 0 || !pair.slice(separator + 1).trim()) {
-      throw new Error('标签格式应为 key=value，并以逗号分隔');
+      throw new Error(invalidMessage);
     }
     labels[pair.slice(0, separator).trim()] = pair.slice(separator + 1).trim();
   }
@@ -185,7 +192,7 @@ const SystemAlertsPage = () => {
         }
       })
       .catch(() => {
-        if (!cancelled) message.error('系统告警加载失败，请稍后重试');
+        if (!cancelled) message.error(t('sysAlerts.loadFailed'));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -221,7 +228,7 @@ const SystemAlertsPage = () => {
       setAlerts((prev) => prev.map((a) => (a.id === id ? { ...a, acknowledged: true } : a)));
       message.success(t('sysAlerts.acknowledged'));
     } catch {
-      message.error('确认告警失败，请稍后重试');
+      message.error(t('sysAlerts.acknowledgeFailed'));
     } finally {
       setAcknowledgingIds((current) => {
         const next = new Set(current);
@@ -239,7 +246,7 @@ const SystemAlertsPage = () => {
       else setPage(1);
       message.success(t('sysAlerts.cleared'));
     } catch {
-      message.error('清理已确认告警失败，请稍后重试');
+      message.error(t('sysAlerts.clearFailed'));
     } finally {
       setClearing(false);
     }
@@ -259,9 +266,9 @@ const SystemAlertsPage = () => {
         `rocketmq-system-alerts-${new Date().toISOString().slice(0, 10)}.csv`,
         buildCsv(ALERT_EXPORT_COLUMNS, rows),
       );
-      message.success(`已导出 ${rows.length} 条告警事件`);
+      message.success(t('sysAlerts.exportSuccess', { count: rows.length }));
     } catch {
-      message.error('告警事件导出失败，请稍后重试');
+      message.error(t('sysAlerts.exportFailed'));
     } finally {
       setExporting(false);
     }
@@ -274,7 +281,7 @@ const SystemAlertsPage = () => {
       const result = await listAlertDeliveries(alertId);
       setDeliveries((current) => ({ ...current, [alertId]: result }));
     } catch {
-      message.error('通知投递记录加载失败，请稍后重试');
+      message.error(t('sysAlerts.deliveryLoadFailed'));
     } finally {
       setLoadingDeliveries((current) => {
         const next = new Set(current);
@@ -291,7 +298,7 @@ const SystemAlertsPage = () => {
       const result = await listRelatedSystemAlerts(alertId);
       setRelatedAlerts((current) => ({ ...current, [alertId]: result }));
     } catch {
-      message.error('关联事件加载失败，请稍后重试');
+      message.error(t('sysAlerts.relatedLoadFailed'));
     } finally {
       setLoadingRelatedIds((current) => {
         const next = new Set(current);
@@ -306,9 +313,9 @@ const SystemAlertsPage = () => {
     try {
       await retryAlertDelivery(deliveryId);
       await loadDeliveries(alertId, true);
-      message.success('已加入重新投递队列');
+      message.success(t('deliveries.retryQueued'));
     } catch {
-      message.error('重新投递失败，请稍后重试');
+      message.error(t('deliveries.retryFailed'));
     } finally {
       setRetryingDeliveryIds((current) => {
         const next = new Set(current);
@@ -323,7 +330,7 @@ const SystemAlertsPage = () => {
     try {
       setSilences(await listAlertSilences());
     } catch {
-      message.error('维护窗口加载失败，请稍后重试');
+      message.error(t('sysAlerts.silenceLoadFailed'));
     } finally {
       setLoadingSilences(false);
     }
@@ -358,14 +365,14 @@ const SystemAlertsPage = () => {
         reason: values.reason,
         ruleId: values.ruleId ? Number(values.ruleId) : undefined,
         domain: values.domain || undefined,
-        labels: parseSilenceLabels(values.labelsText),
+        labels: parseSilenceLabels(values.labelsText, t('sysAlerts.labelsFormatInvalid')),
       };
       await createAlertSilence(request);
       silenceForm.resetFields();
       await loadSilences();
-      message.success('维护窗口已创建');
+      message.success(t('sysAlerts.silenceCreated'));
     } catch {
-      message.error('维护窗口创建失败，请检查时间范围');
+      message.error(t('sysAlerts.silenceCreateFailed'));
     } finally {
       setSavingSilence(false);
     }
@@ -376,9 +383,9 @@ const SystemAlertsPage = () => {
     try {
       await deleteAlertSilence(id);
       await loadSilences();
-      message.success('维护窗口已结束');
+      message.success(t('sysAlerts.silenceEnded'));
     } catch {
-      message.error('维护窗口结束失败，请稍后重试');
+      message.error(t('sysAlerts.silenceEndFailed'));
     } finally {
       setDeletingSilenceId(null);
     }
@@ -396,9 +403,9 @@ const SystemAlertsPage = () => {
               onClick={() => void exportAlerts()}
               loading={exporting}
             >
-              导出 CSV
+              {t('sysAlerts.exportCsv')}
             </Button>
-            <Button onClick={openSilences}>维护窗口</Button>
+            <Button onClick={openSilences}>{t('sysAlerts.maintenanceWindows')}</Button>
             <Button
               icon={<Trash size={14} />}
               onClick={handleClearAcked}
@@ -446,14 +453,14 @@ const SystemAlertsPage = () => {
           }}
           options={[
             { value: 'all', label: t('common.all') },
-            { value: 'BUSINESS', label: '业务告警' },
-            { value: 'CLUSTER', label: '集群告警' },
+            { value: 'BUSINESS', label: t('sysAlerts.business') },
+            { value: 'CLUSTER', label: t('sysAlerts.cluster') },
           ]}
         />
         <Input
-          aria-label="实例 ID 筛选"
+          aria-label={t('sysAlerts.instanceFilter')}
           size="small"
-          placeholder="实例 ID"
+          placeholder={t('sysAlerts.instanceId')}
           style={{ width: 150 }}
           value={instanceFilter}
           onChange={(event) => {
@@ -462,9 +469,9 @@ const SystemAlertsPage = () => {
           }}
         />
         <Input
-          aria-label="资源标签筛选"
+          aria-label={t('sysAlerts.labelsFilter')}
           size="small"
-          placeholder="标签 key=value"
+          placeholder={t('sysAlerts.labelsPlaceholder')}
           style={{ width: 190 }}
           value={labelFilter}
           onChange={(event) => {
@@ -473,7 +480,7 @@ const SystemAlertsPage = () => {
           }}
         />
         <Input
-          aria-label="开始时间筛选"
+          aria-label={t('sysAlerts.startTimeFilter')}
           type="datetime-local"
           size="small"
           style={{ width: 190 }}
@@ -484,7 +491,7 @@ const SystemAlertsPage = () => {
           }}
         />
         <Input
-          aria-label="结束时间筛选"
+          aria-label={t('sysAlerts.endTimeFilter')}
           type="datetime-local"
           size="small"
           style={{ width: 190 }}
@@ -503,13 +510,13 @@ const SystemAlertsPage = () => {
             setPage(1);
           }}
           options={[
-            { value: 'all', label: '全部状态' },
-            { value: 'FIRING', label: '触发中' },
-            { value: 'RESOLVED', label: '已恢复' },
+            { value: 'all', label: t('sysAlerts.allStatuses') },
+            { value: 'FIRING', label: t('sysAlerts.firing') },
+            { value: 'RESOLVED', label: t('sysAlerts.resolved') },
           ]}
         />
         <Select
-          aria-label="通知抑制筛选"
+          aria-label={t('sysAlerts.suppressionFilter')}
           value={suppressionFilter}
           size="small"
           style={{ minWidth: 132 }}
@@ -518,12 +525,12 @@ const SystemAlertsPage = () => {
             setPage(1);
           }}
           options={[
-            { value: 'all', label: '全部投递状态' },
-            { value: 'suppressed', label: '通知已抑制' },
-            { value: 'delivered', label: '未被抑制' },
+            { value: 'all', label: t('sysAlerts.allDeliveryStatuses') },
+            { value: 'suppressed', label: t('sysAlerts.notificationSuppressed') },
+            { value: 'delivered', label: t('sysAlerts.notificationNotSuppressed') },
           ]}
         />
-        {collectorStatus && <Tag color="success">原生采集已启用</Tag>}
+        {collectorStatus && <Tag color="success">{t('sysAlerts.nativeCollectionEnabled')}</Tag>}
       </Flex>
 
       <Flex vertical gap={12}>
@@ -571,11 +578,23 @@ const SystemAlertsPage = () => {
                     </Tag>
                     {alert.domain && (
                       <Tag color={alert.domain === 'CLUSTER' ? 'geekblue' : 'green'}>
-                        {alert.domain === 'CLUSTER' ? '集群' : '业务'}
+                        {alert.domain === 'CLUSTER'
+                          ? t('sysAlerts.domainCluster')
+                          : t('sysAlerts.domainBusiness')}
                       </Tag>
                     )}
-                    {alert.transition && <Tag>{formatAlertTransition(alert.transition)}</Tag>}
-                    {alert.notificationSuppressed && <Tag color="gold">通知已抑制</Tag>}
+                    {alert.transition && (
+                      <Tag>
+                        {formatAlertTransition(
+                          alert.transition,
+                          t('sysAlerts.firing'),
+                          t('sysAlerts.resolved'),
+                        )}
+                      </Tag>
+                    )}
+                    {alert.notificationSuppressed && (
+                      <Tag color="gold">{t('sysAlerts.notificationSuppressed')}</Tag>
+                    )}
                   </Flex>
                   <Text type="secondary" style={{ fontSize: 14 }}>
                     {alert.description}
@@ -588,13 +607,13 @@ const SystemAlertsPage = () => {
                   )}
                   {alert.acknowledgedAt && (
                     <Text type="secondary" style={{ display: 'block', fontSize: 12 }}>
-                      确认：{alert.acknowledgedBy ?? 'system'} ·{' '}
+                      {t('sysAlerts.acknowledgedBy', { user: alert.acknowledgedBy ?? 'system' })} ·{' '}
                       {formatUtcDateTime(alert.acknowledgedAt)}
                     </Text>
                   )}
                   {alert.notificationSuppressed && (
                     <Text type="warning" style={{ display: 'block', fontSize: 12 }}>
-                      {alert.suppressionReason || '通知已由上游集群故障抑制'}
+                      {alert.suppressionReason || t('sysAlerts.suppressedByUpstream')}
                     </Text>
                   )}
                   {alert.labels && Object.keys(alert.labels).length > 0 && (
@@ -612,19 +631,27 @@ const SystemAlertsPage = () => {
                   {relatedAlerts[alert.id] && (
                     <Flex vertical gap={4} style={{ marginTop: 8 }}>
                       <Text strong style={{ fontSize: 12 }}>
-                        可能根因/影响
+                        {t('sysAlerts.rootCauseImpact')}
                       </Text>
                       {relatedAlerts[alert.id].length === 0 && (
-                        <Text type="secondary">暂无跨域关联事件</Text>
+                        <Text type="secondary">{t('sysAlerts.noRelatedEvents')}</Text>
                       )}
                       {relatedAlerts[alert.id].map((related) => (
                         <Flex key={related.id} gap={6} align="center" wrap="wrap">
                           <Tag color={related.domain === 'CLUSTER' ? 'geekblue' : 'green'}>
-                            {related.domain === 'CLUSTER' ? '集群' : '业务'}
+                            {related.domain === 'CLUSTER'
+                              ? t('sysAlerts.domainCluster')
+                              : t('sysAlerts.domainBusiness')}
                           </Tag>
                           <Text>{related.title}</Text>
                           {related.transition && (
-                            <Tag>{formatAlertTransition(related.transition)}</Tag>
+                            <Tag>
+                              {formatAlertTransition(
+                                related.transition,
+                                t('sysAlerts.firing'),
+                                t('sysAlerts.resolved'),
+                              )}
+                            </Tag>
                           )}
                           <Text type="secondary" style={{ fontSize: 12 }}>
                             {formatUtcDateTime(related.time)}
@@ -639,10 +666,10 @@ const SystemAlertsPage = () => {
                       {deliveries[alert.id].length === 0 && (
                         <Text type="secondary">
                           {alert.notificationSuppressed
-                            ? alert.suppressionReason || '通知已由上游集群故障抑制'
+                            ? alert.suppressionReason || t('sysAlerts.suppressedByUpstream')
                             : alert.ruleId == null
-                              ? '无通知投递记录'
-                              : '未配置通知通道'}
+                              ? t('sysAlerts.noDeliveryRecords')
+                              : t('sysAlerts.noChannels')}
                         </Text>
                       )}
                       {deliveries[alert.id].map((delivery) => (
@@ -666,7 +693,7 @@ const SystemAlertsPage = () => {
                                 onClick={() => void handleRetryDelivery(alert.id, delivery.id)}
                                 loading={retryingDeliveryIds.has(delivery.id)}
                               >
-                                重新投递
+                                {t('deliveries.retry')}
                               </Button>
                             )}
                           </Flex>
@@ -694,10 +721,10 @@ const SystemAlertsPage = () => {
                     {formatUtcDateTime(alert.time)}
                   </Text>
                   <Button size="small" type="link" onClick={() => void loadDeliveries(alert.id)}>
-                    投递记录
+                    {t('sysAlerts.deliveryRecords')}
                   </Button>
                   <Button size="small" type="link" onClick={() => void loadRelatedAlerts(alert.id)}>
-                    关联事件
+                    {t('sysAlerts.relatedEvents')}
                   </Button>
                   {alert.suppressionCauseAlertId && (
                     <Button
@@ -705,7 +732,7 @@ const SystemAlertsPage = () => {
                       type="link"
                       onClick={() => void loadRelatedAlerts(alert.id)}
                     >
-                      查看根因
+                      {t('sysAlerts.viewRootCause')}
                     </Button>
                   )}
                   {!alert.acknowledged && alert.transition !== 'RESOLVED' && (
@@ -742,11 +769,11 @@ const SystemAlertsPage = () => {
         />
       )}
       <Modal
-        title="维护窗口"
+        title={t('sysAlerts.maintenanceWindows')}
         open={silencesVisible}
         onCancel={() => setSilencesVisible(false)}
         onOk={() => void createSilence()}
-        okText="创建"
+        okText={t('sysAlerts.create')}
         okButtonProps={{ style: { display: canManageSilences ? undefined : 'none' } }}
         confirmLoading={savingSilence}
         width={680}
@@ -754,51 +781,51 @@ const SystemAlertsPage = () => {
         {canManageSilences && (
           <Form form={silenceForm} layout="vertical" initialValues={{ domain: 'BUSINESS' }}>
             <Flex gap={8}>
-              <Form.Item name="domain" label="告警域" style={{ flex: 1 }}>
+              <Form.Item name="domain" label={t('sysAlerts.domain')} style={{ flex: 1 }}>
                 <Select
                   options={[
-                    { value: 'BUSINESS', label: '业务告警' },
-                    { value: 'CLUSTER', label: '集群告警' },
+                    { value: 'BUSINESS', label: t('sysAlerts.business') },
+                    { value: 'CLUSTER', label: t('sysAlerts.cluster') },
                   ]}
                 />
               </Form.Item>
               <Form.Item
                 name="ruleId"
-                label="规则 ID"
+                label={t('sysAlerts.ruleId')}
                 style={{ flex: 1 }}
-                rules={[{ pattern: /^\d+$/, message: '请输入有效的规则 ID' }]}
+                rules={[{ pattern: /^\d+$/, message: t('sysAlerts.validRuleIdRequired') }]}
               >
                 <Input inputMode="numeric" />
               </Form.Item>
-              <Form.Item name="instanceId" label="实例 ID" style={{ flex: 1 }}>
+              <Form.Item name="instanceId" label={t('sysAlerts.instanceId')} style={{ flex: 1 }}>
                 <Input />
               </Form.Item>
             </Flex>
             <Flex gap={8}>
               <Form.Item
                 name="startsAt"
-                label="开始时间"
-                rules={[{ required: true, message: '请选择开始时间' }]}
+                label={t('sysAlerts.startTime')}
+                rules={[{ required: true, message: t('sysAlerts.startTimeRequired') }]}
                 style={{ flex: 1 }}
               >
                 <Input type="datetime-local" />
               </Form.Item>
               <Form.Item
                 name="endsAt"
-                label="结束时间"
-                rules={[{ required: true, message: '请选择结束时间' }]}
+                label={t('sysAlerts.endTime')}
+                rules={[{ required: true, message: t('sysAlerts.endTimeRequired') }]}
                 style={{ flex: 1 }}
               >
                 <Input type="datetime-local" />
               </Form.Item>
             </Flex>
-            <Form.Item name="reason" label="原因">
+            <Form.Item name="reason" label={t('sysAlerts.reason')}>
               <Input maxLength={512} />
             </Form.Item>
             <Form.Item
               name="labelsText"
-              label="标签范围"
-              extra="可选，格式：brokerName=broker-a,topic=orders"
+              label={t('sysAlerts.labelScope')}
+              extra={t('sysAlerts.labelScopeHelp')}
             >
               <Input />
             </Form.Item>
@@ -806,12 +833,15 @@ const SystemAlertsPage = () => {
         )}
         <Spin spinning={loadingSilences}>
           <Flex vertical gap={6}>
-            {silences.length === 0 && <Text type="secondary">当前没有维护窗口</Text>}
+            {silences.length === 0 && (
+              <Text type="secondary">{t('sysAlerts.noMaintenanceWindows')}</Text>
+            )}
             {silences.map((silence) => (
               <Flex key={silence.id} justify="space-between" align="center" gap={8}>
                 <Text>
-                  {silence.domain ?? '全部'} · {silence.instanceId ?? '全部实例'} ·{' '}
-                  {silence.startsAt} - {silence.endsAt}
+                  {silence.domain ?? t('common.all')} ·{' '}
+                  {silence.instanceId ?? t('sysAlerts.allInstances')} · {silence.startsAt} -{' '}
+                  {silence.endsAt}
                   {silence.labels && Object.keys(silence.labels).length > 0
                     ? ` · ${Object.entries(silence.labels)
                         .map(([key, value]) => `${key}=${value}`)
@@ -825,7 +855,7 @@ const SystemAlertsPage = () => {
                     loading={deletingSilenceId === silence.id}
                     onClick={() => void deleteSilence(silence.id)}
                   >
-                    结束
+                    {t('sysAlerts.end')}
                   </Button>
                 )}
               </Flex>

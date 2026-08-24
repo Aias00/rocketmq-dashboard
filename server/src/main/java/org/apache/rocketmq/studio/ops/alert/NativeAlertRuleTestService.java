@@ -50,12 +50,14 @@ public class NativeAlertRuleTestService {
                     .forEach(collector -> samples.addAll(collector.collect(instance)));
         }
         return AlertRuleTestResultVO.builder().samples(samples.stream()
+                .filter(sample -> rule.getMetric().equals(sample.metricKey()))
                 .filter(sample -> NativeAlertRuleScopeMatcher.matches(rule, sample))
                 .map(sample -> {
                     AlertEvaluationResult evaluation = evaluator.evaluate(rule, sample);
                     return AlertRuleTestResultVO.Sample.builder().labels(sample.labels())
                             .availability(sample.availability().name()).currentValue(evaluation.currentValue())
-                            .conditionMet(evaluation.conditionMet()).build();
+                            .conditionMet(evaluation.conditionMet())
+                            .unavailableReason(sample.unavailableReason()).build();
                 }).toList()).build();
     }
 

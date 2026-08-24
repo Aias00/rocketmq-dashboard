@@ -24,6 +24,7 @@ import java.util.Map;
 @Builder
 public record AlertRuleTestResultVO(List<Sample> samples) {
     @Builder
-    public record Sample(Map<String, String> labels, String availability, Double currentValue, boolean conditionMet) {
+    public record Sample(Map<String, String> labels, String availability, Double currentValue, boolean conditionMet,
+            String unavailableReason) {
     }
 }

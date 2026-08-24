@@ -104,6 +104,7 @@ class ApacheRocketMqBusinessMetricsCollectorTest {
                 .allSatisfy(sample -> {
                     assertThat(sample.availability()).isEqualTo(MetricAvailability.UNAVAILABLE);
                     assertThat(sample.value()).isNull();
+                    assertThat(sample.unavailableReason()).isEqualTo("BUSINESS_METRICS_COLLECTION_FAILED");
                 });
     }
 
@@ -123,6 +124,7 @@ class ApacheRocketMqBusinessMetricsCollectorTest {
             assertThat(sample.availability()).isEqualTo(MetricAvailability.UNAVAILABLE);
             assertThat(sample.value()).isNull();
             assertThat(sample.labels()).containsEntry("consumerGroup", "orders");
+            assertThat(sample.unavailableReason()).isEqualTo("CONSUMER_STATS_UNAVAILABLE");
         });
     }
 

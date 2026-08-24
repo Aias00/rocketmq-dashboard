@@ -32,6 +32,7 @@ import {
   Flex,
   message,
   Popconfirm,
+  Typography,
   theme,
 } from 'antd';
 import type { ColumnsType, TableRowSelection } from 'antd/es/table/interface';
@@ -123,9 +124,12 @@ const legacyMetricTranslationKeys: Record<string, string> = {
 export const supportsUnavailableOperator = (metric?: string): boolean =>
   metric != null && availabilityMetrics.has(metric);
 
-export const formatThresholdCondition = (rule: AlertRule): string => {
+export const formatThresholdCondition = (
+  rule: AlertRule,
+  unavailableLabel = 'Unavailable',
+): string => {
   if (rule.operator === 'UNAVAILABLE') {
-    return '指标不可用时触发';
+    return unavailableLabel;
   }
   if (nativeRatioMetrics.has(rule.metric) && !rule.thresholdUnit) {
     return `${rule.operator} ${rule.threshold * 100}%`;
@@ -169,6 +173,23 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
     selectedMetricIsRatio || selectedThresholdUnit === '%' || selectedThresholdUnit === 'ratio';
   const thresholdUnitSuffix = selectedThresholdUnit === 'ratio' ? '%' : selectedThresholdUnit;
 
+  const thresholdUnitLabel = (unit?: string | null) => {
+    if (unit === 'messages') return t('alerts.unitMessages');
+    if (unit === 'seconds') return t('alerts.unitSeconds');
+    if (unit === 'ratio') return t('alerts.unitRatio');
+    return unit;
+  };
+
+  const unavailableReasonLabel = (reason?: string | null) => {
+    if (reason === 'CONSUMER_STATS_UNAVAILABLE') return t('alerts.reasonConsumerStatsUnavailable');
+    if (reason === 'CONSUMER_PROGRESS_UNAVAILABLE')
+      return t('alerts.reasonConsumerProgressUnavailable');
+    if (reason === 'BUSINESS_METRICS_COLLECTION_FAILED') {
+      return t('alerts.reasonBusinessCollectionFailed');
+    }
+    return t('alerts.reasonUnknownUnavailable');
+  };
+
   const metricLabel = (metric: string, fallback = metric) => {
     const key = nativeMetricTranslationKeys[metric] ?? legacyMetricTranslationKeys[metric];
     if (!key) return fallback;
@@ -190,7 +211,7 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
         if (!cancelled) setRules(nextRules);
       })
       .catch(() => {
-        if (!cancelled) message.error('告警规则加载失败，请稍后重试');
+        if (!cancelled) message.error(t('alerts.ruleLoadFailed'));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -207,7 +228,7 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
   useEffect(() => {
     void listInstances()
       .then(setInstances)
-      .catch(() => message.error('RocketMQ 实例加载失败，请稍后重试'));
+      .catch(() => message.error(t('alerts.instanceLoadFailed')));
   }, []);
 
   const enabledCount = rules.filter((r) => r.enabled).length;
@@ -286,10 +307,10 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
       ) {
         form.setFieldValue('threshold', Number(form.getFieldValue('threshold')) * 100);
       }
-      if (metrics.length === 0) message.warning('该实例暂不支持原生告警指标');
+      if (metrics.length === 0) message.warning(t('alerts.metricUnavailable'));
     } catch {
       if (requestVersion === metricRequestVersion.current) {
-        message.error('告警指标能力加载失败，请检查 RocketMQ 实例');
+        message.error(t('alerts.metricLoadFailed'));
       }
     } finally {
       if (requestVersion === metricRequestVersion.current) setMetricLoading(false);
@@ -313,7 +334,7 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
     setTestResult(null);
     setSelectedInstanceId(rule.instanceId);
     const { id: _id, lastTriggered: _lastTriggered, ...copy } = rule;
-    form.setFieldsValue({ ...copy, name: `${rule.name} - 副本` });
+    form.setFieldsValue({ ...copy, name: t('alerts.duplicateName', { name: rule.name }) });
     if (rule.instanceId?.trim()) {
       void loadMetricCapabilities(rule.instanceId, false);
     } else {
@@ -331,7 +352,7 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
         : toggleAlertRule(rule.id, enabled, domain));
       setRules((previous) => previous.map((item) => (item.id === rule.id ? updated : item)));
     } catch {
-      message.error('更新告警规则状态失败，请稍后重试');
+      message.error(t('alerts.ruleUpdateFailed'));
     } finally {
       setActionId(null);
     }
@@ -344,9 +365,9 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
       await (domain === 'CLUSTER' ? deleteAlertRule(rule.id) : deleteAlertRule(rule.id, domain));
       setRules((previous) => previous.filter((item) => item.id !== rule.id));
       setSelectedRuleIds((previous) => previous.filter((id) => id !== rule.id));
-      message.success('告警规则已删除');
+      message.success(t('alerts.ruleDeleted'));
     } catch {
-      message.error('删除告警规则失败，请稍后重试');
+      message.error(t('alerts.ruleDeleteFailed'));
     } finally {
       setActionId(null);
     }
@@ -455,7 +476,7 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
     {
       title: t('alerts.threshold'),
       sorter: (a, b) => (a.threshold ?? 0) - (b.threshold ?? 0),
-      render: (_, record) => formatThresholdCondition(record),
+      render: (_, record) => formatThresholdCondition(record, t('alerts.unavailableCondition')),
     },
     {
       title: t('alerts.duration'),
@@ -503,16 +524,21 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
         ),
     },
     {
-      title: '运行态',
+      title: t('alerts.runtime'),
       width: 130,
       render: (_, record) => {
         const states = runtime.filter((state) => state.ruleId === record.id);
-        if (!states.length) return <span style={{ color: '#999' }}>未采集</span>;
+        if (!states.length)
+          return <span style={{ color: '#999' }}>{t('alerts.notCollected')}</span>;
         const firing = states.filter((state) => state.status === 'FIRING').length;
         const pending = states.filter((state) => state.status === 'PENDING').length;
         return (
           <Tag color={firing ? 'error' : pending ? 'warning' : 'default'}>
-            {firing ? `触发 ${firing}` : pending ? `待定 ${pending}` : states[0].status}
+            {firing
+              ? t('alerts.firingCount', { count: firing })
+              : pending
+                ? t('alerts.pendingCount', { count: pending })
+                : states[0].status}
           </Tag>
         );
       },
@@ -536,7 +562,7 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
             disabled={isActionRunning}
             onClick={() => openDuplicateModal(record)}
           >
-            复制
+            {t('alerts.duplicate')}
           </Button>
           <Popconfirm
             title={t('common.areYouSureToDelete')}
@@ -575,7 +601,7 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
         setRules((previous) =>
           previous.map((rule) => (rule.id === editingRule.id ? updated : rule)),
         );
-        message.success('告警规则已更新');
+        message.success(t('alerts.ruleUpdated'));
       } else {
         const created = await (domain === 'CLUSTER'
           ? createAlertRule(payload)
@@ -589,7 +615,7 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
       if (error && typeof error === 'object' && 'errorFields' in error) {
         return; // validation failure; antd already shows field-level errors
       }
-      message.error('保存告警规则失败，请稍后重试');
+      message.error(t('alerts.ruleSaveFailed'));
     } finally {
       setSubmitting(false);
     }
@@ -608,7 +634,7 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
         : testAlertRule(payload, domain));
       setTestResult(result);
       if (result.samples.length === 0) {
-        message.warning('未采集到匹配样本，请检查实例和指标作用域');
+        message.warning(t('alerts.testNoSamples'));
         return;
       }
       const unavailable = result.samples.filter(
@@ -617,8 +643,8 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
       if (unavailable === result.samples.length) {
         message.warning(
           domain === 'BUSINESS'
-            ? `采集到 ${unavailable} 个样本，但均不可用。请确认该实例存在可查询消费进度的在线消费组。`
-            : `采集到 ${unavailable} 个样本，但均不可用。请检查实例连接和目标资源状态。`,
+            ? t('alerts.testAllBusinessUnavailable', { count: unavailable })
+            : t('alerts.testAllClusterUnavailable', { count: unavailable }),
         );
         return;
       }
@@ -627,14 +653,24 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
       const valuesSummary = result.samples
         .filter((sample) => sample.availability === 'AVAILABLE')
         .slice(0, 3)
-        .map((sample) => `${sample.currentValue}${sample.conditionMet ? '（命中）' : ''}`)
-        .join('，');
+        .map((sample) =>
+          sample.conditionMet
+            ? t('alerts.sampleMatched', { value: sample.currentValue ?? '-' })
+            : String(sample.currentValue ?? '-'),
+        )
+        .join(', ');
       message.info(
-        `采集到 ${result.samples.length} 个样本（可用 ${available}，不可用 ${unavailable}），${matched} 个命中：${valuesSummary}`,
+        t('alerts.testSampleSummary', {
+          total: result.samples.length,
+          available,
+          unavailable,
+          matched,
+          values: valuesSummary,
+        }),
       );
     } catch (error) {
       if (error && typeof error === 'object' && 'errorFields' in error) return;
-      message.error('规则试运行失败，请检查实例连接和指标配置');
+      message.error(t('alerts.testRunFailed'));
     } finally {
       setTesting(false);
     }
@@ -792,7 +828,7 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
         footer={
           <Flex justify="flex-end" gap={8}>
             <Button onClick={() => void handleTest()} loading={testing} disabled={submitting}>
-              试运行
+              {t('alerts.testRun')}
             </Button>
             <Button
               onClick={() => {
@@ -825,20 +861,20 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
             <Form.Item
               name="name"
               label={t('alerts.ruleName')}
-              rules={[{ required: true, message: '请输入规则名称' }]}
+              rules={[{ required: true, message: t('alerts.ruleNameRequired') }]}
               style={{ gridColumn: '1 / -1' }}
             >
-              <Input placeholder="请输入规则名称" />
+              <Input placeholder={t('alerts.ruleNamePlaceholder')} />
             </Form.Item>
 
             <Form.Item
               name="instanceId"
               label={t('alerts.instance')}
-              rules={[{ required: true, message: '请选择 RocketMQ 实例' }]}
-              extra="原生采集规则必须绑定一个受管 RocketMQ 实例。"
+              rules={[{ required: true, message: t('alerts.instanceRequired') }]}
+              extra={t('alerts.instanceBindingHelp')}
             >
               <Select
-                placeholder="请选择 RocketMQ 实例"
+                placeholder={t('alerts.instanceRequired')}
                 options={instances.map((instance) => ({
                   value: instance.name,
                   label: `${instance.name}${instance.vendor && instance.vendor !== 'APACHE' ? ` (${instance.vendor})` : ''}`,
@@ -854,10 +890,10 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
             <Form.Item
               name="metric"
               label={t('alerts.metric')}
-              rules={[{ required: true, message: '请选择监控指标' }]}
+              rules={[{ required: true, message: t('alerts.metricRequired') }]}
             >
               <Select
-                placeholder={metricLoading ? '正在加载监控指标' : '请选择监控指标'}
+                placeholder={metricLoading ? t('alerts.metricLoading') : t('alerts.metricRequired')}
                 options={metricOptions.map((metric) => ({
                   label: metricLabel(metric.key, metric.label),
                   value: metric.key,
@@ -884,17 +920,17 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
               <>
                 <Form.Item
                   name="consumerGroup"
-                  label="消费组（可选）"
-                  extra="留空时，对该实例中的所有消费组分别评估规则。"
+                  label={t('alerts.consumerGroupOptional')}
+                  extra={t('alerts.consumerGroupHelp')}
                 >
-                  <Input placeholder="例如 order-consumer" />
+                  <Input placeholder={t('alerts.consumerGroupPlaceholder')} />
                 </Form.Item>
                 <Form.Item
                   name="topic"
-                  label="Topic（可选）"
-                  extra="仅适用于 Topic backlog 指标；留空时匹配所有 Topic。"
+                  label={t('alerts.topicOptional')}
+                  extra={t('alerts.topicHelp')}
                 >
-                  <Input placeholder="例如 order-topic" />
+                  <Input placeholder={t('alerts.topicPlaceholder')} />
                 </Form.Item>
               </>
             )}
@@ -903,17 +939,17 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
               <>
                 <Form.Item
                   name="clusterName"
-                  label="集群（可选）"
-                  extra="留空或填写 * 时匹配该实例中的所有集群。"
+                  label={t('alerts.clusterOptional')}
+                  extra={t('alerts.clusterHelp')}
                 >
-                  <Input placeholder="例如 DefaultCluster" />
+                  <Input placeholder={t('alerts.clusterPlaceholder')} />
                 </Form.Item>
                 <Form.Item
                   name="brokerName"
-                  label="Broker（可选）"
-                  extra="留空或填写 * 时匹配所选集群中的所有 Broker。"
+                  label={t('alerts.brokerOptional')}
+                  extra={t('alerts.brokerHelp')}
                 >
-                  <Input placeholder="例如 broker-a" />
+                  <Input placeholder={t('alerts.brokerPlaceholder')} />
                 </Form.Item>
               </>
             )}
@@ -926,11 +962,11 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
                 <Form.Item
                   name="operator"
                   noStyle
-                  rules={[{ required: true, message: '请选择运算符' }]}
+                  rules={[{ required: true, message: t('alerts.operatorRequired') }]}
                 >
                   <Select
-                    aria-label="运算符"
-                    placeholder="运算符"
+                    aria-label={t('alerts.operatorPlaceholder')}
+                    placeholder={t('alerts.operatorPlaceholder')}
                     style={{ width: 100 }}
                     options={[
                       { label: '>', value: '>' },
@@ -938,7 +974,7 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
                       { label: '>=', value: '>=' },
                       { label: '<=', value: '<=' },
                       {
-                        label: '不可用',
+                        label: t('alerts.unavailable'),
                         value: 'UNAVAILABLE',
                         disabled: !supportsUnavailableCondition,
                       },
@@ -952,12 +988,12 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
                   <Form.Item
                     name="threshold"
                     noStyle
-                    rules={[{ required: true, message: '请输入阈值' }]}
+                    rules={[{ required: true, message: t('alerts.thresholdRequired') }]}
                   >
                     <InputNumber
-                      placeholder="阈值"
+                      placeholder={t('alerts.thresholdPlaceholder')}
                       style={{ flex: 1 }}
-                      addonAfter={thresholdUnitSuffix || undefined}
+                      addonAfter={thresholdUnitLabel(thresholdUnitSuffix) || undefined}
                       min={selectedMetricUsesPercentage ? 0 : undefined}
                       max={selectedMetricUsesPercentage ? 100 : undefined}
                       precision={selectedMetricUsesPercentage ? 2 : undefined}
@@ -965,19 +1001,19 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
                   </Form.Item>
                 )}
               </Flex>
-              {selectedOperator === 'UNAVAILABLE' && '采集到指标不可用状态时触发。'}
+              {selectedOperator === 'UNAVAILABLE' && t('alerts.unavailableConditionHelp')}
               {selectedOperator !== 'UNAVAILABLE' && selectedMetricUsesPercentage && (
-                <span>比例指标以百分比填写，例如 85 表示 85%。</span>
+                <span>{t('alerts.percentageHelp')}</span>
               )}
             </Form.Item>
 
             <Form.Item
               name="duration"
               label={t('alerts.duration')}
-              rules={[{ required: true, message: '请选择持续时间' }]}
+              rules={[{ required: true, message: t('alerts.durationRequired') }]}
             >
               <Select
-                placeholder="请选择持续时间"
+                placeholder={t('alerts.durationRequired')}
                 options={durationOptions.map((d) => ({ label: d, value: d }))}
               />
             </Form.Item>
@@ -989,7 +1025,7 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
               <Select options={reminderIntervalOptions.map((value) => ({ label: value, value }))} />
             </Form.Item>
 
-            <Form.Item name="aggregation" label="窗口聚合" initialValue="LAST">
+            <Form.Item name="aggregation" label={t('alerts.windowAggregation')} initialValue="LAST">
               <Select
                 options={['LAST', 'MAX', 'MIN', 'AVG', 'SUM'].map((value) => ({
                   label: value,
@@ -997,15 +1033,15 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
                 }))}
               />
             </Form.Item>
-            <Form.Item name="windowSeconds" label="窗口秒数" initialValue={0}>
+            <Form.Item name="windowSeconds" label={t('alerts.windowSeconds')} initialValue={0}>
               <InputNumber min={0} precision={0} style={{ width: '100%' }} />
             </Form.Item>
 
             <Form.Item
               name="consecutiveSamples"
-              label="连续采样次数"
+              label={t('alerts.consecutiveSamples')}
               initialValue={1}
-              rules={[{ required: true, message: '请输入连续采样次数' }]}
+              rules={[{ required: true, message: t('alerts.consecutiveSamplesRequired') }]}
             >
               <InputNumber min={1} precision={0} style={{ width: '100%' }} />
             </Form.Item>
@@ -1013,41 +1049,77 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
             {testResult && testResult.samples.length > 0 && (
               <div style={{ gridColumn: '1 / -1' }}>
                 <Table
-                  title={() => '规则试运行结果'}
+                  title={() => t('alerts.testResult')}
                   rowKey={({ labels, currentValue, availability }) =>
                     `${JSON.stringify(labels)}-${currentValue}-${availability}`
                   }
                   size="small"
                   pagination={false}
                   dataSource={testResult.samples}
+                  tableLayout="fixed"
+                  scroll={{ x: 800 }}
                   columns={[
                     {
-                      title: '标签',
+                      title: t('alerts.labels'),
                       dataIndex: 'labels',
-                      render: (labels: Record<string, string>) =>
-                        Object.entries(labels)
+                      width: 180,
+                      render: (labels: Record<string, string>) => {
+                        const labelText = Object.entries(labels)
                           .map(([key, value]) => `${key}=${value}`)
-                          .join(', '),
+                          .join(', ');
+                        return (
+                          <Typography.Text
+                            ellipsis={{ tooltip: labelText }}
+                            style={{ display: 'block' }}
+                          >
+                            {labelText}
+                          </Typography.Text>
+                        );
+                      },
                     },
                     {
-                      title: '采集状态',
+                      title: t('alerts.collectionStatus'),
                       dataIndex: 'availability',
+                      width: 110,
                       render: (availability: string) => (
                         <Tag color={availability === 'AVAILABLE' ? 'green' : 'orange'}>
-                          {availability}
+                          {availability === 'AVAILABLE'
+                            ? t('alerts.available')
+                            : t('alerts.unavailable')}
                         </Tag>
                       ),
                     },
                     {
-                      title: '当前值',
-                      dataIndex: 'currentValue',
-                      render: (value: number | null) => value ?? '不可用',
+                      title: t('alerts.unavailableReason'),
+                      dataIndex: 'unavailableReason',
+                      width: 270,
+                      render: (reason: string | null | undefined, sample) => {
+                        if (sample.availability === 'AVAILABLE') return '-';
+                        const reasonText = unavailableReasonLabel(reason);
+                        return (
+                          <Typography.Paragraph
+                            ellipsis={{ rows: 2, tooltip: reasonText }}
+                            style={{ margin: 0, overflowWrap: 'anywhere' }}
+                          >
+                            {reasonText}
+                          </Typography.Paragraph>
+                        );
+                      },
                     },
                     {
-                      title: '阈值命中',
+                      title: t('alerts.currentValue'),
+                      dataIndex: 'currentValue',
+                      width: 100,
+                      render: (value: number | null) => value ?? t('alerts.unavailable'),
+                    },
+                    {
+                      title: t('alerts.thresholdMatched'),
                       dataIndex: 'conditionMet',
+                      width: 105,
                       render: (matched: boolean) => (
-                        <Tag color={matched ? 'red' : 'green'}>{matched ? '命中' : '未命中'}</Tag>
+                        <Tag color={matched ? 'red' : 'green'}>
+                          {matched ? t('alerts.matched') : t('alerts.notMatched')}
+                        </Tag>
                       ),
                     },
                   ]}
@@ -1058,7 +1130,7 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
             <Form.Item
               name="channels"
               label={t('alerts.channels')}
-              rules={[{ required: true, message: '请选择通知渠道' }]}
+              rules={[{ required: true, message: t('alerts.channels') }]}
               style={{ gridColumn: '1 / -1' }}
             >
               <Checkbox.Group
@@ -1070,8 +1142,12 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
               />
             </Form.Item>
 
-            <Form.Item name="description" label="规则描述" style={{ gridColumn: '1 / -1' }}>
-              <TextArea placeholder="请输入规则描述" rows={3} />
+            <Form.Item
+              name="description"
+              label={t('alerts.ruleDescription')}
+              style={{ gridColumn: '1 / -1' }}
+            >
+              <TextArea placeholder={t('alerts.ruleDescriptionPlaceholder')} rows={3} />
             </Form.Item>
             <Form.Item
               name="notificationTemplate"

@@ -21,6 +21,7 @@ import userEvent from '@testing-library/user-event';
 import { App } from 'antd';
 import { getGeneralSettings, saveGeneralSettings } from '../../../api/settings';
 import { ThemeProvider } from '../../../theme/ThemeProvider';
+import { LangProvider } from '../../../i18n/LangContext';
 import { GeneralSettingsTab } from '../GeneralSettingsTab';
 
 beforeAll(() => {
@@ -52,9 +53,11 @@ vi.mock('../../../api/settings', () => ({
 const renderTab = () =>
   render(
     <App>
-      <ThemeProvider>
-        <GeneralSettingsTab />
-      </ThemeProvider>
+      <LangProvider>
+        <ThemeProvider>
+          <GeneralSettingsTab />
+        </ThemeProvider>
+      </LangProvider>
     </App>,
   );
 

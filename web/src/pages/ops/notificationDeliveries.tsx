@@ -71,7 +71,7 @@ const NotificationDeliveriesPage = () => {
     setRetryingIds((current) => new Set(current).add(record.id));
     try {
       await retryAlertDelivery(record.id);
-      message.success('已加入重新投递队列');
+      message.success(t('deliveries.retryQueued'));
       setSelectedDelivery((current) =>
         current?.id === record.id
           ? { ...current, status: 'PENDING', attemptCount: 0, lastError: null }
@@ -79,7 +79,7 @@ const NotificationDeliveriesPage = () => {
       );
       refresh();
     } catch {
-      message.error('重新投递失败，请稍后重试');
+      message.error(t('deliveries.retryFailed'));
     } finally {
       setRetryingIds((current) => {
         const next = new Set(current);
@@ -97,11 +97,14 @@ const NotificationDeliveriesPage = () => {
       const result = await retryAlertDeliveries(ids);
       const failed = Object.keys(result.failures).length;
       message.success(
-        `已将 ${result.succeededIds.length} 条记录加入重试队列${failed ? `，${failed} 条未重试` : ''}`,
+        t('deliveries.bulkRetryQueued', {
+          succeeded: result.succeededIds.length,
+          failed: failed ? t('deliveries.bulkRetryFailures', { count: failed }) : '',
+        }),
       );
       refresh();
     } catch {
-      message.error('批量重新投递失败，请稍后重试');
+      message.error(t('deliveries.bulkRetryFailed'));
     } finally {
       setRetryingVisible(false);
     }
@@ -203,12 +206,12 @@ const NotificationDeliveriesPage = () => {
             onClick={() => setSelectedDelivery(record)}
           />
           {record.status === 'FAILED' && (
-            <Tooltip title="重新投递">
+            <Tooltip title={t('deliveries.retry')}>
               <Button
                 type="text"
                 size="small"
                 icon={<ArrowClockwise size={18} />}
-                aria-label="重新投递"
+                aria-label={t('deliveries.retry')}
                 loading={retryingIds.has(record.id)}
                 onClick={() => void retryDelivery(record)}
               />
@@ -230,7 +233,7 @@ const NotificationDeliveriesPage = () => {
             loading={retryingVisible}
             onClick={() => void retryVisibleFailures()}
           >
-            重试当前页失败记录
+            {t('deliveries.retryCurrentPage')}
           </Button>
           <Select
             allowClear
@@ -329,7 +332,7 @@ const NotificationDeliveriesPage = () => {
                 loading={retryingIds.has(selectedDelivery.id)}
                 onClick={() => void retryDelivery(selectedDelivery)}
               >
-                重新投递
+                {t('deliveries.retry')}
               </Button>
             )}
             <div>
