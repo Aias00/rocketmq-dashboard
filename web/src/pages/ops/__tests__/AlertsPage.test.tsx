@@ -320,7 +320,7 @@ describe('AlertsPage', () => {
     expect((await screen.findAllByText('Broker 磁盘使用率')).length).toBeGreaterThan(1);
   });
 
-  it('edits a legacy business rule without requiring a Studio instance', async () => {
+  it('keeps the instance field visible while editing a legacy business rule', async () => {
     vi.mocked(listAlertRules).mockResolvedValue([
       {
         id: 99,
@@ -345,9 +345,9 @@ describe('AlertsPage', () => {
     expect(await screen.findByRole('textbox', { name: '监控指标' })).toHaveValue(
       'rocketmq_disk_use_ratio',
     );
-    expect(screen.queryByRole('combobox', { name: 'RocketMQ 实例' })).not.toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'RocketMQ 实例' })).toBeInTheDocument();
     expect(
-      screen.getByText('历史 Prometheus 规则保留原始指标表达式，不要求绑定 Studio 实例。'),
+      screen.getByText('历史 Prometheus 规则可不绑定 Studio 实例；留空将保持兼容模式。'),
     ).toBeInTheDocument();
   });
 
