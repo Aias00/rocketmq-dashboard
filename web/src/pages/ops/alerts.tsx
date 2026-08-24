@@ -87,6 +87,9 @@ const nativeMetricTranslationKeys: Record<string, string> = {
   'topic.backlog.total': 'alerts.metrics.topicBacklogTotal',
   'dlq.message.count': 'alerts.metrics.dlqMessageCount',
   'cloud.instance.availability': 'alerts.metrics.cloudInstanceAvailability',
+};
+
+const legacyMetricTranslationKeys: Record<string, string> = {
   rocketmq_disk_use_ratio: 'alerts.metrics.legacyDiskUsageRatio',
 };
 
@@ -128,9 +131,10 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
   const metricRequestVersion = useRef(0);
   const importInputRef = useRef<HTMLInputElement>(null);
   const supportsUnavailableCondition = supportsUnavailableOperator(selectedMetric);
+  const editingLegacyRule = Boolean(editingRule && !editingRule.instanceId?.trim());
 
   const metricLabel = (metric: string, fallback = metric) => {
-    const key = nativeMetricTranslationKeys[metric];
+    const key = nativeMetricTranslationKeys[metric] ?? legacyMetricTranslationKeys[metric];
     if (!key) return fallback;
     const translated = t(key);
     return translated === key ? fallback : translated;
@@ -255,7 +259,11 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
     setEditingRule(rule);
     form.setFieldsValue(rule);
     setSelectedInstanceId(rule.instanceId);
-    void loadMetricCapabilities(rule.instanceId, false);
+    if (rule.instanceId?.trim()) {
+      void loadMetricCapabilities(rule.instanceId, false);
+    } else {
+      setMetricOptions([]);
+    }
     setModalVisible(true);
   };
 
@@ -698,45 +706,58 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
             <Input placeholder="请输入规则名称" />
           </Form.Item>
 
-          <Form.Item
-            name="instanceId"
-            label={t('alerts.instance')}
-            rules={[{ required: true, message: '请选择 RocketMQ 实例' }]}
-            extra="原生采集规则必须绑定一个受管 RocketMQ 实例。"
-          >
-            <Select
-              placeholder="请选择 RocketMQ 实例"
-              options={instances.map((instance) => ({
-                value: instance.name,
-                label: `${instance.name}${instance.vendor && instance.vendor !== 'APACHE' ? ` (${instance.vendor})` : ''}`,
-              }))}
-              onChange={(instanceId) => {
-                setSelectedInstanceId(instanceId);
-                void loadMetricCapabilities(instanceId);
-              }}
-            />
-          </Form.Item>
+          {!editingLegacyRule && (
+            <Form.Item
+              name="instanceId"
+              label={t('alerts.instance')}
+              rules={[{ required: true, message: '请选择 RocketMQ 实例' }]}
+              extra="原生采集规则必须绑定一个受管 RocketMQ 实例。"
+            >
+              <Select
+                placeholder="请选择 RocketMQ 实例"
+                options={instances.map((instance) => ({
+                  value: instance.name,
+                  label: `${instance.name}${instance.vendor && instance.vendor !== 'APACHE' ? ` (${instance.vendor})` : ''}`,
+                }))}
+                onChange={(instanceId) => {
+                  setSelectedInstanceId(instanceId);
+                  void loadMetricCapabilities(instanceId);
+                }}
+              />
+            </Form.Item>
+          )}
 
-          <Form.Item
-            name="metric"
-            label={t('alerts.metric')}
-            rules={[{ required: true, message: '请选择监控指标' }]}
-          >
-            <Select
-              placeholder={metricLoading ? '正在加载监控指标' : '请选择监控指标'}
-              options={metricOptions}
-              disabled={!selectedInstanceId || metricLoading}
-              loading={metricLoading}
-              onChange={(metric) => {
-                if (
-                  form.getFieldValue('operator') === 'UNAVAILABLE' &&
-                  !supportsUnavailableOperator(metric)
-                ) {
-                  form.setFieldValue('operator', '>');
-                }
-              }}
-            />
-          </Form.Item>
+          {editingLegacyRule ? (
+            <Form.Item
+              name="metric"
+              label={t('alerts.metric')}
+              rules={[{ required: true, message: '请输入监控指标' }]}
+              extra="历史 Prometheus 规则保留原始指标表达式，不要求绑定 Studio 实例。"
+            >
+              <Input placeholder="例如 rocketmq_consumer_lag_messages" />
+            </Form.Item>
+          ) : (
+            <Form.Item
+              name="metric"
+              label={t('alerts.metric')}
+              rules={[{ required: true, message: '请选择监控指标' }]}
+            >
+              <Select
+                placeholder={metricLoading ? '正在加载监控指标' : '请选择监控指标'}
+                options={metricOptions}
+                disabled={!selectedInstanceId || metricLoading}
+                loading={metricLoading}
+                onChange={(metric) => {
+                  if (
+                    form.getFieldValue('operator') === 'UNAVAILABLE' &&
+                    !supportsUnavailableOperator(metric)
+                  ) {
+                    form.setFieldValue('operator', '>');
+                  }
+                }}
+              />
+            </Form.Item>
+          )}
 
           {domain === 'BUSINESS' && (
             <>

@@ -308,6 +308,37 @@ describe('AlertsPage', () => {
     expect((await screen.findAllByText('Broker 磁盘使用率')).length).toBeGreaterThan(1);
   });
 
+  it('edits a legacy business rule without requiring a Studio instance', async () => {
+    vi.mocked(listAlertRules).mockResolvedValue([
+      {
+        id: 99,
+        name: 'Legacy disk usage',
+        metric: 'rocketmq_disk_use_ratio',
+        operator: '>',
+        threshold: 80,
+        thresholdUnit: '%',
+        duration: '1m',
+        channels: ['dingtalk'],
+        enabled: true,
+        lastTriggered: null,
+        description: '',
+      },
+    ]);
+    const user = userEvent.setup();
+    renderPage('BUSINESS');
+
+    await screen.findByText('Legacy disk usage');
+    await user.click(within(getRuleRow('Legacy disk usage')).getByRole('button', { name: '编辑' }));
+
+    expect(await screen.findByRole('textbox', { name: '监控指标' })).toHaveValue(
+      'rocketmq_disk_use_ratio',
+    );
+    expect(screen.queryByRole('combobox', { name: 'RocketMQ 实例' })).not.toBeInTheDocument();
+    expect(
+      screen.getByText('历史 Prometheus 规则保留原始指标表达式，不要求绑定 Studio 实例。'),
+    ).toBeInTheDocument();
+  });
+
   it('uses English metric labels when English is selected', async () => {
     localStorage.setItem(LANGUAGE_STORAGE_KEY, 'en');
     vi.mocked(listNativeAlertMetrics).mockResolvedValue([
