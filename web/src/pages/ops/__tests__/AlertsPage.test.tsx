@@ -361,6 +361,17 @@ describe('AlertsPage', () => {
     expect(await screen.findByText('Broker availability')).toBeInTheDocument();
   });
 
+  it('renders notification template variables below the character counter as separate tokens', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: '新建规则' }));
+
+    expect(screen.getByText('可用变量')).toBeInTheDocument();
+    expect(screen.getByText('${ruleName}')).toBeInTheDocument();
+    expect(screen.getByText('${thresholdUnit}')).toBeInTheDocument();
+  });
+
   it('exposes optional cluster and broker scopes for cluster rules', async () => {
     const user = userEvent.setup();
     renderPage();

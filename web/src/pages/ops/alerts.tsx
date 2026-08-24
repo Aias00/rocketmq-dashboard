@@ -67,6 +67,20 @@ const channelColors: Record<string, string> = {
 
 const durationOptions = ['1m', '5m', '15m', '30m'];
 const reminderIntervalOptions = ['5m', '15m', '30m', '1h', '4h'];
+const notificationTemplateVariables = [
+  'ruleName',
+  'title',
+  'description',
+  'transition',
+  'metric',
+  'instanceId',
+  'value',
+  'threshold',
+  'thresholdUnit',
+  'level',
+  'time',
+  'labels',
+];
 const availabilityMetrics = new Set([
   'nameserver.availability',
   'broker.availability',
@@ -941,7 +955,16 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
           <Form.Item
             name="notificationTemplate"
             label={t('alerts.notificationTemplate')}
-            extra={t('alerts.notificationTemplateHelp')}
+            extra={
+              <div style={{ paddingTop: 24 }}>
+                <div style={{ marginBottom: 8 }}>{t('alerts.notificationTemplateVariables')}</div>
+                <Flex gap={6} wrap="wrap">
+                  {notificationTemplateVariables.map((variable) => (
+                    <Tag key={variable}>{`$\{${variable}}`}</Tag>
+                  ))}
+                </Flex>
+              </div>
+            }
           >
             <TextArea
               placeholder="[${level}] ${title} - ${description}\nLabels: ${labels}"

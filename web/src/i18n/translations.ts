@@ -242,6 +242,7 @@ const translations: Record<string, Record<Lang, string>> = {
     zh: '支持 ${ruleName}、${title}、${description}、${transition}、${metric}、${instanceId}、${value}、${threshold}、${thresholdUnit}、${level}、${time}、${labels}',
     en: 'Supports ${ruleName}, ${title}, ${description}, ${transition}, ${metric}, ${instanceId}, ${value}, ${threshold}, ${thresholdUnit}, ${level}, ${time}, and ${labels}',
   },
+  'alerts.notificationTemplateVariables': { zh: '可用变量', en: 'Available variables' },
   'alerts.metrics.legacyDiskUsageRatio': { zh: '磁盘使用率', en: 'Disk usage ratio' },
   'alerts.exportSuccess': { zh: '告警规则已导出', en: 'Alert rules exported' },
   'alerts.exportFailed': { zh: '导出告警规则失败', en: 'Failed to export alert rules' },
