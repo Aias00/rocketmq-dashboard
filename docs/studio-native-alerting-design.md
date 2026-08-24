@@ -325,8 +325,9 @@ An event row displays its domain badge, current value, threshold, resource ident
 
 1. `FIRING` and `RESOLVED` events for the same rule and instance.
 2. Delivered Email and SMS-webhook outbox rows for both lifecycle transitions.
-3. At least two Mailpit messages for the configured recipient.
-4. A webhook capture response containing both `FIRING` and `RESOLVED`.
+3. A webhook capture response containing both `FIRING` and `RESOLVED`.
+
+The Email assertions stop at the durable Outbox's `DELIVERED` state, which confirms successful handoff to the configured SMTP endpoint. The script intentionally does not require a Mailpit-specific message-inspection API or assert final mailbox storage.
 
 The script intentionally requires an isolated MySQL database with `rmq_studio_user` and `rmq_settings` already initialized, plus an administrator account supplied through environment variables. It never uses an operator's development database or deletes any existing records. Its required environment, receiver contract, and invocation guidance are documented in the script header.
 

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 #
 # Validates native alerting against real dependencies. It requires an isolated, already
-# initialized MySQL database, a RocketMQ NameServer, SMTP sink compatible with Mailpit,
-# and a webhook receiver whose assertion endpoint returns captured JSON payloads.
+# initialized MySQL database, a RocketMQ NameServer, an SMTP endpoint, and a webhook receiver
+# whose assertion endpoint returns captured JSON payloads.
 #
 # Required environment:
 #   E2E_DB_JDBC_URL       JDBC URL for an isolated initialized MySQL database
@@ -18,7 +18,6 @@
 # Optional environment:
 #   E2E_DB_USERNAME=root E2E_DB_PASSWORD=studio123 E2E_MYSQL_HOST=127.0.0.1
 #   E2E_MYSQL_PORT=3306 E2E_SMTP_PORT=1025 E2E_PORT=18083 E2E_SILENCE_SECONDS=10
-#   E2E_MAILPIT_API_URL=http://127.0.0.1:8025/api/v1/messages
 #   E2E_STUDIO_JAR=.../server/target/rocketmq-studio-1.0.0.jar
 #
 # The script retains its e2e-native-alert-* records as database evidence. It does not
@@ -42,7 +41,6 @@ STUDIO_JAR=${E2E_STUDIO_JAR:-"$SERVER_DIR/target/rocketmq-studio-1.0.0.jar"}
 PORT=${E2E_PORT:-18083}
 SMTP_PORT=${E2E_SMTP_PORT:-1025}
 SILENCE_SECONDS=${E2E_SILENCE_SECONDS:-10}
-MAILPIT_API_URL=${E2E_MAILPIT_API_URL:-http://127.0.0.1:8025/api/v1/messages}
 MYSQL_HOST=${E2E_MYSQL_HOST:-127.0.0.1}
 MYSQL_PORT=${E2E_MYSQL_PORT:-3306}
 DB_USERNAME=${E2E_DB_USERNAME:-root}
@@ -176,13 +174,12 @@ api_post /api/instances/update "$(jq -n --arg id "$INSTANCE_ID" --arg endpoint "
 wait_for "RESOLVED event" 30 resolved_exists
 wait_for "RESOLVED delivery" 30 resolved_rows_delivered
 
-MAIL_COUNT=$(curl -fsS "$MAILPIT_API_URL" | jq --arg recipient "$E2E_EMAIL_RECIPIENT" --arg subject "$RULE_NAME" \
-  '[.messages[] | select((.To // [])[]?.Address == $recipient and .Subject == ("[RocketMQ Studio] " + $subject))] | length')
-[[ "$MAIL_COUNT" -ge 2 ]] || { echo "Expected FIRING and RESOLVED emails in Mailpit; saw $MAIL_COUNT" >&2; exit 1; }
+# DELIVERED confirms the SMTP sender handed both lifecycle messages to its configured endpoint.
+# The script deliberately does not depend on a Mailpit-specific message-inspection API.
 WEBHOOK_PAYLOADS=$(curl -fsS "$E2E_WEBHOOK_ASSERT_URL")
 grep -q "$RULE_NAME" <<<"$WEBHOOK_PAYLOADS" || { echo 'Webhook capture has no payload for this run' >&2; exit 1; }
 grep -q 'FIRING' <<<"$WEBHOOK_PAYLOADS" || { echo 'Webhook capture has no FIRING payload' >&2; exit 1; }
 grep -q 'RESOLVED' <<<"$WEBHOOK_PAYLOADS" || { echo 'Webhook capture has no RESOLVED payload' >&2; exit 1; }
 
-echo "PASS: silence suppression, FIRING/RESOLVED state transitions, SMTP email, and webhook delivery verified."
+echo "PASS: silence suppression, FIRING/RESOLVED state transitions, SMTP handoff, and webhook delivery verified."
 echo "Evidence is retained in $E2E_MYSQL_DATABASE for instance $INSTANCE_ID; Studio log: $APP_LOG"
