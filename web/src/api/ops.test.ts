@@ -165,8 +165,8 @@ describe('Ops API - Alert Rules', () => {
   });
 
   it('routes business alert rules to the business rule API', async () => {
-    mock.onGet('/alert-rules').reply(200, { code: 200, data: [] });
-    mock.onPost('/alert-rules/create').reply(200, { code: 200, data: { id: 2 } });
+    mock.onGet('/business-alert-rules').reply(200, { code: 200, data: [] });
+    mock.onPost('/business-alert-rules/create').reply(200, { code: 200, data: { id: 2 } });
 
     await expect(listAlertRules('BUSINESS')).resolves.toEqual([]);
     await expect(createAlertRule({ name: 'Lag' }, 'BUSINESS')).resolves.toEqual({ id: 2 });

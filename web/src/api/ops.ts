@@ -168,7 +168,7 @@ export interface AuditQuery {
 
 // ─── Alert Rules ────────────────────────────────────────────────
 const alertRulePath = (domain: AlertRuleDomain) =>
-  domain === 'BUSINESS' ? '/alert-rules' : '/cluster-alert-rules';
+  domain === 'BUSINESS' ? '/business-alert-rules' : '/cluster-alert-rules';
 
 export async function listNativeAlertMetrics(instanceId: string, domain: AlertRuleDomain) {
   const res = await client.get<{ data: NativeAlertMetricInfo[] }>('/native-alert-metrics', {
