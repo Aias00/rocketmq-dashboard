@@ -57,6 +57,9 @@ class AlertRuleControllerTest {
     @MockBean
     private NativeAlertMetricCatalogService metricCatalogService;
 
+    @MockBean
+    private AlertRuleTransferService transferService;
+
     @Test
     void businessRulesEndpointShouldReturnBusinessRules() throws Exception {
         AlertRuleVO rule = AlertRuleVO.builder()
@@ -98,6 +101,29 @@ class AlertRuleControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data.rules").value("groups:\n"));
+    }
+
+    @Test
+    void exportsAndImportsBusinessRuleTransfer() throws Exception {
+        AlertRuleTransferDTO transfer = new AlertRuleTransferDTO();
+        transfer.setVersion(AlertRuleTransferDTO.VERSION);
+        transfer.setDomain(AlertDomain.BUSINESS);
+        transfer.setRules(List.of());
+        when(transferService.exportRules(AlertDomain.BUSINESS)).thenReturn(transfer);
+
+        mockMvc.perform(get("/api/alert-rules/transfer"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.version").value(1))
+                .andExpect(jsonPath("$.data.domain").value("BUSINESS"));
+
+        AlertRuleRequestDTO rule = new AlertRuleRequestDTO();
+        rule.setName("Consumer lag");
+        transfer.setRules(List.of(rule));
+        mockMvc.perform(post("/api/alert-rules/import")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(transfer)))
+                .andExpect(status().isOk());
+        verify(transferService).importRules(eq(AlertDomain.BUSINESS), any(AlertRuleTransferDTO.class));
     }
 
     @Test

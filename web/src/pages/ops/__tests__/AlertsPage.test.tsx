@@ -28,6 +28,8 @@ import { listInstances } from '../../../services/instanceService';
 import {
   bulkDeleteAlertRules,
   bulkToggleAlertRules,
+  exportAlertRulesTransfer,
+  importAlertRulesTransfer,
   listAlertRules,
   listNativeAlertMetrics,
   toggleAlertRule,
@@ -45,6 +47,8 @@ vi.mock('../../../services/opsService', () => ({
   toggleAlertRule: vi.fn(),
   bulkToggleAlertRules: vi.fn(),
   bulkDeleteAlertRules: vi.fn(),
+  exportAlertRulesTransfer: vi.fn(),
+  importAlertRulesTransfer: vi.fn(),
   updateAlertRule: vi.fn(),
 }));
 

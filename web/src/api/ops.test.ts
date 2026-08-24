@@ -26,6 +26,8 @@ import {
   updateIsVIPChannel,
   updateUseTLS,
   listAlertRules,
+  exportAlertRulesTransfer,
+  importAlertRulesTransfer,
   listNativeAlertMetrics,
   createAlertRule,
   updateAlertRule,
@@ -168,6 +170,33 @@ describe('Ops API - Alert Rules', () => {
 
     await expect(listAlertRules('BUSINESS')).resolves.toEqual([]);
     await expect(createAlertRule({ name: 'Lag' }, 'BUSINESS')).resolves.toEqual({ id: 2 });
+  });
+
+  it('transfers native alert rules through the selected alert domain', async () => {
+    const transfer = {
+      version: 1,
+      domain: 'CLUSTER' as const,
+      rules: [
+        {
+          name: 'Disk usage',
+          metric: 'broker.disk.usage',
+          operator: '>',
+          threshold: 85,
+          duration: '5m',
+          channels: ['dingtalk'],
+          enabled: true,
+          description: 'disk',
+        },
+      ],
+    };
+    mock.onGet('/cluster-alert-rules/transfer').reply(200, { code: 200, data: transfer });
+    mock.onPost('/cluster-alert-rules/import').reply((config) => {
+      expect(JSON.parse(config.data)).toEqual(transfer);
+      return [200, { code: 200, data: [{ ...transfer.rules[0], id: 1, lastTriggered: null }] }];
+    });
+
+    await expect(exportAlertRulesTransfer()).resolves.toEqual(transfer);
+    await expect(importAlertRulesTransfer(transfer)).resolves.toHaveLength(1);
   });
 
   it('loads native metric capabilities for an instance and domain', async () => {

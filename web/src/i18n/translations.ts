@@ -237,6 +237,13 @@ const translations: Record<string, Record<Lang, string>> = {
   'alerts.enabled': { zh: '已启用', en: 'Enabled' },
   'alerts.triggered24h': { zh: '24h 触发', en: 'Triggered (24h)' },
   'alerts.newRule': { zh: '新建规则', en: 'New Rule' },
+  'alerts.exportSuccess': { zh: '告警规则已导出', en: 'Alert rules exported' },
+  'alerts.exportFailed': { zh: '导出告警规则失败', en: 'Failed to export alert rules' },
+  'alerts.importSuccess': { zh: '已导入 {count} 条告警规则', en: 'Imported {count} alert rules' },
+  'alerts.importFailed': {
+    zh: '导入失败，请选择当前页面导出的规则文件',
+    en: 'Import failed. Choose a rule file exported from this page.',
+  },
   'alerts.ruleName': { zh: '规则名称', en: 'Rule Name' },
   'alerts.instance': { zh: 'RocketMQ 实例', en: 'RocketMQ Instance' },
   'alerts.metric': { zh: '监控指标', en: 'Metric' },

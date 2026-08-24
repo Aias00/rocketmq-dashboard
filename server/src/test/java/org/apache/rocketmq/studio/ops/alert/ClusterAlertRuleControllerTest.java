@@ -55,6 +55,9 @@ class ClusterAlertRuleControllerTest {
     @MockBean
     private NativeAlertMetricCatalogService metricCatalogService;
 
+    @MockBean
+    private AlertRuleTransferService transferService;
+
     @Test
     void listRulesShouldUseClusterDomain() throws Exception {
         when(alertService.listRules(AlertDomain.CLUSTER)).thenReturn(List.of(
@@ -64,6 +67,30 @@ class ClusterAlertRuleControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[0].id").value(7))
                 .andExpect(jsonPath("$.data[0].domain").value("CLUSTER"));
+    }
+
+    @Test
+    void exportsAndImportsClusterRuleTransfer() throws Exception {
+        AlertRuleTransferDTO transfer = new AlertRuleTransferDTO();
+        transfer.setVersion(AlertRuleTransferDTO.VERSION);
+        transfer.setDomain(AlertDomain.CLUSTER);
+        transfer.setRules(List.of());
+        when(transferService.exportRules(AlertDomain.CLUSTER)).thenReturn(transfer);
+
+        mockMvc.perform(get("/api/cluster-alert-rules/transfer"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.version").value(1))
+                .andExpect(jsonPath("$.data.domain").value("CLUSTER"));
+
+        AlertRuleRequestDTO rule = new AlertRuleRequestDTO();
+        rule.setName("Broker unavailable");
+        rule.setEnabled(true);
+        transfer.setRules(List.of(rule));
+        mockMvc.perform(post("/api/cluster-alert-rules/import")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(transfer)))
+                .andExpect(status().isOk());
+        verify(transferService).importRules(eq(AlertDomain.CLUSTER), any(AlertRuleTransferDTO.class));
     }
 
     @Test

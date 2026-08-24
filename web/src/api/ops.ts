@@ -37,6 +37,12 @@ export interface AlertRuleBulkResult {
   updatedRules: AlertRule[];
 }
 
+export interface AlertRuleTransfer {
+  version: number;
+  domain: AlertRuleDomain;
+  rules: Array<Omit<AlertRule, 'id' | 'lastTriggered'>>;
+}
+
 export interface AlertRuleTestResult {
   samples: Array<{
     labels: Record<string, string>;
@@ -172,6 +178,19 @@ export async function listNativeAlertMetrics(instanceId: string, domain: AlertRu
 
 export async function listAlertRules(domain: AlertRuleDomain = 'CLUSTER') {
   const res = await client.get<{ data: AlertRule[] }>(alertRulePath(domain));
+  return res.data.data;
+}
+
+export async function exportAlertRulesTransfer(domain: AlertRuleDomain = 'CLUSTER') {
+  const res = await client.get<{ data: AlertRuleTransfer }>(`${alertRulePath(domain)}/transfer`);
+  return res.data.data;
+}
+
+export async function importAlertRulesTransfer(
+  data: AlertRuleTransfer,
+  domain: AlertRuleDomain = 'CLUSTER',
+) {
+  const res = await client.post<{ data: AlertRule[] }>(`${alertRulePath(domain)}/import`, data);
   return res.data.data;
 }
 

@@ -37,6 +37,7 @@ public class AlertRuleController {
     private final AlertService alertService;
     private final NativeAlertRuleTestService nativeAlertRuleTestService;
     private final NativeAlertMetricCatalogService metricCatalogService;
+    private final AlertRuleTransferService transferService;
 
     @GetMapping
     public Result<List<AlertRuleVO>> listRules(HttpServletRequest request) {
@@ -51,6 +52,16 @@ public class AlertRuleController {
     @GetMapping("/export")
     public Result<AlertRulesYamlVO> exportRules() {
         return Result.ok(new AlertRulesYamlVO(alertService.exportPrometheusRulesYaml()));
+    }
+
+    @GetMapping("/transfer")
+    public Result<AlertRuleTransferDTO> exportTransfer() {
+        return Result.ok(transferService.exportRules(AlertDomain.BUSINESS));
+    }
+
+    @PostMapping("/import")
+    public Result<List<AlertRuleVO>> importRules(@Valid @RequestBody(required = false) AlertRuleTransferDTO transfer) {
+        return Result.ok(transferService.importRules(AlertDomain.BUSINESS, transfer));
     }
 
     @PostMapping("/create")

@@ -16,7 +16,7 @@
  */
 
 import { useEffect, useRef, useState, type Key } from 'react';
-import { Plus, Pencil, Trash } from '@phosphor-icons/react';
+import { DownloadSimple, Plus, Pencil, Trash, UploadSimple } from '@phosphor-icons/react';
 import {
   Button,
   Card,
@@ -38,11 +38,14 @@ import type { ColumnsType, TableRowSelection } from 'antd/es/table/interface';
 import PageHeader from '../../components/PageHeader';
 import { useLang } from '../../i18n/LangContext';
 import type { AlertRule, AlertRuleDomain, AlertRuleTestResult } from '../../api/ops';
+import type { AlertRuleTransfer } from '../../api/ops';
 import {
   createAlertRule,
   bulkDeleteAlertRules,
   bulkToggleAlertRules,
   deleteAlertRule,
+  exportAlertRulesTransfer,
+  importAlertRulesTransfer,
   listAlertRules,
   listNativeAlertMetrics,
   toggleAlertRule,
@@ -53,6 +56,7 @@ import { tableScrollX } from '../../utils/table';
 import { formatDateTime } from '../../utils/format';
 import { listInstances } from '../../services/instanceService';
 import type { Instance } from '../../api/instance';
+import { downloadBlob } from '../../utils/download';
 const { TextArea } = Input;
 
 const channelColors: Record<string, string> = {
@@ -119,7 +123,9 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
   const [selectedInstanceId, setSelectedInstanceId] = useState<string>();
   const [metricLoading, setMetricLoading] = useState(false);
   const [instances, setInstances] = useState<Instance[]>([]);
+  const [transferringRules, setTransferringRules] = useState(false);
   const metricRequestVersion = useRef(0);
+  const importInputRef = useRef<HTMLInputElement>(null);
   const supportsUnavailableCondition = supportsUnavailableOperator(selectedMetric);
 
   const metricLabel = (metric: string, fallback = metric) => {
@@ -181,6 +187,42 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
     setTestResult(null);
     form.resetFields();
     setModalVisible(true);
+  };
+
+  const handleExportRules = async () => {
+    setTransferringRules(true);
+    try {
+      const transfer = await exportAlertRulesTransfer(domain);
+      downloadBlob(
+        new Blob([JSON.stringify(transfer, null, 2)], { type: 'application/json;charset=utf-8' }),
+        `rocketmq-studio-${domain.toLowerCase()}-alert-rules.json`,
+      );
+      message.success(t('alerts.exportSuccess'));
+    } catch {
+      message.error(t('alerts.exportFailed'));
+    } finally {
+      setTransferringRules(false);
+    }
+  };
+
+  const handleImportRules = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    setTransferringRules(true);
+    try {
+      const transfer = JSON.parse(await file.text()) as AlertRuleTransfer;
+      if (transfer.version !== 1 || transfer.domain !== domain || !Array.isArray(transfer.rules)) {
+        throw new Error('invalid transfer document');
+      }
+      const imported = await importAlertRulesTransfer(transfer, domain);
+      setRules((current) => [...current, ...imported]);
+      message.success(t('alerts.importSuccess', { count: imported.length }));
+    } catch {
+      message.error(t('alerts.importFailed'));
+    } finally {
+      setTransferringRules(false);
+    }
   };
 
   const loadMetricCapabilities = async (instanceId?: string, resetMetric = true) => {
@@ -517,6 +559,28 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
                 {triggered24h}
               </span>
             </Flex>
+            <Button
+              icon={<DownloadSimple />}
+              disabled={isActionRunning}
+              loading={transferringRules}
+              onClick={() => void handleExportRules()}
+            >
+              {t('common.export')}
+            </Button>
+            <Button
+              icon={<UploadSimple />}
+              disabled={isActionRunning || transferringRules}
+              onClick={() => importInputRef.current?.click()}
+            >
+              {t('common.import')}
+            </Button>
+            <input
+              ref={importInputRef}
+              type="file"
+              accept="application/json,.json"
+              hidden
+              onChange={(event) => void handleImportRules(event)}
+            />
             <Button
               type="primary"
               icon={<Plus />}

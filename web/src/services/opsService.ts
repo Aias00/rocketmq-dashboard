@@ -7,6 +7,7 @@ import type {
   AlertRuleBulkResult,
   AlertRuleDomain,
   AlertRuleTestResult,
+  AlertRuleTransfer,
   NativeAlertMetricInfo,
   CollectorStatus,
   SystemAlert,
@@ -110,6 +111,27 @@ function formatAuditCsv(records: AuditRecord[]): string {
 export async function listAlertRules(domain: AlertRuleDomain = 'CLUSTER'): Promise<AlertRule[]> {
   if (isMockMode()) return alertRulesState.map(copyAlertRule);
   return opsApi.listAlertRules(domain);
+}
+
+export async function exportAlertRulesTransfer(
+  domain: AlertRuleDomain = 'CLUSTER',
+): Promise<AlertRuleTransfer> {
+  if (isMockMode()) return { version: 1, domain, rules: alertRulesState.map(copyAlertRule) };
+  return opsApi.exportAlertRulesTransfer(domain);
+}
+
+export async function importAlertRulesTransfer(
+  data: AlertRuleTransfer,
+  domain: AlertRuleDomain = 'CLUSTER',
+): Promise<AlertRule[]> {
+  if (!isMockMode()) return opsApi.importAlertRulesTransfer(data, domain);
+  const startId = Date.now();
+  const imported = data.rules.map((rule, index) => ({
+    ...copyAlertRule(rule as AlertRule),
+    id: startId + index,
+  }));
+  alertRulesState.push(...imported);
+  return imported.map(copyAlertRule);
 }
 
 export async function listNativeAlertMetrics(

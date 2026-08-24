@@ -37,10 +37,21 @@ public class ClusterAlertRuleController {
     private final AlertService alertService;
     private final NativeAlertRuleTestService nativeAlertRuleTestService;
     private final NativeAlertMetricCatalogService metricCatalogService;
+    private final AlertRuleTransferService transferService;
 
     @GetMapping
     public Result<List<AlertRuleVO>> listRules() {
         return Result.ok(alertService.listRules(AlertDomain.CLUSTER));
+    }
+
+    @GetMapping("/transfer")
+    public Result<AlertRuleTransferDTO> exportTransfer() {
+        return Result.ok(transferService.exportRules(AlertDomain.CLUSTER));
+    }
+
+    @PostMapping("/import")
+    public Result<List<AlertRuleVO>> importRules(@Valid @RequestBody(required = false) AlertRuleTransferDTO transfer) {
+        return Result.ok(transferService.importRules(AlertDomain.CLUSTER, transfer));
     }
 
     @PostMapping("/create")
