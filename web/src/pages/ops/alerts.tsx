@@ -87,6 +87,7 @@ const nativeMetricTranslationKeys: Record<string, string> = {
   'topic.backlog.total': 'alerts.metrics.topicBacklogTotal',
   'dlq.message.count': 'alerts.metrics.dlqMessageCount',
   'cloud.instance.availability': 'alerts.metrics.cloudInstanceAvailability',
+  rocketmq_disk_use_ratio: 'alerts.metrics.legacyDiskUsageRatio',
 };
 
 export const supportsUnavailableOperator = (metric?: string): boolean =>

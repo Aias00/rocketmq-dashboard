@@ -23,7 +23,9 @@ class AlertSchemaMigrationTest {
         dataSource.setURL("jdbc:h2:mem:alert-schema-migration;MODE=MySQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE");
         dataSource.setUser("sa");
         try (Connection connection = dataSource.getConnection(); Statement statement = connection.createStatement()) {
-            statement.execute("CREATE TABLE rmq_alert_rule (id BIGINT PRIMARY KEY, name VARCHAR(128))");
+            statement.execute("CREATE TABLE rmq_alert_rule (id BIGINT PRIMARY KEY, name VARCHAR(128), metric VARCHAR(128))");
+            statement.execute("INSERT INTO rmq_alert_rule (id, name, metric) VALUES "
+                    + "(1, 'Disk usage', 'rocketmq_disk_use_ratio')");
             statement.execute("CREATE TABLE rmq_system_alert (id BIGINT PRIMARY KEY, time TIMESTAMP)");
             statement.execute("CREATE TABLE rmq_alert_notification_outbox (id BIGINT PRIMARY KEY, alert_id BIGINT, "
                     + "channel VARCHAR(32), status VARCHAR(16), next_attempt_at TIMESTAMP)");
@@ -56,6 +58,12 @@ class AlertSchemaMigrationTest {
                         + "('sending_started_at', 'claim_token', 'message_content')")) {
             result.next();
             assertThat(result.getInt(1)).isEqualTo(3);
+        }
+
+        try (Connection connection = dataSource.getConnection(); Statement statement = connection.createStatement();
+                ResultSet result = statement.executeQuery("SELECT domain FROM rmq_alert_rule WHERE id = 1")) {
+            result.next();
+            assertThat(result.getString(1)).isEqualTo("CLUSTER");
         }
     }
 }

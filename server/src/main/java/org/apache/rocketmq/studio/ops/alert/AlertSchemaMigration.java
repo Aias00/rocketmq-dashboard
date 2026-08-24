@@ -114,6 +114,7 @@ public class AlertSchemaMigration implements ApplicationRunner {
             for (Index index : INDEXES) {
                 ensureIndex(metadata, connection.getCatalog(), statement, index);
             }
+            reclassifyLegacyClusterRules(metadata, connection.getCatalog(), statement);
         }
     }
 
@@ -187,6 +188,19 @@ public class AlertSchemaMigration implements ApplicationRunner {
             }
             return false;
         }
+    }
+
+    private static void reclassifyLegacyClusterRules(DatabaseMetaData metadata, String catalog, Statement statement)
+            throws Exception {
+        // These Prometheus metric names predate the native alert-domain field. They describe
+        // broker/node health and must not remain in the Business Alerts list after upgrade.
+        if (!hasColumn(metadata, catalog, "rmq_alert_rule", "domain")
+                || !hasColumn(metadata, catalog, "rmq_alert_rule", "metric")) {
+            return;
+        }
+        statement.executeUpdate("UPDATE rmq_alert_rule SET domain = 'CLUSTER' WHERE domain = 'BUSINESS' "
+                + "AND metric IN ('rocketmq_disk_use_ratio', 'rocketmq_dispatch_behind_bytes', "
+                + "'rocketmq_broker_exception_count', 'rocketmq_processor_watermark')");
     }
 
     private record Column(String table, String name, String definition) {
