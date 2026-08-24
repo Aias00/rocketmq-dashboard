@@ -31,6 +31,7 @@ export interface GeneralSettings {
   baseUrl: string;
   dingtalkWebhook?: string;
   dingtalkSigningSecret?: string;
+  clearDingtalkSigningSecret?: boolean;
   dingtalkWebhookConfigured?: boolean;
   dingtalkSigningSecretConfigured?: boolean;
   emailRecipients?: string;
@@ -47,6 +48,7 @@ export type GeneralSettingsUpdate = Omit<
 > & {
   apiKey?: string;
   clearApiKey?: boolean;
+  clearDingtalkSigningSecret?: boolean;
 };
 
 export interface DataSource {

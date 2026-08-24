@@ -342,4 +342,23 @@ class NotificationOutboxServiceTest {
                 .hasMessage("Only failed notification deliveries can be retried");
         verify(mapper, never()).update(any(), any());
     }
+
+    @Test
+    void retriesFailedDeliveriesIndependentlyInBulk() {
+        RmqAlertNotificationOutboxMapper mapper = mock(RmqAlertNotificationOutboxMapper.class);
+        RmqAlertNotificationOutbox failed = new RmqAlertNotificationOutbox();
+        failed.setId(8L);
+        failed.setAlertId(9L);
+        failed.setChannel("dingtalk");
+        failed.setStatus(NotificationOutboxStatus.FAILED.name());
+        when(mapper.selectById(8L)).thenReturn(failed);
+        when(mapper.update(org.mockito.ArgumentMatchers.isNull(), any(UpdateWrapper.class))).thenReturn(1);
+
+        NotificationDeliveryBulkRetryResult result = new NotificationOutboxService(mapper,
+                mock(SettingsRepository.class), mock(AlertSilenceService.class), mock(AlertRepository.class),
+                mock(OperationAuditService.class)).retryFailedDeliveries(List.of(8L, 9L, 8L));
+
+        assertThat(result.getSucceededIds()).containsExactly(8L);
+        assertThat(result.getFailures()).containsKey(9L);
+    }
 }

@@ -81,20 +81,35 @@ class SystemAlertControllerTest {
         LocalDateTime from = LocalDateTime.of(2026, 8, 1, 0, 0);
         LocalDateTime to = LocalDateTime.of(2026, 8, 2, 0, 0);
         when(alertService.listAlerts("warning", AlertDomain.BUSINESS, "local", "FIRING",
-                "brokerName", "broker-a", from, to, 2, 10))
+                "brokerName", "broker-a", from, to, 2, 10, true))
                 .thenReturn(PageResult.of(List.of(alert), 11, 2, 10));
 
         mockMvc.perform(get("/api/system-alerts/page").param("level", "warning")
                         .param("domain", "BUSINESS").param("instanceId", "local")
                         .param("transition", "FIRING").param("labelKey", "brokerName")
                         .param("labelValue", "broker-a").param("from", "2026-08-01T00:00")
-                        .param("to", "2026-08-02T00:00").param("page", "2").param("pageSize", "10"))
+                        .param("to", "2026-08-02T00:00").param("notificationSuppressed", "true")
+                        .param("page", "2").param("pageSize", "10"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.total").value(11))
                 .andExpect(jsonPath("$.data.items[0].id").value(2));
 
         verify(alertService).listAlerts("warning", AlertDomain.BUSINESS, "local", "FIRING",
-                "brokerName", "broker-a", from, to, 2, 10);
+                "brokerName", "broker-a", from, to, 2, 10, true);
+    }
+
+    @Test
+    void relatedAlertsShouldReturnCrossDomainEvents() throws Exception {
+        SystemAlertVO related = SystemAlertVO.builder().id(2L).domain(AlertDomain.CLUSTER)
+                .title("Broker unavailable").transition("FIRING").build();
+        when(alertService.findRelatedAlerts(1L)).thenReturn(List.of(related));
+
+        mockMvc.perform(get("/api/system-alerts/1/related"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].id").value(2))
+                .andExpect(jsonPath("$.data[0].domain").value("CLUSTER"));
+
+        verify(alertService).findRelatedAlerts(1L);
     }
 
     @Test
@@ -125,6 +140,22 @@ class SystemAlertControllerTest {
                 .andExpect(jsonPath("$.code").value(200));
 
         verify(notificationOutboxService).retryFailedDelivery(8L);
+    }
+
+    @Test
+    void retryFailedDeliveriesShouldReturnPartialResult() throws Exception {
+        NotificationDeliveryBulkRetryResult result = new NotificationDeliveryBulkRetryResult(
+                List.of(8L), Map.of(9L, "Delivery is not failed"));
+        when(notificationOutboxService.retryFailedDeliveries(List.of(8L, 9L))).thenReturn(result);
+
+        mockMvc.perform(post("/api/system-alerts/deliveries/retry")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(List.of(8L, 9L))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.succeededIds[0]").value(8))
+                .andExpect(jsonPath("$.data.failures.9").value("Delivery is not failed"));
+
+        verify(notificationOutboxService).retryFailedDeliveries(List.of(8L, 9L));
     }
 
     @Test

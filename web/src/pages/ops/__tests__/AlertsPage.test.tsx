@@ -28,9 +28,8 @@ import { listInstances } from '../../../services/instanceService';
 import {
   bulkDeleteAlertRules,
   bulkToggleAlertRules,
-  exportAlertRulesTransfer,
-  importAlertRulesTransfer,
   listAlertRules,
+  listAlertRuleRuntime,
   listNativeAlertMetrics,
   toggleAlertRule,
 } from '../../../services/opsService';
@@ -43,6 +42,7 @@ vi.mock('../../../services/opsService', () => ({
   createAlertRule: vi.fn(),
   deleteAlertRule: vi.fn(),
   listAlertRules: vi.fn(),
+  listAlertRuleRuntime: vi.fn(),
   listNativeAlertMetrics: vi.fn(),
   toggleAlertRule: vi.fn(),
   bulkToggleAlertRules: vi.fn(),
@@ -148,6 +148,7 @@ describe('AlertsPage', () => {
     vi.clearAllMocks();
     localStorage.setItem(LANGUAGE_STORAGE_KEY, 'zh');
     vi.mocked(listAlertRules).mockResolvedValue(alertRules.map(cloneRule));
+    vi.mocked(listAlertRuleRuntime).mockResolvedValue([]);
     vi.mocked(listNativeAlertMetrics).mockResolvedValue([]);
     vi.mocked(listInstances).mockResolvedValue([
       {

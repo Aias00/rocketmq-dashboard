@@ -18,6 +18,7 @@ package org.apache.rocketmq.studio.ops.alert;
 
 import java.time.Instant;
 import java.util.Optional;
+import java.util.List;
 
 public interface AlertStateRepository {
     Optional<AlertRuleState> find(AlertStateKey key);
@@ -35,4 +36,8 @@ public interface AlertStateRepository {
     boolean acknowledge(AlertStateKey key, Instant firedAt);
 
     void deleteByRuleId(Long ruleId);
+
+    default List<AlertRuleRuntimeVO> findRuntimeByRuleIds(List<AlertRuleVO> rules) {
+        return List.of();
+    }
 }

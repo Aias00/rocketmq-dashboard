@@ -4,6 +4,7 @@ import { isMockMode } from './dataMode';
 import * as opsApi from '../api/ops';
 import type {
   AlertRule,
+  AlertRuleRuntime,
   AlertRuleBulkResult,
   AlertRuleDomain,
   AlertRuleTestResult,
@@ -16,6 +17,7 @@ import type {
   AuditRecord,
   PageResult,
   NotificationDelivery,
+  NotificationDeliveryBulkRetryResult,
   NotificationDeliveryQuery,
   NotificationDeliveryRecord,
   AlertSilence,
@@ -111,6 +113,12 @@ function formatAuditCsv(records: AuditRecord[]): string {
 export async function listAlertRules(domain: AlertRuleDomain = 'CLUSTER'): Promise<AlertRule[]> {
   if (isMockMode()) return alertRulesState.map(copyAlertRule);
   return opsApi.listAlertRules(domain);
+}
+export async function listAlertRuleRuntime(
+  domain: AlertRuleDomain = 'CLUSTER',
+): Promise<AlertRuleRuntime[]> {
+  if (isMockMode()) return [];
+  return opsApi.listAlertRuleRuntime(domain);
 }
 
 export async function exportAlertRulesTransfer(
@@ -317,6 +325,12 @@ export async function listSystemAlertsPage(
     if (params.instanceId && alert.instanceId !== params.instanceId) return false;
     if (normalizedTransition && alert.transition !== normalizedTransition) return false;
     if (params.labelKey && alert.labels?.[params.labelKey] !== params.labelValue) return false;
+    if (
+      params.notificationSuppressed != null &&
+      alert.notificationSuppressed !== params.notificationSuppressed
+    ) {
+      return false;
+    }
     const alertTime = new Date(alert.time).getTime();
     if (params.from && alertTime < new Date(params.from).getTime()) return false;
     if (params.to && alertTime > new Date(params.to).getTime()) return false;
@@ -329,6 +343,11 @@ export async function listSystemAlertsPage(
     page,
     size: pageSize,
   };
+}
+
+export async function listRelatedSystemAlerts(id: number): Promise<SystemAlert[]> {
+  if (isMockMode()) return [];
+  return opsApi.listRelatedSystemAlerts(id);
 }
 
 export async function getCollectorStatus(): Promise<CollectorStatus> {
@@ -370,6 +389,13 @@ export async function listAlertDeliveries(id: number): Promise<NotificationDeliv
 export async function retryAlertDelivery(id: number): Promise<void> {
   if (isMockMode()) return;
   return opsApi.retryAlertDelivery(id);
+}
+
+export async function retryAlertDeliveries(
+  ids: number[],
+): Promise<NotificationDeliveryBulkRetryResult> {
+  if (isMockMode()) return { succeededIds: ids, failures: {} };
+  return opsApi.retryAlertDeliveries(ids);
 }
 
 export async function listAlertDeliveriesPage(

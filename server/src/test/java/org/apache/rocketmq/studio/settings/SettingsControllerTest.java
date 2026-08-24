@@ -20,6 +20,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.rocketmq.studio.auth.AuthenticatedUserContext;
 import org.apache.rocketmq.studio.common.exception.BusinessException;
 import org.apache.rocketmq.studio.common.domain.PageResult;
+import org.apache.rocketmq.studio.ops.alert.NotificationOutboxService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -56,6 +57,9 @@ class SettingsControllerTest {
 
     @MockBean
     private SettingsService settingsService;
+
+    @MockBean
+    private NotificationOutboxService notificationOutboxService;
 
     @Test
     void getGeneralSettingsShouldReturnSettings() throws Exception {

@@ -19,6 +19,7 @@ package org.apache.rocketmq.studio.ops.alert;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import org.apache.rocketmq.studio.common.domain.PageResult;
 import org.apache.rocketmq.studio.common.domain.enums.AlertLevel;
 import org.apache.rocketmq.studio.common.exception.BusinessException;
 import org.apache.rocketmq.studio.audit.OperationAuditService;
@@ -33,6 +34,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -184,6 +186,33 @@ class AlertServiceTest {
                 .contains("expr: rocketmq_consumer_lag_messages > 5000")
                 .contains("for: 3m")
                 .contains("description: \"Lag too high\"");
+    }
+
+    @Test
+    void exportPrometheusRulesYamlShouldExcludeNativeClusterRules() {
+        AlertRuleVO legacy = AlertRuleVO.builder()
+                .name("High Lag Alert")
+                .metric("rocketmq_consumer_lag_messages")
+                .operator(">")
+                .threshold(5000)
+                .enabled(true)
+                .build();
+        AlertRuleVO nativeRule = AlertRuleVO.builder()
+                .domain(AlertDomain.CLUSTER)
+                .name("Native Disk Usage")
+                .metric("broker.disk.usage_ratio")
+                .operator(">=")
+                .threshold(85)
+                .thresholdUnit("%")
+                .enabled(true)
+                .build();
+        when(alertRepository.findAllRules()).thenReturn(List.of(legacy, nativeRule));
+
+        String result = alertService.exportPrometheusRulesYaml();
+
+        assertThat(result)
+                .contains("HighLagAlert")
+                .doesNotContain("NativeDiskUsage");
     }
 
     @Test
@@ -946,6 +975,43 @@ class AlertServiceTest {
         assertThat(result).hasSize(1);
         assertThat(result.get(0).getLevel()).isEqualTo(AlertLevel.warning);
         verify(alertRepository).findAlerts(null);
+    }
+
+    @Test
+    void relatedAlertsShouldReturnOtherDomainFiringEventsInTheSameInstanceAndScope() {
+        LocalDateTime eventTime = LocalDateTime.of(2026, 8, 23, 12, 0);
+        SystemAlertVO source = SystemAlertVO.builder().id(1L).domain(AlertDomain.BUSINESS)
+                .instanceId("local").time(eventTime).labels(Map.of("brokerName", "broker-a")).build();
+        SystemAlertVO related = SystemAlertVO.builder().id(2L).domain(AlertDomain.CLUSTER)
+                .instanceId("local").time(eventTime).transition("FIRING")
+                .labels(Map.of("brokerName", "broker-a")).build();
+        SystemAlertVO differentBroker = SystemAlertVO.builder().id(3L).domain(AlertDomain.CLUSTER)
+                .instanceId("local").time(eventTime).transition("FIRING")
+                .labels(Map.of("brokerName", "broker-b")).build();
+        when(alertRepository.findAlertById(1L)).thenReturn(Optional.of(source));
+        when(alertRepository.findAlertsPage(any(SystemAlertQuery.class)))
+                .thenReturn(PageResult.of(List.of(related, differentBroker), 2, 1, 100));
+
+        List<SystemAlertVO> result = alertService.findRelatedAlerts(1L);
+
+        assertThat(result).containsExactly(related);
+        verify(alertRepository).findAlertsPage(argThat(query -> query.domain() == AlertDomain.CLUSTER
+                && "local".equals(query.instanceId()) && "FIRING".equals(query.transition())
+                && eventTime.minusMinutes(30).equals(query.from()) && eventTime.plusMinutes(30).equals(query.to())));
+    }
+
+    @Test
+    void relatedAlertsShouldIncludeTheExplicitSuppressionCauseOutsideTheDisplayWindow() {
+        SystemAlertVO source = SystemAlertVO.builder().id(1L).domain(AlertDomain.BUSINESS)
+                .instanceId("local").suppressionCauseAlertId(12L)
+                .labels(Map.of("brokerName", "broker-a")).build();
+        SystemAlertVO cause = SystemAlertVO.builder().id(12L).domain(AlertDomain.CLUSTER)
+                .instanceId("local").transition("FIRING")
+                .labels(Map.of("brokerName", "broker-a")).build();
+        when(alertRepository.findAlertById(1L)).thenReturn(Optional.of(source));
+        when(alertRepository.findAlertById(12L)).thenReturn(Optional.of(cause));
+
+        assertThat(alertService.findRelatedAlerts(1L)).containsExactly(cause);
     }
 
     @Test

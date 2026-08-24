@@ -13,7 +13,7 @@ not require Prometheus or Alertmanager for rule evaluation or event creation.
 | Area | Current implementation | Explicitly deferred |
 | --- | --- | --- |
 | Notification routing | Per-rule channel selection for DingTalk, configured SMS webhook, and SMTP email. Delivery uses the durable outbox. | Independent channel and notification-policy CRUD, generic per-rule Webhook endpoints. |
-| Notification frequency | One delivery attempt sequence for `FIRING` and another for `RESOLVED`; retries have bounded exponential backoff. | Repeat-notification and `cooldownSeconds` policy. |
+| Notification frequency | `FIRING`, periodic `REMINDER` (per rule `reminderInterval`), and `RESOLVED` deliveries; retries have bounded exponential backoff. | A separate `cooldownSeconds` policy. |
 | Collector health | Per-instance bounded collection, timeout, database lease, and delivery audit history. | Producer failure-rate, thread-pool rejection, and cloud Broker-level health metrics. |
 | Validation | Unit and controller tests plus `server/scripts/native-alert-e2e.sh` for a real RocketMQ, MySQL, SMTP, and webhook receiver environment. | A CI-owned shared RocketMQ/SMTP/webhook environment; production SLO dashboards for collector or delivery failure rate. |
 
@@ -200,7 +200,7 @@ PENDING/FIRING -- silence matches --> state unchanged, notification suppressed
 
 The fingerprint is `sha256(ruleId + instanceId + sorted(labels))`. A single rule therefore creates independent events for different Brokers, Topics, queues, or consumer groups.
 
-Current delivery emits on `FIRING` and `RESOLVED`; repeat-notification cooldown is future work. A value recovery always emits a `RESOLVED` event.
+Current delivery emits on `FIRING`, periodic `REMINDER` transitions controlled by the rule's `reminderInterval`, and `RESOLVED`. A separate `cooldownSeconds` policy remains future work. A value recovery always emits a `RESOLVED` event.
 
 ## Persistence
 
@@ -312,7 +312,7 @@ An event row displays its domain badge, current value, threshold, resource ident
 
 1. Introduce the metric contract, catalog, Apache collectors, snapshots, and single-node scheduler.
 2. Implement rule evaluation, state transitions, Alert Events lifecycle, acknowledgement, and three initial rules: Broker unavailable, Broker disk pressure, Consumer lag.
-3. Implement DingTalk, SMS webhook, and Email through the outbox worker, plus delivery history. Generic per-rule Webhook delivery and cooldown are future work.
+3. Implement DingTalk, SMS webhook, and Email through the outbox worker, plus delivery history and rule-level `reminderInterval`. Generic per-rule Webhook delivery and a separate cooldown policy are future work.
 4. Add silences, multi-replica lease handling, rule test-run, and capability-aware forms. These are complete,
    including label-scoped silences and instance-specific metric capability forms.
 5. Add Proxy and cloud collectors, additional business rules, and optional Prometheus YAML export compatibility.
@@ -340,8 +340,10 @@ export E2E_ADMIN_PASSWORD='***'
 export E2E_NAMESRV_ADDR=127.0.0.1:9876
 export E2E_SMTP_HOST=127.0.0.1
 export E2E_EMAIL_RECIPIENT=native-alert-e2e@example.test
-export E2E_WEBHOOK_URL='http://127.0.0.1:18090/alerts'
-export E2E_WEBHOOK_ASSERT_URL='http://127.0.0.1:18090/received'
+# Use a routable private address, not 127.0.0.1: notification webhooks reject loopback
+# targets to prevent SSRF. Replace this address with the host address of the receiver.
+export E2E_WEBHOOK_URL='http://192.168.1.10:18090/alerts'
+export E2E_WEBHOOK_ASSERT_URL='http://192.168.1.10:18090/received'
 server/scripts/native-alert-e2e.sh
 ```
 

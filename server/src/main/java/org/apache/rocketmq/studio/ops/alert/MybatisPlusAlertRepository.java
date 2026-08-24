@@ -117,6 +117,7 @@ public class MybatisPlusAlertRepository implements AlertRepository {
                 .eq(query.domain() != null, "domain", query.domain() == null ? null : query.domain().name())
                 .eq(StringUtils.hasText(query.instanceId()), "instance_id", trimToNull(query.instanceId()))
                 .eq(StringUtils.hasText(query.transition()), "transition", normalizeTransition(query.transition()))
+                .eq(query.notificationSuppressed() != null, "notification_suppressed", query.notificationSuppressed())
                 .apply(StringUtils.hasText(query.labelKey()),
                         "JSON_CONTAINS(labels_json, JSON_OBJECT({0}, {1}))", query.labelKey(), query.labelValue())
                 .ge(query.from() != null, "time", query.from())
@@ -236,6 +237,9 @@ public class MybatisPlusAlertRepository implements AlertRepository {
         vo.setTransition(entity.getTransition());
         vo.setInstanceId(entity.getInstanceId());
         vo.setCurrentValue(entity.getCurrentValue());
+        vo.setNotificationSuppressed(Boolean.TRUE.equals(entity.getNotificationSuppressed()));
+        vo.setSuppressionCauseAlertId(entity.getSuppressionCauseAlertId());
+        vo.setSuppressionReason(entity.getSuppressionReason());
         vo.setLabels(readLabels(entity.getLabelsJson()));
         return vo;
     }
@@ -256,6 +260,9 @@ public class MybatisPlusAlertRepository implements AlertRepository {
         entity.setTransition(alert.getTransition());
         entity.setInstanceId(alert.getInstanceId());
         entity.setCurrentValue(alert.getCurrentValue());
+        entity.setNotificationSuppressed(alert.isNotificationSuppressed());
+        entity.setSuppressionCauseAlertId(alert.getSuppressionCauseAlertId());
+        entity.setSuppressionReason(alert.getSuppressionReason());
         entity.setLabelsJson(writeLabels(alert.getLabels()));
         entity.setGmtModified(LocalDateTime.now());
         return entity;

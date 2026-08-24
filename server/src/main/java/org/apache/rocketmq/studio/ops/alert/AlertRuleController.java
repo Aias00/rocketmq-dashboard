@@ -49,6 +49,11 @@ public class AlertRuleController {
         return Result.ok(alertService.listRules(AlertDomain.BUSINESS));
     }
 
+    @GetMapping("/runtime")
+    public Result<List<AlertRuleRuntimeVO>> listRuntime() {
+        return Result.ok(alertService.listRuleRuntime(AlertDomain.BUSINESS));
+    }
+
     @GetMapping("/export")
     public Result<AlertRulesYamlVO> exportRules() {
         return Result.ok(new AlertRulesYamlVO(alertService.exportPrometheusRulesYaml()));

@@ -30,14 +30,15 @@ class AlertRuleRequestDTOTest {
     private final Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
 
     @Test
-    void channelsShouldRejectNullAndBlankElements() {
+    void channelsShouldRejectNullBlankAndUnsupportedElements() {
         AlertRuleRequestDTO request = new AlertRuleRequestDTO();
         request.setName("High Lag");
         request.setChannels(Arrays.asList("email", null, " "));
 
         assertThat(validator.validate(request))
                 .extracting(violation -> violation.getMessage())
-                .containsOnly("channel must not be blank");
+                .containsExactlyInAnyOrder("channel must not be blank", "channel must not be blank",
+                        "channel is unsupported");
     }
 
     @Test

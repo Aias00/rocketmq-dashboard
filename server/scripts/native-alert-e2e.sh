@@ -10,7 +10,7 @@
 #   E2E_ADMIN_USERNAME    Studio administrator already present in that database
 #   E2E_ADMIN_PASSWORD    Password for E2E_ADMIN_USERNAME
 #   E2E_NAMESRV_ADDR      Reachable NameServer address, for example 127.0.0.1:9876
-#   E2E_WEBHOOK_URL       Receiver URL saved as the SMS webhook setting
+#   E2E_WEBHOOK_URL       Non-loopback receiver URL saved as the SMS webhook setting
 #   E2E_WEBHOOK_ASSERT_URL GET endpoint returning captured webhook payloads
 #   E2E_EMAIL_RECIPIENT   Recipient accepted by the SMTP sink
 #   E2E_SMTP_HOST         SMTP host
@@ -148,10 +148,11 @@ curl -fsS -c "$COOKIE" -H 'Content-Type: application/json' \
   -d "$(jq -n --arg username "$E2E_ADMIN_USERNAME" --arg password "$E2E_ADMIN_PASSWORD" '{username:$username,password:$password}')" \
   "http://127.0.0.1:${PORT}/api/auth/login" >/dev/null
 
-# Configure both real delivery paths through the public settings API.
+# Configure both real delivery paths through the public settings API. LLM is outside this
+# scenario, so leave its base URL blank rather than depending on external DNS/network access.
 api_post /api/settings/general/save "$(jq -n --arg webhook "$E2E_WEBHOOK_URL" --arg recipient "$E2E_EMAIL_RECIPIENT" \
   '{theme:"light",compact:false,desktopNotify:false,notifySound:false,sessionTimeout:30,requireLogin:true,
-    llmProvider:"openai",model:"gpt-4o-mini",baseUrl:"https://api.openai.com/v1",emailRecipients:$recipient,smsWebhook:$webhook}')" >/dev/null
+    llmProvider:"openai",model:"gpt-4o-mini",baseUrl:"",emailRecipients:$recipient,smsWebhook:$webhook}')" >/dev/null
 api_post /api/instances/create "$(jq -n --arg name "$INSTANCE_ID" \
   '{name:$name,type:"DIRECT",endpoint:"127.0.0.1:19879",vendor:"APACHE"}')" >/dev/null
 RULE=$(api_post /api/cluster-alert-rules/create "$(jq -n --arg name "$RULE_NAME" --arg instance "$INSTANCE_ID" \

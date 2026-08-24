@@ -194,6 +194,24 @@ public class NotificationOutboxService {
         recordDelivery(row, "RETRY_ALERT_NOTIFICATION_MANUALLY", "SUCCESS", null);
     }
 
+    public NotificationDeliveryBulkRetryResult retryFailedDeliveries(List<Long> deliveryIds) {
+        if (deliveryIds == null || deliveryIds.isEmpty() || deliveryIds.size() > 100) {
+            throw new org.apache.rocketmq.studio.common.exception.BusinessException(400,
+                    "Provide between 1 and 100 notification delivery IDs");
+        }
+        List<Long> succeeded = new ArrayList<>();
+        Map<Long, String> failures = new java.util.LinkedHashMap<>();
+        for (Long deliveryId : new LinkedHashSet<>(deliveryIds)) {
+            try {
+                retryFailedDelivery(deliveryId);
+                succeeded.add(deliveryId);
+            } catch (org.apache.rocketmq.studio.common.exception.BusinessException error) {
+                failures.put(deliveryId, error.getMessage());
+            }
+        }
+        return new NotificationDeliveryBulkRetryResult(succeeded, failures);
+    }
+
     private static String normalizeFilter(String value) {
         String normalized = normalizeTrim(value);
         return normalized == null ? null : normalized.toLowerCase();

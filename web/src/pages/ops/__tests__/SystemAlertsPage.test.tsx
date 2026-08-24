@@ -15,6 +15,7 @@ import {
   acknowledgeAlert,
   createAlertSilence,
   listAlertDeliveries,
+  listRelatedSystemAlerts,
   retryAlertDelivery,
   listAlertSilences,
   listSystemAlertsPage,
@@ -27,6 +28,7 @@ vi.mock('../../../services/opsService', () => ({
   listSystemAlertsPage: vi.fn(),
   getCollectorStatus: vi.fn().mockResolvedValue({ collectionInterval: 'PT30S' }),
   listAlertDeliveries: vi.fn().mockResolvedValue([]),
+  listRelatedSystemAlerts: vi.fn().mockResolvedValue([]),
   retryAlertDelivery: vi.fn(),
   listAlertSilences: vi.fn(),
   createAlertSilence: vi.fn(),
@@ -282,6 +284,63 @@ describe('SystemAlertsPage', () => {
     expect(screen.getByText('未配置通知通道')).toBeInTheDocument();
     expect(listAlertDeliveries).toHaveBeenCalledWith(7);
     expect(listAlertDeliveries).toHaveBeenCalledWith(8);
+  });
+
+  it('explains when a business notification was suppressed by a cluster incident', async () => {
+    vi.mocked(listSystemAlertsPage).mockResolvedValue({
+      items: [
+        {
+          id: 12,
+          level: 'warning',
+          title: 'Consumer lag',
+          description: 'orders consumer lag is high',
+          time: '2026-08-10 01:04',
+          acknowledged: false,
+          ruleId: 42,
+          notificationSuppressed: true,
+          suppressionCauseAlertId: 9,
+          suppressionReason: '通知已由上游集群故障抑制：Broker unavailable',
+        },
+      ],
+      total: 1,
+      page: 1,
+      size: 20,
+    });
+    vi.mocked(listAlertDeliveries).mockResolvedValue([]);
+    const user = userEvent.setup();
+    renderPage();
+
+    expect(await screen.findByText('通知已抑制')).toBeInTheDocument();
+    expect(screen.getByText('通知已由上游集群故障抑制：Broker unavailable')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: '投递记录' }));
+    expect(await screen.findAllByText('通知已由上游集群故障抑制：Broker unavailable')).toHaveLength(
+      2,
+    );
+    await user.click(screen.getByRole('button', { name: '查看根因' }));
+    expect(listRelatedSystemAlerts).toHaveBeenCalledWith(12);
+  });
+
+  it('shows cross-domain related events on demand', async () => {
+    vi.mocked(listRelatedSystemAlerts).mockResolvedValue([
+      {
+        id: 9,
+        level: 'error',
+        title: 'Cluster root event',
+        description: 'broker-a is offline',
+        time: '2026-08-10 01:00',
+        domain: 'CLUSTER',
+        transition: 'FIRING',
+        acknowledged: false,
+      },
+    ]);
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click((await screen.findAllByRole('button', { name: '关联事件' }))[0]);
+
+    expect(await screen.findByText('Cluster root event')).toBeInTheDocument();
+    expect(screen.getByText('可能根因/影响')).toBeInTheDocument();
+    expect(listRelatedSystemAlerts).toHaveBeenCalledWith(1);
   });
 
   it('keeps delivery failures within the alert card and retries only failed deliveries', async () => {

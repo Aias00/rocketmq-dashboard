@@ -33,6 +33,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
 
 class NativeAlertProcessorTest {
@@ -152,7 +153,7 @@ class NativeAlertProcessorTest {
         };
 
         new NativeAlertProcessor(service, new AlertRuleEvaluator(), new AlertStateMachine(), states, snapshots,
-                mock(AlertRepository.class), mock(NotificationOutboxService.class)).process(List.of(current));
+                mock(AlertRepository.class), mock(NotificationOutboxService.class), suppression()).process(List.of(current));
 
         assertThat(saved.values()).singleElement().satisfies(state -> {
             assertThat(state.status()).isEqualTo(AlertStateStatus.FIRING);
@@ -195,7 +196,7 @@ class NativeAlertProcessorTest {
         };
 
         new NativeAlertProcessor(service, new AlertRuleEvaluator(), new AlertStateMachine(), states, snapshots,
-                mock(AlertRepository.class), mock(NotificationOutboxService.class)).process(List.of(current));
+                mock(AlertRepository.class), mock(NotificationOutboxService.class), suppression()).process(List.of(current));
 
         assertThat(saved.values()).singleElement().satisfies(state -> {
             assertThat(state.status()).isEqualTo(AlertStateStatus.FIRING);
@@ -240,7 +241,7 @@ class NativeAlertProcessorTest {
         NotificationOutboxService outbox = mock(NotificationOutboxService.class);
 
         new NativeAlertProcessor(service, new AlertRuleEvaluator(), new AlertStateMachine(), states,
-                mock(MetricSnapshotRepository.class), alerts, outbox).process(List.of(sample("orders")));
+                mock(MetricSnapshotRepository.class), alerts, outbox, suppression()).process(List.of(sample("orders")));
 
         verify(outbox).enqueue(any(SystemAlertVO.class), org.mockito.ArgumentMatchers.same(rule),
                 org.mockito.ArgumentMatchers.anyMap());
@@ -249,7 +250,63 @@ class NativeAlertProcessorTest {
     private static NativeAlertProcessor processor(AlertService service, AlertStateRepository states,
             AlertRepository alerts) {
         return new NativeAlertProcessor(service, new AlertRuleEvaluator(), new AlertStateMachine(), states,
-                mock(MetricSnapshotRepository.class), alerts, mock(NotificationOutboxService.class));
+                mock(MetricSnapshotRepository.class), alerts, mock(NotificationOutboxService.class), suppression());
+    }
+
+    @Test
+    void suppressesBusinessFiringNotificationWhenAnActiveClusterIncidentMatches() {
+        AlertService service = mock(AlertService.class);
+        AlertRuleVO rule = rule("local", "orders", 1);
+        rule.setChannels(List.of("dingtalk"));
+        when(service.listRules(AlertDomain.BUSINESS)).thenReturn(List.of(rule));
+        AlertStateRepository states = mock(AlertStateRepository.class);
+        when(states.find(any(AlertStateKey.class))).thenReturn(Optional.empty());
+        when(states.save(any(AlertStateKey.class), any(AlertRuleState.class))).thenReturn(true);
+        AlertRepository alerts = mock(AlertRepository.class);
+        when(alerts.saveAlert(any(SystemAlertVO.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        NotificationOutboxService outbox = mock(NotificationOutboxService.class);
+        AlertNotificationSuppressionService suppression = mock(AlertNotificationSuppressionService.class);
+        SystemAlertVO clusterCause = SystemAlertVO.builder().id(11L).title("Broker unavailable").build();
+        when(suppression.findSuppressingClusterAlert(any(SystemAlertVO.class))).thenReturn(Optional.of(clusterCause));
+
+        new NativeAlertProcessor(service, new AlertRuleEvaluator(), new AlertStateMachine(), states,
+                mock(MetricSnapshotRepository.class), alerts, outbox, suppression).process(List.of(sample("orders")));
+
+        org.mockito.ArgumentCaptor<SystemAlertVO> event = org.mockito.ArgumentCaptor.forClass(SystemAlertVO.class);
+        verify(alerts).saveAlert(event.capture());
+        assertThat(event.getValue().isNotificationSuppressed()).isTrue();
+        assertThat(event.getValue().getSuppressionCauseAlertId()).isEqualTo(11L);
+        assertThat(event.getValue().getSuppressionReason()).contains("#11").contains("Broker unavailable");
+        verify(outbox, never()).enqueue(any(), any(), any());
+    }
+
+    @Test
+    void doesNotSuppressResolvedBusinessNotification() {
+        AlertService service = mock(AlertService.class);
+        AlertRuleVO rule = rule("local", "orders", 1);
+        rule.setChannels(List.of("dingtalk"));
+        when(service.listRules(AlertDomain.BUSINESS)).thenReturn(List.of(rule));
+        AlertStateRepository states = mock(AlertStateRepository.class);
+        when(states.find(any(AlertStateKey.class))).thenReturn(Optional.of(new AlertRuleState(AlertStateStatus.FIRING,
+                1, 20D, null, Instant.now().minusSeconds(60), Instant.now().minusSeconds(30), null)));
+        when(states.save(any(AlertStateKey.class), any(AlertRuleState.class))).thenReturn(true);
+        AlertRepository alerts = mock(AlertRepository.class);
+        when(alerts.saveAlert(any(SystemAlertVO.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        NotificationOutboxService outbox = mock(NotificationOutboxService.class);
+        AlertNotificationSuppressionService suppression = mock(AlertNotificationSuppressionService.class);
+
+        new NativeAlertProcessor(service, new AlertRuleEvaluator(), new AlertStateMachine(), states,
+                mock(MetricSnapshotRepository.class), alerts, outbox, suppression)
+                .process(List.of(sample("orders", 0D)));
+
+        verify(suppression, never()).findSuppressingClusterAlert(any());
+        verify(outbox).enqueue(any(), org.mockito.ArgumentMatchers.same(rule), any());
+    }
+
+    private static AlertNotificationSuppressionService suppression() {
+        AlertNotificationSuppressionService service = mock(AlertNotificationSuppressionService.class);
+        when(service.findSuppressingClusterAlert(any(SystemAlertVO.class))).thenReturn(Optional.empty());
+        return service;
     }
 
     private static AlertRuleVO rule(String instanceId, String group, int consecutiveSamples) {

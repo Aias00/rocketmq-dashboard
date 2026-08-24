@@ -26,6 +26,7 @@ import {
   updateIsVIPChannel,
   updateUseTLS,
   listAlertRules,
+  listAlertRuleRuntime,
   exportAlertRulesTransfer,
   importAlertRulesTransfer,
   listNativeAlertMetrics,
@@ -36,6 +37,7 @@ import {
   bulkDeleteAlertRules,
   bulkToggleAlertRules,
   listSystemAlerts,
+  listRelatedSystemAlerts,
   listSystemAlertsPage,
   acknowledgeAlert,
   clearAcknowledgedAlerts,
@@ -157,6 +159,13 @@ describe('Ops API - Alert Rules', () => {
     const result = await listAlertRules();
     expect(result).toHaveLength(1);
     expect(result[0].name).toBe('HighCPU');
+  });
+
+  it('loads runtime state through the selected alert domain', async () => {
+    const runtime = [{ ruleId: 1, fingerprint: 'broker-a', status: 'FIRING', consecutiveHits: 3 }];
+    mock.onGet('/cluster-alert-rules/runtime').reply(200, { code: 200, data: runtime });
+
+    await expect(listAlertRuleRuntime()).resolves.toEqual(runtime);
   });
 
   it('creates an alert rule', async () => {
@@ -287,6 +296,12 @@ describe('Ops API - System Alerts & Audit', () => {
     });
     const result = await listSystemAlerts();
     expect(result[0].level).toBe('critical');
+  });
+
+  it('loads related system alerts for an event', async () => {
+    mock.onGet('/system-alerts/9/related').reply(200, { code: 200, data: [{ id: 10 }] });
+
+    await expect(listRelatedSystemAlerts(9)).resolves.toEqual([{ id: 10 }]);
   });
 
   it('lists paged system alerts with server-side filters', async () => {

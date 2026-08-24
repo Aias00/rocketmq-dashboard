@@ -14,6 +14,11 @@ import java.util.HexFormat;
 
 /** Stable identity for the fields that determine when a rule evaluates to true. */
 final class AlertRuleSemanticFingerprint {
+    private static final java.util.Set<String> RATIO_METRICS = java.util.Set.of(
+            "broker.disk.usage_ratio",
+            "broker.jvm.heap.usage_ratio",
+            "broker.send_queue.usage_ratio");
+
     private AlertRuleSemanticFingerprint() {
     }
 
@@ -23,7 +28,7 @@ final class AlertRuleSemanticFingerprint {
         append(value, normalize(rule.getInstanceId()));
         append(value, normalize(rule.getMetric()));
         append(value, normalizeUpper(rule.getOperator()));
-        append(value, normalizeThreshold(rule.getThreshold()));
+        append(value, normalizeThreshold(rule));
         append(value, normalizeLower(rule.getDuration()));
         append(value, normalizeUpper(defaultIfBlank(rule.getAggregation(), "LAST")));
         append(value, Integer.toString(Math.max(0, rule.getWindowSeconds())));
@@ -56,7 +61,15 @@ final class AlertRuleSemanticFingerprint {
         return normalized.isEmpty() ? fallback : normalized;
     }
 
-    private static String normalizeThreshold(double threshold) {
+    static double normalizedThreshold(AlertRuleVO rule) {
+        if ("%".equals(rule.getThresholdUnit()) && RATIO_METRICS.contains(rule.getMetric())) {
+            return rule.getThreshold() / 100D;
+        }
+        return rule.getThreshold();
+    }
+
+    private static String normalizeThreshold(AlertRuleVO rule) {
+        double threshold = normalizedThreshold(rule);
         if (threshold == 0D) {
             return "0";
         }

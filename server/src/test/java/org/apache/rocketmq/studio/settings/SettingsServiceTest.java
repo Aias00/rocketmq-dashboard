@@ -236,6 +236,23 @@ class SettingsServiceTest {
     }
 
     @Test
+    void saveGeneralSettingsShouldClearDingtalkSigningSecretOnlyWhenExplicitlyRequested() {
+        GeneralSettingsVO existing = GeneralSettingsVO.builder()
+                .dingtalkSigningSecret("SEC-existing")
+                .build();
+        GeneralSettingsVO update = GeneralSettingsVO.builder()
+                .clearDingtalkSigningSecret(true)
+                .build();
+        when(settingsRepository.loadGeneralSettings()).thenReturn(existing);
+
+        settingsService.saveGeneralSettings(update);
+
+        assertThat(update.getDingtalkSigningSecret()).isEmpty();
+        assertThat(update.isClearDingtalkSigningSecret()).isFalse();
+        verify(settingsRepository).saveGeneralSettings(update);
+    }
+
+    @Test
     void saveGeneralSettingsShouldLetClearTakePrecedenceOverReplacementApiKey() {
         GeneralSettingsVO update = GeneralSettingsVO.builder()
                 .apiKey("sk-new")

@@ -16,14 +16,19 @@
  */
 package org.apache.rocketmq.studio.ops.alert;
 
+import lombok.Builder;
+import lombok.Value;
+
 import java.time.LocalDateTime;
 
-/** Server-side filters for the paged alert-event feed. */
-public record SystemAlertQuery(String level, AlertDomain domain, String instanceId, String transition,
-        String labelKey, String labelValue, LocalDateTime from, LocalDateTime to, int page, int pageSize,
-        Boolean notificationSuppressed) {
-    public SystemAlertQuery(String level, AlertDomain domain, String instanceId, String transition,
-            String labelKey, String labelValue, LocalDateTime from, LocalDateTime to, int page, int pageSize) {
-        this(level, domain, instanceId, transition, labelKey, labelValue, from, to, page, pageSize, null);
-    }
+@Value
+@Builder
+public class AlertRuleRuntimeVO {
+    Long ruleId;
+    String fingerprint;
+    AlertStateStatus status;
+    int consecutiveHits;
+    Double currentValue;
+    LocalDateTime lastNotifiedAt;
+    LocalDateTime nextReminderAt;
 }

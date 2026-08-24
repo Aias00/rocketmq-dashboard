@@ -56,6 +56,12 @@ public class RmqSystemAlert {
 
     private Double currentValue;
 
+    private Boolean notificationSuppressed;
+
+    private Long suppressionCauseAlertId;
+
+    private String suppressionReason;
+
     private String labelsJson;
 
     private LocalDateTime gmtCreate;

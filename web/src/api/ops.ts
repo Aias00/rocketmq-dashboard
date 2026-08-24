@@ -52,6 +52,14 @@ export interface AlertRuleTestResult {
     conditionMet: boolean;
   }>;
 }
+export interface AlertRuleRuntime {
+  ruleId: number;
+  fingerprint: string;
+  status: string;
+  consecutiveHits: number;
+  currentValue?: number | null;
+  nextReminderAt?: string | null;
+}
 
 // Matches mock/dashboard.ts systemAlerts
 export interface SystemAlert {
@@ -69,6 +77,9 @@ export interface SystemAlert {
   transition?: 'FIRING' | 'RESOLVED' | null;
   instanceId?: string | null;
   currentValue?: number | null;
+  notificationSuppressed?: boolean;
+  suppressionCauseAlertId?: number | null;
+  suppressionReason?: string | null;
   labels?: Record<string, string>;
 }
 
@@ -87,6 +98,7 @@ export interface SystemAlertQuery {
   labelValue?: string;
   from?: string;
   to?: string;
+  notificationSuppressed?: boolean;
   page?: number;
   pageSize?: number;
 }
@@ -99,6 +111,11 @@ export interface NotificationDelivery {
   nextAttemptAt?: string | null;
   lastError?: string | null;
   deliveredAt?: string | null;
+}
+
+export interface NotificationDeliveryBulkRetryResult {
+  succeededIds: number[];
+  failures: Record<string, string>;
 }
 
 export interface NotificationDeliveryRecord extends NotificationDelivery {
@@ -180,6 +197,10 @@ export async function listNativeAlertMetrics(instanceId: string, domain: AlertRu
 
 export async function listAlertRules(domain: AlertRuleDomain = 'CLUSTER') {
   const res = await client.get<{ data: AlertRule[] }>(alertRulePath(domain));
+  return res.data.data;
+}
+export async function listAlertRuleRuntime(domain: AlertRuleDomain = 'CLUSTER') {
+  const res = await client.get<{ data: AlertRuleRuntime[] }>(`${alertRulePath(domain)}/runtime`);
   return res.data.data;
 }
 
@@ -271,6 +292,11 @@ export async function listSystemAlertsPage(params: SystemAlertQuery = {}) {
   return res.data.data;
 }
 
+export async function listRelatedSystemAlerts(id: number) {
+  const res = await client.get<{ data: SystemAlert[] }>(`/system-alerts/${id}/related`);
+  return res.data.data;
+}
+
 export async function getCollectorStatus() {
   const res = await client.get<{ data: CollectorStatus }>('/alert-collector-status');
   return res.data.data;
@@ -292,6 +318,14 @@ export async function listAlertDeliveries(id: number) {
 
 export async function retryAlertDelivery(id: number) {
   await client.post(`/system-alerts/deliveries/${id}/retry`);
+}
+
+export async function retryAlertDeliveries(ids: number[]) {
+  const res = await client.post<{ data: NotificationDeliveryBulkRetryResult }>(
+    '/system-alerts/deliveries/retry',
+    ids,
+  );
+  return res.data.data;
 }
 
 export async function listAlertDeliveriesPage(params: NotificationDeliveryQuery = {}) {

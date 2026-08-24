@@ -58,6 +58,7 @@ const buildPayload = (settings: GeneralSettings): GeneralSettingsUpdate => ({
   baseUrl: settings.baseUrl,
   dingtalkWebhook: settings.dingtalkWebhook,
   dingtalkSigningSecret: settings.dingtalkSigningSecret,
+  clearDingtalkSigningSecret: settings.clearDingtalkSigningSecret,
   emailRecipients: settings.emailRecipients,
   smsWebhook: settings.smsWebhook,
 });
@@ -122,11 +123,32 @@ export const GeneralSettingsTab = () => {
     if (!settings) return false;
     try {
       await saveGeneralSettings(buildPayload({ ...settings, ...patch }));
-      setSettings({ ...settings, ...patch });
+      const statePatch = { ...patch };
+      delete statePatch.clearDingtalkSigningSecret;
+      setSettings({ ...settings, ...statePatch });
       return true;
     } catch {
       message.error('设置保存失败，请稍后重试');
       return false;
+    }
+  };
+
+  const clearDingtalkSigningSecret = async () => {
+    if (!settings) return;
+    setSavingNotification(true);
+    try {
+      if (
+        await mergeAndSave({
+          dingtalkSigningSecret: '',
+          clearDingtalkSigningSecret: true,
+          dingtalkSigningSecretConfigured: false,
+        })
+      ) {
+        notifyForm.setFieldValue('dingtalkSigningSecret', '');
+        message.success('钉钉签名密钥已清除');
+      }
+    } finally {
+      setSavingNotification(false);
     }
   };
 
@@ -289,6 +311,17 @@ export const GeneralSettingsTab = () => {
           >
             <Input.Password placeholder="SEC..." autoComplete="new-password" />
           </Form.Item>
+          {settings?.dingtalkSigningSecretConfigured && (
+            <Form.Item style={{ marginTop: -16 }}>
+              <Button
+                danger
+                onClick={() => void clearDingtalkSigningSecret()}
+                loading={savingNotification}
+              >
+                清除钉钉签名密钥
+              </Button>
+            </Form.Item>
+          )}
 
           <Form.Item
             label="邮件收件人"

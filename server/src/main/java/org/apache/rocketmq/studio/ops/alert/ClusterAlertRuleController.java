@@ -44,6 +44,11 @@ public class ClusterAlertRuleController {
         return Result.ok(alertService.listRules(AlertDomain.CLUSTER));
     }
 
+    @GetMapping("/runtime")
+    public Result<List<AlertRuleRuntimeVO>> listRuntime() {
+        return Result.ok(alertService.listRuleRuntime(AlertDomain.CLUSTER));
+    }
+
     @GetMapping("/transfer")
     public Result<AlertRuleTransferDTO> exportTransfer() {
         return Result.ok(transferService.exportRules(AlertDomain.CLUSTER));

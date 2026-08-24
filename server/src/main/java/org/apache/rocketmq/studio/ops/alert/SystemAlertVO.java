@@ -44,6 +44,9 @@ public class SystemAlertVO {
     private String transition;
     private String instanceId;
     private Double currentValue;
+    private boolean notificationSuppressed;
+    private Long suppressionCauseAlertId;
+    private String suppressionReason;
     @Builder.Default
     private Map<String, String> labels = Map.of();
 }

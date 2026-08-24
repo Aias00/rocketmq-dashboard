@@ -64,9 +64,14 @@ public class AlertService {
                 .toList();
     }
 
+    public List<AlertRuleRuntimeVO> listRuleRuntime(AlertDomain domain) {
+        return alertStateRepository.findRuntimeByRuleIds(listRules(domain));
+    }
+
     public String exportPrometheusRulesYaml() {
         List<AlertRuleVO> rules = alertRepository.findAllRules().stream()
                 .filter(AlertRuleVO::isEnabled)
+                .filter(rule -> resolveDomain(rule) == AlertDomain.BUSINESS)
                 .toList();
         List<PrometheusAlertRule> prometheusRules = rules.isEmpty()
                 ? defaultPrometheusRules()
@@ -437,6 +442,12 @@ public class AlertService {
     public PageResult<SystemAlertVO> listAlerts(String level, AlertDomain domain, String instanceId,
             String transition, String labelKey, String labelValue, LocalDateTime from, LocalDateTime to,
             int page, int pageSize) {
+        return listAlerts(level, domain, instanceId, transition, labelKey, labelValue, from, to, page, pageSize, null);
+    }
+
+    public PageResult<SystemAlertVO> listAlerts(String level, AlertDomain domain, String instanceId,
+            String transition, String labelKey, String labelValue, LocalDateTime from, LocalDateTime to,
+            int page, int pageSize, Boolean notificationSuppressed) {
         if (page < 1 || pageSize < 1 || pageSize > 100) {
             throw new BusinessException(400, "Invalid page or pageSize");
         }
@@ -448,7 +459,40 @@ public class AlertService {
         }
         return alertRepository.findAlertsPage(new SystemAlertQuery(level, domain, instanceId, transition,
                 hasText(labelKey) ? labelKey.trim() : null, hasText(labelValue) ? labelValue.trim() : null,
-                from, to, page, pageSize));
+                from, to, page, pageSize, notificationSuppressed));
+    }
+
+    public List<SystemAlertVO> findRelatedAlerts(Long id) {
+        if (id == null) {
+            throw new BusinessException(400, "System alert ID is required");
+        }
+        SystemAlertVO source = alertRepository.findAlertById(id)
+                .orElseThrow(() -> new BusinessException(404, "System alert not found: " + id));
+        AlertDomain relatedDomain = (source.getDomain() == null ? AlertDomain.BUSINESS : source.getDomain())
+                == AlertDomain.BUSINESS
+                ? AlertDomain.CLUSTER : AlertDomain.BUSINESS;
+        List<SystemAlertVO> explicitCauses = source.getSuppressionCauseAlertId() == null
+                ? List.of()
+                : alertRepository.findAlertById(source.getSuppressionCauseAlertId())
+                        .stream()
+                        .filter(candidate -> candidate.getDomain() == relatedDomain)
+                        .filter(candidate -> AlertCorrelationScope.matches(source, candidate))
+                        .toList();
+        if (!hasText(source.getInstanceId()) || source.getTime() == null) {
+            return explicitCauses;
+        }
+        LocalDateTime from = source.getTime().minusMinutes(30);
+        LocalDateTime to = source.getTime().plusMinutes(30);
+        List<SystemAlertVO> windowMatches = alertRepository.findAlertsPage(new SystemAlertQuery(null, relatedDomain, source.getInstanceId(),
+                        "FIRING", null, null, from, to, 1, 100))
+                .getItems().stream()
+                .filter(candidate -> !Objects.equals(candidate.getId(), source.getId()))
+                .filter(candidate -> AlertCorrelationScope.matches(source, candidate))
+                .toList();
+        LinkedHashMap<Long, SystemAlertVO> related = new LinkedHashMap<>();
+        explicitCauses.forEach(candidate -> related.put(candidate.getId(), candidate));
+        windowMatches.forEach(candidate -> related.putIfAbsent(candidate.getId(), candidate));
+        return List.copyOf(related.values());
     }
 
 

@@ -53,6 +53,9 @@ public class GeneralSettingsVO {
     @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     @ToString.Exclude
     private String dingtalkSigningSecret;
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
+    @ToString.Exclude
+    private boolean clearDingtalkSigningSecret;
     private String emailRecipients;
     private String smsWebhook;
 

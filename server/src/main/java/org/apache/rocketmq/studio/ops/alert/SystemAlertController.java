@@ -60,10 +60,16 @@ public class SystemAlertController {
             @RequestParam(required = false) String labelValue,
             @RequestParam(required = false) LocalDateTime from,
             @RequestParam(required = false) LocalDateTime to,
+            @RequestParam(required = false) Boolean notificationSuppressed,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int pageSize) {
         return Result.ok(alertService.listAlerts(level, domain, instanceId, transition,
-                labelKey, labelValue, from, to, page, pageSize));
+                labelKey, labelValue, from, to, page, pageSize, notificationSuppressed));
+    }
+
+    @GetMapping("/{id}/related")
+    public Result<List<SystemAlertVO>> listRelatedAlerts(@PathVariable Long id) {
+        return Result.ok(alertService.findRelatedAlerts(id));
     }
 
     @GetMapping("/{id}/deliveries")
@@ -85,6 +91,12 @@ public class SystemAlertController {
     public Result<Void> retryFailedDelivery(@PathVariable Long deliveryId) {
         notificationOutboxService.retryFailedDelivery(deliveryId);
         return Result.ok();
+    }
+
+    @PostMapping("/deliveries/retry")
+    public Result<NotificationDeliveryBulkRetryResult> retryFailedDeliveries(
+            @RequestBody(required = false) List<Long> deliveryIds) {
+        return Result.ok(notificationOutboxService.retryFailedDeliveries(deliveryIds));
     }
 
     @PostMapping("/acknowledge")

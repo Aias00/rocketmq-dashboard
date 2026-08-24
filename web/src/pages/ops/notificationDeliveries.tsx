@@ -18,14 +18,18 @@ import {
   Typography,
   message,
 } from 'antd';
-import { Eye } from '@phosphor-icons/react';
+import { ArrowClockwise, Eye } from '@phosphor-icons/react';
 import type { ColumnsType } from 'antd/es/table';
 import PageHeader from '../../components/PageHeader';
 import { useLang } from '../../i18n/LangContext';
 import type { Instance } from '../../api/instance';
 import type { NotificationDeliveryRecord } from '../../api/ops';
 import { listInstances } from '../../services/instanceService';
-import { listAlertDeliveriesPage } from '../../services/opsService';
+import {
+  listAlertDeliveriesPage,
+  retryAlertDeliveries,
+  retryAlertDelivery,
+} from '../../services/opsService';
 import { formatUtcDateTime } from '../../utils/format';
 import { tableScrollX } from '../../utils/table';
 
@@ -49,6 +53,59 @@ const NotificationDeliveriesPage = () => {
   const [status, setStatus] = useState<NotificationDeliveryRecord['status']>();
   const [instanceId, setInstanceId] = useState<string>();
   const [selectedDelivery, setSelectedDelivery] = useState<NotificationDeliveryRecord>();
+  const [retryingIds, setRetryingIds] = useState<Set<number>>(() => new Set());
+  const [retryingVisible, setRetryingVisible] = useState(false);
+
+  const refresh = () => {
+    setLoading(true);
+    void listAlertDeliveriesPage({ channel, status, instanceId, page, pageSize })
+      .then((result) => {
+        setItems(result.items);
+        setTotal(result.total);
+      })
+      .catch(() => message.error(t('deliveries.loadFailed')))
+      .finally(() => setLoading(false));
+  };
+
+  const retryDelivery = async (record: NotificationDeliveryRecord) => {
+    setRetryingIds((current) => new Set(current).add(record.id));
+    try {
+      await retryAlertDelivery(record.id);
+      message.success('已加入重新投递队列');
+      setSelectedDelivery((current) =>
+        current?.id === record.id
+          ? { ...current, status: 'PENDING', attemptCount: 0, lastError: null }
+          : current,
+      );
+      refresh();
+    } catch {
+      message.error('重新投递失败，请稍后重试');
+    } finally {
+      setRetryingIds((current) => {
+        const next = new Set(current);
+        next.delete(record.id);
+        return next;
+      });
+    }
+  };
+
+  const retryVisibleFailures = async () => {
+    const ids = items.filter((item) => item.status === 'FAILED').map((item) => item.id);
+    if (ids.length === 0) return;
+    setRetryingVisible(true);
+    try {
+      const result = await retryAlertDeliveries(ids);
+      const failed = Object.keys(result.failures).length;
+      message.success(
+        `已将 ${result.succeededIds.length} 条记录加入重试队列${failed ? `，${failed} 条未重试` : ''}`,
+      );
+      refresh();
+    } catch {
+      message.error('批量重新投递失败，请稍后重试');
+    } finally {
+      setRetryingVisible(false);
+    }
+  };
 
   useEffect(() => {
     void listInstances()
@@ -134,7 +191,7 @@ const NotificationDeliveriesPage = () => {
     },
     {
       title: t('common.actions'),
-      width: 80,
+      width: 120,
       align: 'center',
       render: (_, record) => (
         <Tooltip title={t('deliveries.viewDetails')}>
@@ -145,6 +202,18 @@ const NotificationDeliveriesPage = () => {
             aria-label={t('deliveries.viewDetails')}
             onClick={() => setSelectedDelivery(record)}
           />
+          {record.status === 'FAILED' && (
+            <Tooltip title="重新投递">
+              <Button
+                type="text"
+                size="small"
+                icon={<ArrowClockwise size={18} />}
+                aria-label="重新投递"
+                loading={retryingIds.has(record.id)}
+                onClick={() => void retryDelivery(record)}
+              />
+            </Tooltip>
+          )}
         </Tooltip>
       ),
     },
@@ -155,6 +224,14 @@ const NotificationDeliveriesPage = () => {
       <PageHeader title={t('deliveries.title')} subtitle={t('deliveries.subtitle')} />
       <Card bodyStyle={{ padding: 20 }}>
         <Flex gap={12} wrap="wrap" style={{ marginBottom: 20 }}>
+          <Button
+            icon={<ArrowClockwise size={18} />}
+            disabled={!items.some((item) => item.status === 'FAILED')}
+            loading={retryingVisible}
+            onClick={() => void retryVisibleFailures()}
+          >
+            重试当前页失败记录
+          </Button>
           <Select
             allowClear
             placeholder={t('deliveries.allChannels')}
@@ -246,6 +323,15 @@ const NotificationDeliveriesPage = () => {
                 </Descriptions.Item>
               )}
             </Descriptions>
+            {selectedDelivery.status === 'FAILED' && (
+              <Button
+                icon={<ArrowClockwise size={18} />}
+                loading={retryingIds.has(selectedDelivery.id)}
+                onClick={() => void retryDelivery(selectedDelivery)}
+              >
+                重新投递
+              </Button>
+            )}
             <div>
               <Typography.Text strong>{t('deliveries.messageContent')}</Typography.Text>
               <Typography.Paragraph

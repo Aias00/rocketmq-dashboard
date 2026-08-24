@@ -16,7 +16,7 @@
  */
 
 import { useEffect, useRef, useState, type Key } from 'react';
-import { DownloadSimple, Plus, Pencil, Trash, UploadSimple } from '@phosphor-icons/react';
+import { Copy, DownloadSimple, Plus, Pencil, Trash, UploadSimple } from '@phosphor-icons/react';
 import {
   Button,
   Card,
@@ -41,6 +41,7 @@ import type {
   AlertRule,
   AlertRuleDomain,
   AlertRuleTestResult,
+  AlertRuleRuntime,
   NativeAlertMetricInfo,
 } from '../../api/ops';
 import type { AlertRuleTransfer } from '../../api/ops';
@@ -52,6 +53,7 @@ import {
   exportAlertRulesTransfer,
   importAlertRulesTransfer,
   listAlertRules,
+  listAlertRuleRuntime,
   listNativeAlertMetrics,
   toggleAlertRule,
   testAlertRule,
@@ -139,6 +141,7 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
   const { t } = useLang();
   const { token } = theme.useToken();
   const [rules, setRules] = useState<AlertRule[]>([]);
+  const [runtime, setRuntime] = useState<AlertRuleRuntime[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingRule, setEditingRule] = useState<AlertRule | null>(null);
@@ -189,6 +192,9 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
+    void listAlertRuleRuntime(domain)
+      .then(setRuntime)
+      .catch(() => undefined);
 
     return () => {
       cancelled = true;
@@ -291,6 +297,20 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
     setEditingRule(rule);
     form.setFieldsValue(rule);
     setSelectedInstanceId(rule.instanceId);
+    if (rule.instanceId?.trim()) {
+      void loadMetricCapabilities(rule.instanceId, false);
+    } else {
+      setMetricOptions([]);
+    }
+    setModalVisible(true);
+  };
+
+  const openDuplicateModal = (rule: AlertRule) => {
+    setEditingRule(null);
+    setTestResult(null);
+    setSelectedInstanceId(rule.instanceId);
+    const { id: _id, lastTriggered: _lastTriggered, ...copy } = rule;
+    form.setFieldsValue({ ...copy, name: `${rule.name} - 副本` });
     if (rule.instanceId?.trim()) {
       void loadMetricCapabilities(rule.instanceId, false);
     } else {
@@ -480,6 +500,21 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
         ),
     },
     {
+      title: '运行态',
+      width: 130,
+      render: (_, record) => {
+        const states = runtime.filter((state) => state.ruleId === record.id);
+        if (!states.length) return <span style={{ color: '#999' }}>未采集</span>;
+        const firing = states.filter((state) => state.status === 'FIRING').length;
+        const pending = states.filter((state) => state.status === 'PENDING').length;
+        return (
+          <Tag color={firing ? 'error' : pending ? 'warning' : 'default'}>
+            {firing ? `触发 ${firing}` : pending ? `待定 ${pending}` : states[0].status}
+          </Tag>
+        );
+      },
+    },
+    {
       title: t('common.actions'),
       render: (_, record) => (
         <Flex gap={8}>
@@ -491,6 +526,14 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
             onClick={() => openEditModal(record)}
           >
             {t('common.edit')}
+          </Button>
+          <Button
+            size="small"
+            icon={<Copy size={14} />}
+            disabled={isActionRunning}
+            onClick={() => openDuplicateModal(record)}
+          >
+            复制
           </Button>
           <Popconfirm
             title={t('common.areYouSureToDelete')}

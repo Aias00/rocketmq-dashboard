@@ -2,7 +2,6 @@
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
- * The ASF licenses this file to You under the Apache License, Version 2.0.
  */
 package org.apache.rocketmq.studio.ops.alert;
 
@@ -48,5 +47,34 @@ class AlertRuleSemanticFingerprintTest {
                 .isNotEqualTo(AlertRuleSemanticFingerprint.of(base));
         assertThat(AlertRuleSemanticFingerprint.of(differentWindow))
                 .isNotEqualTo(AlertRuleSemanticFingerprint.of(base));
+    }
+
+    @Test
+    void ratioThresholdsShouldUseTheirNormalizedValueForSemanticIdentity() {
+        AlertRuleVO percentage = AlertRuleVO.builder()
+                .domain(AlertDomain.CLUSTER)
+                .metric("broker.disk.usage_ratio")
+                .operator(">=")
+                .threshold(85)
+                .thresholdUnit("%")
+                .build();
+        AlertRuleVO fraction = AlertRuleVO.builder()
+                .domain(AlertDomain.CLUSTER)
+                .metric("broker.disk.usage_ratio")
+                .operator(">=")
+                .threshold(0.85)
+                .thresholdUnit(null)
+                .build();
+        AlertRuleVO rawValue = AlertRuleVO.builder()
+                .domain(AlertDomain.CLUSTER)
+                .metric("broker.disk.usage_ratio")
+                .operator(">=")
+                .threshold(85)
+                .thresholdUnit(null)
+                .build();
+
+        assertThat(AlertRuleSemanticFingerprint.of(percentage))
+                .isEqualTo(AlertRuleSemanticFingerprint.of(fraction))
+                .isNotEqualTo(AlertRuleSemanticFingerprint.of(rawValue));
     }
 }

@@ -27,6 +27,9 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.Optional;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Repository
 @RequiredArgsConstructor
@@ -77,6 +80,23 @@ public class MybatisPlusAlertStateRepository implements AlertStateRepository {
         if (ruleId != null) {
             mapper.delete(new QueryWrapper<RmqAlertState>().eq("rule_id", ruleId));
         }
+    }
+
+    @Override
+    public List<AlertRuleRuntimeVO> findRuntimeByRuleIds(List<AlertRuleVO> rules) {
+        Map<Long, AlertRuleVO> byId = rules.stream().filter(rule -> rule.getId() != null)
+                .collect(Collectors.toMap(AlertRuleVO::getId, rule -> rule));
+        if (byId.isEmpty()) return List.of();
+        return mapper.selectList(new QueryWrapper<RmqAlertState>().in("rule_id", byId.keySet())).stream()
+                .map(state -> toRuntime(state, byId.get(state.getRuleId()))).toList();
+    }
+
+    private static AlertRuleRuntimeVO toRuntime(RmqAlertState entity, AlertRuleVO rule) {
+        LocalDateTime next = entity.getLastNotifiedAt() == null || rule == null ? null
+                : entity.getLastNotifiedAt().plus(AlertRuleDuration.parse(rule.getReminderInterval()));
+        return AlertRuleRuntimeVO.builder().ruleId(entity.getRuleId()).fingerprint(entity.getFingerprint())
+                .status(AlertStateStatus.valueOf(entity.getStatus())).consecutiveHits(entity.getConsecutiveHits() == null ? 0 : entity.getConsecutiveHits())
+                .currentValue(entity.getCurrentValue()).lastNotifiedAt(entity.getLastNotifiedAt()).nextReminderAt(next).build();
     }
 
     private static void apply(RmqAlertState entity, AlertRuleState state) {

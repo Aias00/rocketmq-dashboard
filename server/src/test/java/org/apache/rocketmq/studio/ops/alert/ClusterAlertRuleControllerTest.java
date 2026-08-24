@@ -70,6 +70,21 @@ class ClusterAlertRuleControllerTest {
     }
 
     @Test
+    void listRuntimeShouldUseClusterDomain() throws Exception {
+        when(alertService.listRuleRuntime(AlertDomain.CLUSTER)).thenReturn(List.of(
+                AlertRuleRuntimeVO.builder().ruleId(7L).fingerprint("broker-a")
+                        .status(AlertStateStatus.FIRING).consecutiveHits(3).build()));
+
+        mockMvc.perform(get("/api/cluster-alert-rules/runtime"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].ruleId").value(7))
+                .andExpect(jsonPath("$.data[0].status").value("FIRING"))
+                .andExpect(jsonPath("$.data[0].consecutiveHits").value(3));
+
+        verify(alertService).listRuleRuntime(AlertDomain.CLUSTER);
+    }
+
+    @Test
     void exportsAndImportsClusterRuleTransfer() throws Exception {
         AlertRuleTransferDTO transfer = new AlertRuleTransferDTO();
         transfer.setVersion(AlertRuleTransferDTO.VERSION);

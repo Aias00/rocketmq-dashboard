@@ -29,6 +29,7 @@ import java.time.Duration;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.TreeMap;
 import java.util.EnumMap;
 
@@ -43,6 +44,7 @@ public class NativeAlertProcessor {
     private final MetricSnapshotRepository snapshotRepository;
     private final AlertRepository alertRepository;
     private final NotificationOutboxService notificationOutboxService;
+    private final AlertNotificationSuppressionService notificationSuppressionService;
 
     @Transactional
     public void process(List<MetricSample> samples) {
@@ -74,20 +76,41 @@ public class NativeAlertProcessor {
                 if (update.transition() == AlertStateTransition.FIRING || update.transition() == AlertStateTransition.REMINDER
                         || update.transition() == AlertStateTransition.RESOLVED) {
                     LocalDateTime eventTime = LocalDateTime.ofInstant(sample.collectedAt(), ZoneOffset.UTC);
-                    SystemAlertVO event = alertRepository.saveAlert(SystemAlertVO.builder().level(level(rule.getSeverity()))
+                    SystemAlertVO event = SystemAlertVO.builder().level(level(rule.getSeverity()))
                             .title(rule.getName()).description(update.transition() + " " + sample.metricKey()
                                     + " on " + sample.instanceId()).time(eventTime)
                             .acknowledged(false).domain(sample.domain()).ruleId(rule.getId())
                             .fingerprint(key.fingerprint()).transition(update.transition().name())
                             .instanceId(sample.instanceId()).currentValue(update.state().currentValue())
-                            .labels(Map.copyOf(new TreeMap<>(sample.labels()))).build());
+                            .labels(Map.copyOf(new TreeMap<>(sample.labels()))).build();
+                    boolean suppressNotification = shouldSuppress(sample.domain(), update.transition());
+                    if (suppressNotification) {
+                        Optional<SystemAlertVO> cause = notificationSuppressionService.findSuppressingClusterAlert(event);
+                        if (cause.isPresent()) {
+                            event.setNotificationSuppressed(true);
+                            event.setSuppressionCauseAlertId(cause.get().getId());
+                            event.setSuppressionReason("Suppressed by active cluster incident #" + cause.get().getId()
+                                    + ": " + cause.get().getTitle());
+                        }
+                    }
+                    SystemAlertVO savedEvent = alertRepository.saveAlert(event);
+                    if (savedEvent != null) {
+                        event = savedEvent;
+                    }
                     if (update.transition() == AlertStateTransition.FIRING) {
                         alertRepository.markRuleTriggered(rule.getId(), eventTime.toString());
                     }
-                    notificationOutboxService.enqueue(event, rule, sample.labels());
+                    if (!event.isNotificationSuppressed()) {
+                        notificationOutboxService.enqueue(event, rule, sample.labels());
+                    }
                 }
             }
         }
+    }
+
+    private static boolean shouldSuppress(AlertDomain domain, AlertStateTransition transition) {
+        return domain == AlertDomain.BUSINESS
+                && (transition == AlertStateTransition.FIRING || transition == AlertStateTransition.REMINDER);
     }
 
     private MetricSample aggregate(AlertRuleVO rule, MetricSample sample) {

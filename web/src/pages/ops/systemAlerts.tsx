@@ -31,7 +31,7 @@ import {
   Form,
   Input,
 } from 'antd';
-import { CheckCircle, Trash } from '@phosphor-icons/react';
+import { CheckCircle, DownloadSimple, Trash } from '@phosphor-icons/react';
 import PageHeader from '../../components/PageHeader';
 import { useLang } from '../../i18n/LangContext';
 import useAuthStore from '../../stores/authStore';
@@ -40,6 +40,7 @@ import {
   clearAcknowledgedAlerts,
   getCollectorStatus,
   listAlertDeliveries,
+  listRelatedSystemAlerts,
   retryAlertDelivery,
   listSystemAlertsPage,
   createAlertSilence,
@@ -55,6 +56,7 @@ import type {
   SystemAlert,
 } from '../../api/ops';
 import { formatUtcDateTime, formatNumber } from '../../utils/format';
+import { buildCsv, downloadCsv, type CsvColumn } from '../../utils/download';
 
 const { Text } = Typography;
 
@@ -82,6 +84,32 @@ const localDateTimeToUtc = (value: string) => new Date(`${value}:00`).toISOStrin
 const localDateTimeToUtcDatabaseValue = (value: string) =>
   new Date(`${value}:00`).toISOString().replace('Z', '');
 
+const ALERT_EXPORT_COLUMNS: CsvColumn<SystemAlert>[] = [
+  { header: 'ID', value: (alert) => alert.id },
+  { header: 'Domain', value: (alert) => alert.domain },
+  { header: 'Instance', value: (alert) => alert.instanceId },
+  { header: 'Rule ID', value: (alert) => alert.ruleId },
+  { header: 'Title', value: (alert) => alert.title },
+  { header: 'Level', value: (alert) => alert.level },
+  { header: 'Transition', value: (alert) => alert.transition },
+  { header: 'Time (UTC)', value: (alert) => alert.time },
+  { header: 'Current value', value: (alert) => alert.currentValue },
+  {
+    header: 'Labels',
+    value: (alert) =>
+      Object.entries(alert.labels ?? {})
+        .map(([key, value]) => `${key}=${value}`)
+        .join(', '),
+  },
+  { header: 'Notification suppressed', value: (alert) => alert.notificationSuppressed === true },
+  { header: 'Suppression cause alert ID', value: (alert) => alert.suppressionCauseAlertId },
+  { header: 'Suppression reason', value: (alert) => alert.suppressionReason },
+  { header: 'Acknowledged', value: (alert) => alert.acknowledged },
+  { header: 'Acknowledged by', value: (alert) => alert.acknowledgedBy },
+  { header: 'Acknowledged at (UTC)', value: (alert) => alert.acknowledgedAt },
+  { header: 'Description', value: (alert) => alert.description },
+];
+
 const SystemAlertsPage = () => {
   const { t } = useLang();
   const userId = useAuthStore((state) => state.userId);
@@ -98,6 +126,7 @@ const SystemAlertsPage = () => {
   const [levelFilter, setLevelFilter] = useState<string>('all');
   const [domainFilter, setDomainFilter] = useState<string>('all');
   const [transitionFilter, setTransitionFilter] = useState<string>('all');
+  const [suppressionFilter, setSuppressionFilter] = useState<string>('all');
   const [instanceFilter, setInstanceFilter] = useState('');
   const [labelFilter, setLabelFilter] = useState('');
   const [fromFilter, setFromFilter] = useState('');
@@ -110,9 +139,12 @@ const SystemAlertsPage = () => {
   const pageSize = 20;
   const [acknowledgingIds, setAcknowledgingIds] = useState<Set<number>>(() => new Set());
   const [clearing, setClearing] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [deliveries, setDeliveries] = useState<Record<number, NotificationDelivery[]>>({});
   const [loadingDeliveries, setLoadingDeliveries] = useState<Set<number>>(() => new Set());
   const [retryingDeliveryIds, setRetryingDeliveryIds] = useState<Set<number>>(() => new Set());
+  const [relatedAlerts, setRelatedAlerts] = useState<Record<number, SystemAlert[]>>({});
+  const [loadingRelatedIds, setLoadingRelatedIds] = useState<Set<number>>(() => new Set());
   const [silencesVisible, setSilencesVisible] = useState(false);
   const [silences, setSilences] = useState<AlertSilence[]>([]);
   const [loadingSilences, setLoadingSilences] = useState(false);
@@ -120,21 +152,29 @@ const SystemAlertsPage = () => {
   const [deletingSilenceId, setDeletingSilenceId] = useState<number | null>(null);
   const [silenceForm] = Form.useForm();
 
-  useEffect(() => {
-    let cancelled = false;
+  const currentQuery = () => {
     const labelSeparator = labelFilter.indexOf('=');
     const labelKey = labelSeparator > 0 ? labelFilter.slice(0, labelSeparator).trim() : undefined;
     const labelValue = labelKey ? labelFilter.slice(labelSeparator + 1).trim() : undefined;
-
-    void listSystemAlertsPage({
+    return {
       level: levelFilter === 'all' ? undefined : levelFilter,
       domain: domainFilter === 'all' ? undefined : (domainFilter as 'BUSINESS' | 'CLUSTER'),
       transition: transitionFilter === 'all' ? undefined : transitionFilter,
+      notificationSuppressed:
+        suppressionFilter === 'all' ? undefined : suppressionFilter === 'suppressed',
       instanceId: instanceFilter.trim() || undefined,
       labelKey: labelKey && labelValue ? labelKey : undefined,
       labelValue: labelKey && labelValue ? labelValue : undefined,
       from: fromFilter ? localDateTimeToUtcDatabaseValue(fromFilter) : undefined,
       to: toFilter ? localDateTimeToUtcDatabaseValue(toFilter) : undefined,
+    };
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void listSystemAlertsPage({
+      ...currentQuery(),
       page,
       pageSize,
     })
@@ -167,6 +207,7 @@ const SystemAlertsPage = () => {
     levelFilter,
     page,
     refreshNonce,
+    suppressionFilter,
     toFilter,
     transitionFilter,
   ]);
@@ -204,6 +245,28 @@ const SystemAlertsPage = () => {
     }
   };
 
+  const exportAlerts = async () => {
+    setExporting(true);
+    try {
+      const query = currentQuery();
+      const first = await listSystemAlertsPage({ ...query, page: 1, pageSize: 100 });
+      const rows = [...first.items];
+      for (let currentPage = 2; rows.length < first.total; currentPage += 1) {
+        const result = await listSystemAlertsPage({ ...query, page: currentPage, pageSize: 100 });
+        rows.push(...result.items);
+      }
+      downloadCsv(
+        `rocketmq-system-alerts-${new Date().toISOString().slice(0, 10)}.csv`,
+        buildCsv(ALERT_EXPORT_COLUMNS, rows),
+      );
+      message.success(`已导出 ${rows.length} 条告警事件`);
+    } catch {
+      message.error('告警事件导出失败，请稍后重试');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const loadDeliveries = async (alertId: number, force = false) => {
     if ((!force && deliveries[alertId]) || loadingDeliveries.has(alertId)) return;
     setLoadingDeliveries((current) => new Set(current).add(alertId));
@@ -214,6 +277,23 @@ const SystemAlertsPage = () => {
       message.error('通知投递记录加载失败，请稍后重试');
     } finally {
       setLoadingDeliveries((current) => {
+        const next = new Set(current);
+        next.delete(alertId);
+        return next;
+      });
+    }
+  };
+
+  const loadRelatedAlerts = async (alertId: number) => {
+    if (relatedAlerts[alertId] || loadingRelatedIds.has(alertId)) return;
+    setLoadingRelatedIds((current) => new Set(current).add(alertId));
+    try {
+      const result = await listRelatedSystemAlerts(alertId);
+      setRelatedAlerts((current) => ({ ...current, [alertId]: result }));
+    } catch {
+      message.error('关联事件加载失败，请稍后重试');
+    } finally {
+      setLoadingRelatedIds((current) => {
         const next = new Set(current);
         next.delete(alertId);
         return next;
@@ -311,6 +391,13 @@ const SystemAlertsPage = () => {
         subtitle={t('sysAlerts.subtitle', { n: unackCount })}
         extra={
           <Flex gap={8}>
+            <Button
+              icon={<DownloadSimple size={14} />}
+              onClick={() => void exportAlerts()}
+              loading={exporting}
+            >
+              导出 CSV
+            </Button>
             <Button onClick={openSilences}>维护窗口</Button>
             <Button
               icon={<Trash size={14} />}
@@ -421,6 +508,21 @@ const SystemAlertsPage = () => {
             { value: 'RESOLVED', label: '已恢复' },
           ]}
         />
+        <Select
+          aria-label="通知抑制筛选"
+          value={suppressionFilter}
+          size="small"
+          style={{ minWidth: 132 }}
+          onChange={(value) => {
+            setSuppressionFilter(value);
+            setPage(1);
+          }}
+          options={[
+            { value: 'all', label: '全部投递状态' },
+            { value: 'suppressed', label: '通知已抑制' },
+            { value: 'delivered', label: '未被抑制' },
+          ]}
+        />
         {collectorStatus && <Tag color="success">原生采集已启用</Tag>}
       </Flex>
 
@@ -473,6 +575,7 @@ const SystemAlertsPage = () => {
                       </Tag>
                     )}
                     {alert.transition && <Tag>{formatAlertTransition(alert.transition)}</Tag>}
+                    {alert.notificationSuppressed && <Tag color="gold">通知已抑制</Tag>}
                   </Flex>
                   <Text type="secondary" style={{ fontSize: 14 }}>
                     {alert.description}
@@ -489,6 +592,11 @@ const SystemAlertsPage = () => {
                       {formatUtcDateTime(alert.acknowledgedAt)}
                     </Text>
                   )}
+                  {alert.notificationSuppressed && (
+                    <Text type="warning" style={{ display: 'block', fontSize: 12 }}>
+                      {alert.suppressionReason || '通知已由上游集群故障抑制'}
+                    </Text>
+                  )}
                   {alert.labels && Object.keys(alert.labels).length > 0 && (
                     <Flex gap={4} wrap="wrap" style={{ marginTop: 6 }}>
                       {Object.entries(alert.labels)
@@ -500,12 +608,41 @@ const SystemAlertsPage = () => {
                         ))}
                     </Flex>
                   )}
+                  {loadingRelatedIds.has(alert.id) && <Spin size="small" />}
+                  {relatedAlerts[alert.id] && (
+                    <Flex vertical gap={4} style={{ marginTop: 8 }}>
+                      <Text strong style={{ fontSize: 12 }}>
+                        可能根因/影响
+                      </Text>
+                      {relatedAlerts[alert.id].length === 0 && (
+                        <Text type="secondary">暂无跨域关联事件</Text>
+                      )}
+                      {relatedAlerts[alert.id].map((related) => (
+                        <Flex key={related.id} gap={6} align="center" wrap="wrap">
+                          <Tag color={related.domain === 'CLUSTER' ? 'geekblue' : 'green'}>
+                            {related.domain === 'CLUSTER' ? '集群' : '业务'}
+                          </Tag>
+                          <Text>{related.title}</Text>
+                          {related.transition && (
+                            <Tag>{formatAlertTransition(related.transition)}</Tag>
+                          )}
+                          <Text type="secondary" style={{ fontSize: 12 }}>
+                            {formatUtcDateTime(related.time)}
+                          </Text>
+                        </Flex>
+                      ))}
+                    </Flex>
+                  )}
                   {loadingDeliveries.has(alert.id) && <Spin size="small" />}
                   {deliveries[alert.id] && (
                     <Flex vertical gap={6} style={{ marginTop: 6, minWidth: 0 }}>
                       {deliveries[alert.id].length === 0 && (
                         <Text type="secondary">
-                          {alert.ruleId == null ? '无通知投递记录' : '未配置通知通道'}
+                          {alert.notificationSuppressed
+                            ? alert.suppressionReason || '通知已由上游集群故障抑制'
+                            : alert.ruleId == null
+                              ? '无通知投递记录'
+                              : '未配置通知通道'}
                         </Text>
                       )}
                       {deliveries[alert.id].map((delivery) => (
@@ -559,6 +696,18 @@ const SystemAlertsPage = () => {
                   <Button size="small" type="link" onClick={() => void loadDeliveries(alert.id)}>
                     投递记录
                   </Button>
+                  <Button size="small" type="link" onClick={() => void loadRelatedAlerts(alert.id)}>
+                    关联事件
+                  </Button>
+                  {alert.suppressionCauseAlertId && (
+                    <Button
+                      size="small"
+                      type="link"
+                      onClick={() => void loadRelatedAlerts(alert.id)}
+                    >
+                      查看根因
+                    </Button>
+                  )}
                   {!alert.acknowledged && alert.transition !== 'RESOLVED' && (
                     <Button
                       size="small"
