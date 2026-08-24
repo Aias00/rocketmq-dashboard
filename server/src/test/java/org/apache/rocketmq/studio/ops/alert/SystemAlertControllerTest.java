@@ -101,7 +101,8 @@ class SystemAlertControllerTest {
     void listDeliveriesPageShouldForwardFiltersAndPaging() throws Exception {
         NotificationDeliveryPageVO delivery = NotificationDeliveryPageVO.builder().id(8L).alertId(9L)
                 .channel("dingtalk").status(NotificationOutboxStatus.DELIVERED).attemptCount(0)
-                .alertTitle("Disk usage high").instanceId("local").build();
+                .alertTitle("Disk usage high").instanceId("local")
+                .messageContent("[info] Disk usage high").build();
         when(notificationOutboxService.listDeliveries("dingtalk", "DELIVERED", "local", 2, 10))
                 .thenReturn(PageResult.of(List.of(delivery), 11, 2, 10));
 
@@ -111,7 +112,8 @@ class SystemAlertControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.total").value(11))
                 .andExpect(jsonPath("$.data.items[0].channel").value("dingtalk"))
-                .andExpect(jsonPath("$.data.items[0].alertTitle").value("Disk usage high"));
+                .andExpect(jsonPath("$.data.items[0].alertTitle").value("Disk usage high"))
+                .andExpect(jsonPath("$.data.items[0].messageContent").value("[info] Disk usage high"));
 
         verify(notificationOutboxService).listDeliveries("dingtalk", "DELIVERED", "local", 2, 10);
     }

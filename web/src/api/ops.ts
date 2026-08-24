@@ -105,6 +105,7 @@ export interface NotificationDeliveryRecord extends NotificationDelivery {
   id: number;
   alertId: number;
   createdAt: string;
+  messageContent?: string | null;
   alertTitle: string;
   alertDomain?: 'BUSINESS' | 'CLUSTER' | null;
   transition?: 'FIRING' | 'RESOLVED' | null;

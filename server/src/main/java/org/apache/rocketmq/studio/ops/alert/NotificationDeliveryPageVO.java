@@ -24,6 +24,7 @@ public class NotificationDeliveryPageVO {
     String lastError;
     LocalDateTime deliveredAt;
     LocalDateTime createdAt;
+    String messageContent;
     String alertTitle;
     AlertDomain alertDomain;
     String transition;

@@ -35,7 +35,7 @@ import static org.mockito.Mockito.when;
 class NativeAlertRuleTestServiceTest {
 
     @Test
-    void evaluatesOnlyTheSelectedConsumerGroupWithoutPersisting() {
+    void evaluatesOnlyTheSelectedConsumerGroupWithoutPersistingEvenWhenTheRuleIsNotYetEnabled() {
         InstanceRepository instances = mock(InstanceRepository.class);
         BusinessMetricsCollector collector = mock(BusinessMetricsCollector.class);
         InstanceVO instance = InstanceVO.builder().name("local").build();
@@ -43,13 +43,14 @@ class NativeAlertRuleTestServiceTest {
         when(collector.supports(instance)).thenReturn(true);
         when(collector.collect(instance)).thenReturn(List.of(sample("orders", 20), sample("payments", 5)));
         AlertRuleVO rule = AlertRuleVO.builder().domain(AlertDomain.BUSINESS).metric("consumer.lag.total")
-                .instanceId("local").consumerGroup("orders").operator(">").threshold(10).enabled(true).build();
+                .instanceId("local").consumerGroup("orders").operator(">").threshold(10).enabled(false).build();
 
         AlertRuleTestResultVO result = new NativeAlertRuleTestService(instances, List.of(), List.of(collector),
                 new AlertRuleEvaluator()).test(rule);
 
         assertThat(result.samples()).singleElement().satisfies(sample -> {
             assertThat(sample.labels()).containsEntry("consumerGroup", "orders");
+            assertThat(sample.currentValue()).isEqualTo(20);
             assertThat(sample.conditionMet()).isTrue();
         });
     }

@@ -32,7 +32,7 @@ public class AlertRuleEvaluator {
             "broker.send_queue.usage_ratio");
 
     public AlertEvaluationResult evaluate(AlertRuleVO rule, MetricSample sample) {
-        if (rule == null || sample == null || !rule.isEnabled()
+        if (rule == null || sample == null
                 || ruleDomain(rule) != sample.domain()
                 || !StringUtils.hasText(rule.getMetric())
                 || !rule.getMetric().trim().equals(sample.metricKey())) {

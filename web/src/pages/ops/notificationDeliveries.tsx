@@ -5,7 +5,20 @@
  * The ASF licenses this file to You under the Apache License, Version 2.0.
  */
 import { useEffect, useState } from 'react';
-import { Card, Flex, Select, Table, Tag, Typography, message } from 'antd';
+import {
+  Button,
+  Card,
+  Descriptions,
+  Drawer,
+  Flex,
+  Select,
+  Table,
+  Tag,
+  Tooltip,
+  Typography,
+  message,
+} from 'antd';
+import { Eye } from '@phosphor-icons/react';
 import type { ColumnsType } from 'antd/es/table';
 import PageHeader from '../../components/PageHeader';
 import { useLang } from '../../i18n/LangContext';
@@ -13,7 +26,7 @@ import type { Instance } from '../../api/instance';
 import type { NotificationDeliveryRecord } from '../../api/ops';
 import { listInstances } from '../../services/instanceService';
 import { listAlertDeliveriesPage } from '../../services/opsService';
-import { formatDateTime } from '../../utils/format';
+import { formatUtcDateTime } from '../../utils/format';
 import { tableScrollX } from '../../utils/table';
 
 const statusColors: Record<NotificationDeliveryRecord['status'], string> = {
@@ -35,6 +48,7 @@ const NotificationDeliveriesPage = () => {
   const [channel, setChannel] = useState<string>();
   const [status, setStatus] = useState<NotificationDeliveryRecord['status']>();
   const [instanceId, setInstanceId] = useState<string>();
+  const [selectedDelivery, setSelectedDelivery] = useState<NotificationDeliveryRecord>();
 
   useEffect(() => {
     void listInstances()
@@ -71,7 +85,7 @@ const NotificationDeliveriesPage = () => {
     {
       title: t('deliveries.alert'),
       dataIndex: 'alertTitle',
-      width: 260,
+      width: 300,
       render: (title, record) => (
         <Flex vertical gap={2}>
           <Typography.Text ellipsis={{ tooltip: title }}>{title}</Typography.Text>
@@ -84,22 +98,22 @@ const NotificationDeliveriesPage = () => {
     {
       title: t('deliveries.instance'),
       dataIndex: 'instanceId',
-      width: 150,
+      width: 145,
       render: (value) => value ?? '-',
     },
-    { title: t('deliveries.channel'), dataIndex: 'channel', width: 110 },
+    { title: t('deliveries.channel'), dataIndex: 'channel', width: 105 },
     {
       title: t('common.status'),
       dataIndex: 'status',
-      width: 130,
+      width: 120,
       render: (value: NotificationDeliveryRecord['status']) => (
         <Tag color={statusColors[value]}>{value}</Tag>
       ),
     },
-    { title: t('deliveries.attempts'), dataIndex: 'attemptCount', width: 100 },
+    { title: t('deliveries.attempts'), dataIndex: 'attemptCount', width: 90, align: 'center' },
     {
       title: t('deliveries.result'),
-      width: 280,
+      width: 240,
       render: (_, record) =>
         record.lastError ? (
           <Typography.Text type="danger" ellipsis={{ tooltip: record.lastError }}>
@@ -108,35 +122,44 @@ const NotificationDeliveriesPage = () => {
         ) : record.deliveredAt ? (
           t('deliveries.delivered')
         ) : record.nextAttemptAt ? (
-          `${t('deliveries.nextAttempt')} ${formatDateTime(record.nextAttemptAt)}`
+          `${t('deliveries.nextAttempt')} ${formatUtcDateTime(record.nextAttemptAt)}`
         ) : (
           '-'
         ),
     },
     {
-      title: t('deliveries.createdAt'),
-      dataIndex: 'createdAt',
-      width: 180,
-      render: formatDateTime,
+      title: t('deliveries.deliveredAt'),
+      width: 185,
+      render: (_, record) => formatUtcDateTime(record.deliveredAt ?? record.createdAt),
     },
     {
-      title: t('deliveries.deliveredAt'),
-      dataIndex: 'deliveredAt',
-      width: 180,
-      render: formatDateTime,
+      title: t('common.actions'),
+      width: 80,
+      align: 'center',
+      render: (_, record) => (
+        <Tooltip title={t('deliveries.viewDetails')}>
+          <Button
+            type="text"
+            size="small"
+            icon={<Eye size={18} />}
+            aria-label={t('deliveries.viewDetails')}
+            onClick={() => setSelectedDelivery(record)}
+          />
+        </Tooltip>
+      ),
     },
   ];
 
   return (
     <>
       <PageHeader title={t('deliveries.title')} subtitle={t('deliveries.subtitle')} />
-      <Card>
-        <Flex gap={12} wrap="wrap" style={{ marginBottom: 16 }}>
+      <Card bodyStyle={{ padding: 20 }}>
+        <Flex gap={12} wrap="wrap" style={{ marginBottom: 20 }}>
           <Select
             allowClear
             placeholder={t('deliveries.allChannels')}
             value={channel}
-            style={{ width: 150 }}
+            style={{ width: 220, flex: '1 1 220px' }}
             options={['dingtalk', 'email', 'sms'].map((value) => ({ value, label: value }))}
             onChange={(value) => resetPage(() => setChannel(value))}
           />
@@ -144,7 +167,7 @@ const NotificationDeliveriesPage = () => {
             allowClear
             placeholder={t('deliveries.allStatuses')}
             value={status}
-            style={{ width: 160 }}
+            style={{ width: 220, flex: '1 1 220px' }}
             options={Object.keys(statusColors).map((value) => ({ value, label: value }))}
             onChange={(value) => resetPage(() => setStatus(value))}
           />
@@ -154,7 +177,7 @@ const NotificationDeliveriesPage = () => {
             optionFilterProp="label"
             placeholder={t('deliveries.allInstances')}
             value={instanceId}
-            style={{ width: 190 }}
+            style={{ width: 280, flex: '1 1 280px' }}
             options={instances.map((instance) => ({ value: instance.name, label: instance.name }))}
             onChange={(value) => resetPage(() => setInstanceId(value))}
           />
@@ -179,6 +202,67 @@ const NotificationDeliveriesPage = () => {
           }}
         />
       </Card>
+      <Drawer
+        title={t('deliveries.details')}
+        width={640}
+        open={selectedDelivery !== undefined}
+        onClose={() => setSelectedDelivery(undefined)}
+      >
+        {selectedDelivery && (
+          <Flex vertical gap={20}>
+            <Descriptions size="small" column={1} bordered>
+              <Descriptions.Item label={t('deliveries.event')}>
+                {selectedDelivery.alertTitle} · #{selectedDelivery.alertId} ·{' '}
+                {selectedDelivery.transition ?? '-'}
+              </Descriptions.Item>
+              <Descriptions.Item label={t('deliveries.instance')}>
+                {selectedDelivery.instanceId ?? '-'}
+              </Descriptions.Item>
+              <Descriptions.Item label={t('deliveries.channel')}>
+                {selectedDelivery.channel}
+              </Descriptions.Item>
+              <Descriptions.Item label={t('common.status')}>
+                <Tag color={statusColors[selectedDelivery.status]}>{selectedDelivery.status}</Tag>
+              </Descriptions.Item>
+              <Descriptions.Item label={t('deliveries.attempts')}>
+                {selectedDelivery.attemptCount}
+              </Descriptions.Item>
+              <Descriptions.Item label={t('deliveries.createdAt')}>
+                {formatUtcDateTime(selectedDelivery.createdAt)}
+              </Descriptions.Item>
+              <Descriptions.Item label={t('deliveries.deliveredAt')}>
+                {formatUtcDateTime(selectedDelivery.deliveredAt)}
+              </Descriptions.Item>
+              {selectedDelivery.nextAttemptAt && (
+                <Descriptions.Item label={t('deliveries.retryAt')}>
+                  {formatUtcDateTime(selectedDelivery.nextAttemptAt)}
+                </Descriptions.Item>
+              )}
+              {selectedDelivery.lastError && (
+                <Descriptions.Item label={t('deliveries.result')}>
+                  <Typography.Text type="danger" style={{ overflowWrap: 'anywhere' }}>
+                    {selectedDelivery.lastError}
+                  </Typography.Text>
+                </Descriptions.Item>
+              )}
+            </Descriptions>
+            <div>
+              <Typography.Text strong>{t('deliveries.messageContent')}</Typography.Text>
+              <Typography.Paragraph
+                copyable={{ text: selectedDelivery.messageContent ?? '' }}
+                style={{
+                  marginTop: 8,
+                  marginBottom: 0,
+                  whiteSpace: 'pre-wrap',
+                  overflowWrap: 'anywhere',
+                }}
+              >
+                {selectedDelivery.messageContent || '-'}
+              </Typography.Paragraph>
+            </div>
+          </Flex>
+        )}
+      </Drawer>
     </>
   );
 };

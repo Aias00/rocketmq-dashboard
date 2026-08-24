@@ -52,6 +52,9 @@ public class NativeAlertProcessor {
                 if (rule.getId() == null) {
                     continue;
                 }
+                if (!rule.isEnabled()) {
+                    continue;
+                }
                 if (!NativeAlertRuleScopeMatcher.matches(rule, sample)) {
                     continue;
                 }
