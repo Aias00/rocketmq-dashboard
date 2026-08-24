@@ -71,6 +71,8 @@ public class RmqAlertRule {
     private Integer consecutiveSamples;
     private String reminderInterval;
 
+    private String semanticFingerprint;
+
     private LocalDateTime gmtCreate;
 
     private LocalDateTime gmtModified;

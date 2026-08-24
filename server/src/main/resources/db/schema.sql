@@ -265,6 +265,8 @@ CREATE TABLE IF NOT EXISTS rmq_alert_rule (
   topic VARCHAR(255) COMMENT 'Optional topic selector for topic backlog metrics',
   consecutive_samples INT NOT NULL DEFAULT 1 COMMENT 'Consecutive native samples required before firing',
   reminder_interval VARCHAR(32) NOT NULL DEFAULT '30m' COMMENT 'Repeat notification interval while unacknowledged',
+  semantic_fingerprint CHAR(64) NOT NULL COMMENT 'SHA-256 identity of the rule evaluation conditions',
+  UNIQUE KEY uk_alert_rule_semantic_fingerprint (semantic_fingerprint),
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 

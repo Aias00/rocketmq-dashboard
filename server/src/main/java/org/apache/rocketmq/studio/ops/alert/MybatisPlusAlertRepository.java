@@ -202,6 +202,7 @@ public class MybatisPlusAlertRepository implements AlertRepository {
         entity.setTopic(rule.getTopic());
         entity.setConsecutiveSamples(Math.max(1, rule.getConsecutiveSamples()));
         entity.setReminderInterval(StringUtils.hasText(rule.getReminderInterval()) ? rule.getReminderInterval() : "30m");
+        entity.setSemanticFingerprint(AlertRuleSemanticFingerprint.of(rule));
         entity.setGmtModified(LocalDateTime.now());
         return entity;
     }

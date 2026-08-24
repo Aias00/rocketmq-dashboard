@@ -24,6 +24,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.dao.DuplicateKeyException;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -112,8 +113,9 @@ public class AlertService {
         }
         rule.setName(rule.getName().trim());
         NativeAlertRulePolicy.validate(rule);
+        rejectDuplicateSemanticRule(rule, null);
         log.info("Creating alert rule: {}", rule.getName());
-        AlertRuleVO saved = alertRepository.saveRule(rule);
+        AlertRuleVO saved = saveNewRule(rule);
         auditRule("CREATE_ALERT_RULE", saved, null);
         return saved;
     }
@@ -141,7 +143,8 @@ public class AlertService {
         log.info("Updating alert rule: {}", id);
         validateRuleId(id);
         NativeAlertRulePolicy.validate(rule);
-        if (!alertRepository.replaceRule(rule)) {
+        rejectDuplicateSemanticRule(rule, id);
+        if (!replaceRuleWithoutDuplicate(rule)) {
             throw ruleNotFound(id);
         }
         alertStateRepository.deleteByRuleId(id);
@@ -166,6 +169,32 @@ public class AlertService {
 
     private AlertDomain resolveDomain(AlertRuleVO rule) {
         return rule.getDomain() == null ? AlertDomain.BUSINESS : rule.getDomain();
+    }
+
+    private void rejectDuplicateSemanticRule(AlertRuleVO rule, Long excludedId) {
+        String fingerprint = AlertRuleSemanticFingerprint.of(rule);
+        boolean duplicate = alertRepository.findAllRules().stream()
+                .filter(candidate -> !Objects.equals(candidate.getId(), excludedId))
+                .anyMatch(candidate -> AlertRuleSemanticFingerprint.of(candidate).equals(fingerprint));
+        if (duplicate) {
+            throw new BusinessException(409, "An alert rule with the same evaluation conditions already exists");
+        }
+    }
+
+    private AlertRuleVO saveNewRule(AlertRuleVO rule) {
+        try {
+            return alertRepository.saveRule(rule);
+        } catch (DuplicateKeyException duplicate) {
+            throw new BusinessException(409, "An alert rule with the same evaluation conditions already exists");
+        }
+    }
+
+    private boolean replaceRuleWithoutDuplicate(AlertRuleVO rule) {
+        try {
+            return alertRepository.replaceRule(rule);
+        } catch (DuplicateKeyException duplicate) {
+            throw new BusinessException(409, "An alert rule with the same evaluation conditions already exists");
+        }
     }
 
     private void requireDomain(AlertDomain domain) {

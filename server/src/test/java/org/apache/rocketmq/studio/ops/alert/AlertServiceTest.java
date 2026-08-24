@@ -627,6 +627,77 @@ class AlertServiceTest {
     }
 
     @Test
+    void createRuleShouldRejectDuplicateEvaluationConditions() {
+        AlertRuleVO existing = AlertRuleVO.builder()
+                .id(1L)
+                .domain(AlertDomain.BUSINESS)
+                .name("Existing rule")
+                .metric("consumer_lag")
+                .operator(">")
+                .threshold(1000)
+                .duration("5m")
+                .aggregation("LAST")
+                .windowSeconds(0)
+                .consumerGroup("group-a")
+                .enabled(true)
+                .build();
+        AlertRuleVO duplicate = AlertRuleVO.builder()
+                .domain(AlertDomain.BUSINESS)
+                .name("Another label")
+                .metric(" consumer_lag ")
+                .operator(" > ")
+                .threshold(1000.0)
+                .duration("5M")
+                .consumerGroup(" group-a ")
+                .channels(List.of("email"))
+                .severity("critical")
+                .enabled(false)
+                .build();
+        when(alertRepository.findAllRules()).thenReturn(List.of(existing));
+
+        assertThatThrownBy(() -> alertService.createRule(duplicate))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("An alert rule with the same evaluation conditions already exists")
+                .satisfies(error -> assertThat(((BusinessException) error).getCode()).isEqualTo(409));
+
+        verify(alertRepository, never()).saveRule(any());
+    }
+
+    @Test
+    void createRuleShouldAllowRulesWithDifferentEvaluationScope() {
+        AlertRuleVO existing = AlertRuleVO.builder()
+                .id(1L).domain(AlertDomain.BUSINESS).name("Group A").metric("consumer_lag")
+                .operator(">=").threshold(1000).duration("5m").consumerGroup("group-a").build();
+        AlertRuleVO distinct = AlertRuleVO.builder()
+                .domain(AlertDomain.BUSINESS).name("Group B").metric("consumer_lag")
+                .operator(">=").threshold(1000).duration("5m").consumerGroup("group-b").build();
+        when(alertRepository.findAllRules()).thenReturn(List.of(existing));
+        when(alertRepository.saveRule(any(AlertRuleVO.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        alertService.createRule(distinct);
+
+        verify(alertRepository).saveRule(distinct);
+    }
+
+    @Test
+    void updateRuleShouldRejectAnotherRulesEvaluationConditions() {
+        AlertRuleVO existing = AlertRuleVO.builder()
+                .id(1L).domain(AlertDomain.BUSINESS).name("Existing").metric("consumer_lag")
+                .operator(">=").threshold(1000).duration("5m").consumerGroup("group-a").build();
+        AlertRuleVO update = AlertRuleVO.builder()
+                .id(2L).domain(AlertDomain.BUSINESS).name("Updated").metric("consumer_lag")
+                .operator(">=").threshold(1000).duration("5m").consumerGroup("group-a").build();
+        when(alertRepository.findAllRules()).thenReturn(List.of(existing, update));
+
+        assertThatThrownBy(() -> alertService.updateRule(update))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("An alert rule with the same evaluation conditions already exists")
+                .satisfies(error -> assertThat(((BusinessException) error).getCode()).isEqualTo(409));
+
+        verify(alertRepository, never()).replaceRule(any());
+    }
+
+    @Test
     void updateRuleShouldNormalizeNameBeforeReplacingAndAuditing() {
         AlertRuleVO update = AlertRuleVO.builder()
                 .id(1L)

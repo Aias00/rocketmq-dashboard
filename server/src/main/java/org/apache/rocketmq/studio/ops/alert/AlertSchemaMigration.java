@@ -74,6 +74,7 @@ public class AlertSchemaMigration implements ApplicationRunner {
             new Column("rmq_alert_rule", "topic", "VARCHAR(255)"),
             new Column("rmq_alert_rule", "consecutive_samples", "INT NOT NULL DEFAULT 1"),
             new Column("rmq_alert_rule", "reminder_interval", "VARCHAR(32) NOT NULL DEFAULT '30m'"),
+            new Column("rmq_alert_rule", "semantic_fingerprint", "CHAR(64)"),
             new Column("rmq_alert_state", "last_notified_at", "DATETIME"),
             new Column("rmq_system_alert", "acknowledged_by", "VARCHAR(128)"),
             new Column("rmq_system_alert", "acknowledged_at", "DATETIME"),
@@ -92,6 +93,7 @@ public class AlertSchemaMigration implements ApplicationRunner {
             new Index("rmq_alert_silence", "idx_alert_silence_active", "starts_at, ends_at"),
             new Index("rmq_alert_silence", "idx_alert_silence_scope", "domain, rule_id, instance_id"),
             new Index("rmq_alert_notification_outbox", "idx_alert_notification_ready", "status, next_attempt_at"),
+            new Index("rmq_alert_rule", "uk_alert_rule_semantic_fingerprint", "semantic_fingerprint", true),
             new Index("rmq_system_alert", "idx_system_alert_domain_time", "domain, time"),
             new Index("rmq_system_alert", "idx_system_alert_feed", "domain, instance_id, transition, time"));
 
@@ -151,7 +153,7 @@ public class AlertSchemaMigration implements ApplicationRunner {
         }
         try {
             log.info("Adding native alerting index {}.{}", index.table(), index.name());
-            statement.executeUpdate("CREATE INDEX " + index.name() + " ON " + index.table()
+            statement.executeUpdate("CREATE " + (index.unique() ? "UNIQUE " : "") + "INDEX " + index.name() + " ON " + index.table()
                     + " (" + index.columns() + ")");
         } catch (SQLException failure) {
             if (!hasIndex(metadata, catalog, index.table(), index.name())) {
@@ -191,6 +193,9 @@ public class AlertSchemaMigration implements ApplicationRunner {
     private record Table(String name, String definition) {
     }
 
-    private record Index(String table, String name, String columns) {
+    private record Index(String table, String name, String columns, boolean unique) {
+        private Index(String table, String name, String columns) {
+            this(table, name, columns, false);
+        }
     }
 }
