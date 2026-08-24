@@ -10,6 +10,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LangProvider } from '../../../i18n/LangContext';
+import { formatUtcDateTime } from '../../../utils/format';
 import {
   acknowledgeAlert,
   createAlertSilence,
@@ -132,9 +133,13 @@ describe('SystemAlertsPage', () => {
     });
     renderPage();
 
-    expect(await screen.findByText('2026-08-23 10:35:38')).toBeInTheDocument();
+    expect(
+      await screen.findByText(formatUtcDateTime('2026-08-23T10:35:38.590731')),
+    ).toBeInTheDocument();
     expect(screen.getByText('已恢复')).toBeInTheDocument();
-    expect(screen.getByText('确认：admin · 2026-08-23 10:40:00')).toBeInTheDocument();
+    expect(
+      screen.getByText(`确认：admin · ${formatUtcDateTime('2026-08-23T10:40:00.000000')}`),
+    ).toBeInTheDocument();
   });
 
   it('filters backend alert levels case-insensitively', async () => {

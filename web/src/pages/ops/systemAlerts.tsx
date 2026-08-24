@@ -54,7 +54,7 @@ import type {
   PageResult,
   SystemAlert,
 } from '../../api/ops';
-import { formatDateTime, formatNumber } from '../../utils/format';
+import { formatUtcDateTime, formatNumber } from '../../utils/format';
 
 const { Text } = Typography;
 
@@ -486,7 +486,7 @@ const SystemAlertsPage = () => {
                   {alert.acknowledgedAt && (
                     <Text type="secondary" style={{ display: 'block', fontSize: 12 }}>
                       确认：{alert.acknowledgedBy ?? 'system'} ·{' '}
-                      {formatDateTime(alert.acknowledgedAt)}
+                      {formatUtcDateTime(alert.acknowledgedAt)}
                     </Text>
                   )}
                   {alert.labels && Object.keys(alert.labels).length > 0 && (
@@ -554,7 +554,7 @@ const SystemAlertsPage = () => {
                 </div>
                 <Flex align="center" gap={8} style={{ flexShrink: 0 }}>
                   <Text type="secondary" style={{ fontSize: 14 }}>
-                    {formatDateTime(alert.time)}
+                    {formatUtcDateTime(alert.time)}
                   </Text>
                   <Button size="small" type="link" onClick={() => void loadDeliveries(alert.id)}>
                     投递记录
