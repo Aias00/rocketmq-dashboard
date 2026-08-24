@@ -23,7 +23,7 @@ import type { AlertRule, NativeAlertMetricInfo } from '../../../api/ops';
 import { LangProvider } from '../../../i18n/LangContext';
 import { LANGUAGE_STORAGE_KEY } from '../../../i18n/languagePreference';
 import { formatDateTime } from '../../../utils/format';
-import AlertsPage, { supportsUnavailableOperator } from '../alerts';
+import AlertsPage, { formatThresholdCondition, supportsUnavailableOperator } from '../alerts';
 import { listInstances } from '../../../services/instanceService';
 import {
   bulkDeleteAlertRules,
@@ -206,6 +206,17 @@ describe('AlertsPage', () => {
     expect(supportsUnavailableOperator('broker.availability')).toBe(true);
     expect(supportsUnavailableOperator('broker.disk.usage_ratio')).toBe(false);
     expect(supportsUnavailableOperator('consumer.lag.total')).toBe(false);
+  });
+
+  it('renders legacy native ratio thresholds as percentages', () => {
+    expect(
+      formatThresholdCondition({
+        ...cloneRule(alertRules[0]),
+        metric: 'broker.disk.usage_ratio',
+        threshold: 0.85,
+        thresholdUnit: null,
+      }),
+    ).toBe('> 85%');
   });
 
   it('bulk enables selected alert rules and clears the selection after success', async () => {

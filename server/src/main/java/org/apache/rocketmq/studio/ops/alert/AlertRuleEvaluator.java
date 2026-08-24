@@ -21,9 +21,15 @@ import org.apache.rocketmq.studio.cluster.metrics.MetricSample;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
+import java.util.Set;
+
 /** Evaluates the existing structured rule operators against one native metric sample. */
 @Component
 public class AlertRuleEvaluator {
+    private static final Set<String> RATIO_METRICS = Set.of(
+            "broker.disk.usage_ratio",
+            "broker.jvm.heap.usage_ratio",
+            "broker.send_queue.usage_ratio");
 
     public AlertEvaluationResult evaluate(AlertRuleVO rule, MetricSample sample) {
         if (rule == null || sample == null || !rule.isEnabled()
@@ -38,7 +44,7 @@ public class AlertRuleEvaluator {
             return new AlertEvaluationResult(true, unavailableCondition, null, sample.availability());
         }
         double value = sample.value();
-        return new AlertEvaluationResult(true, compare(value, rule.getOperator(), rule.getThreshold()), value,
+        return new AlertEvaluationResult(true, compare(value, rule.getOperator(), normalizedThreshold(rule)), value,
                 sample.availability());
     }
 
@@ -59,5 +65,12 @@ public class AlertRuleEvaluator {
             case "!=" -> Double.compare(value, threshold) != 0;
             default -> false;
         };
+    }
+
+    private static double normalizedThreshold(AlertRuleVO rule) {
+        if ("%".equals(rule.getThresholdUnit()) && RATIO_METRICS.contains(rule.getMetric())) {
+            return rule.getThreshold() / 100;
+        }
+        return rule.getThreshold();
     }
 }

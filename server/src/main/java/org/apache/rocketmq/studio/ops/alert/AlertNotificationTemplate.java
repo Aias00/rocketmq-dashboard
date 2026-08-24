@@ -8,10 +8,15 @@ package org.apache.rocketmq.studio.ops.alert;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 
 /** Renders the fixed, documented placeholders allowed in an alert notification. */
 final class AlertNotificationTemplate {
     static final String DEFAULT_TEMPLATE = "[${level}] ${title} - ${description}\nLabels: ${labels}";
+    private static final Set<String> RATIO_METRICS = Set.of(
+            "broker.disk.usage_ratio",
+            "broker.jvm.heap.usage_ratio",
+            "broker.send_queue.usage_ratio");
 
     private AlertNotificationTemplate() {
     }
@@ -32,13 +37,23 @@ final class AlertNotificationTemplate {
         values.put("transition", text(alert.getTransition()));
         values.put("metric", text(rule == null ? null : rule.getMetric()));
         values.put("instanceId", text(alert.getInstanceId()));
-        values.put("value", alert.getCurrentValue() == null ? "" : String.valueOf(alert.getCurrentValue()));
+        values.put("value", formattedValue(alert, rule));
         values.put("threshold", rule == null ? "" : String.valueOf(rule.getThreshold()));
         values.put("thresholdUnit", text(rule == null ? null : rule.getThresholdUnit()));
         values.put("level", text(alert.getLevel()));
         values.put("time", alert.getTime() == null ? "" : alert.getTime().toString());
         values.put("labels", formatLabels(alert.getLabels()));
         return values;
+    }
+
+    private static String formattedValue(SystemAlertVO alert, AlertRuleVO rule) {
+        if (alert.getCurrentValue() == null) {
+            return "";
+        }
+        if (rule != null && "%".equals(rule.getThresholdUnit()) && RATIO_METRICS.contains(rule.getMetric())) {
+            return String.valueOf(alert.getCurrentValue() * 100);
+        }
+        return String.valueOf(alert.getCurrentValue());
     }
 
     private static String formatLabels(Map<String, String> labels) {

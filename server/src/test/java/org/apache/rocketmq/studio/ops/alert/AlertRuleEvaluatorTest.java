@@ -41,6 +41,16 @@ class AlertRuleEvaluatorTest {
     }
 
     @Test
+    void evaluatesPercentageThresholdsForNativeRatioMetrics() {
+        AlertRuleVO rule = AlertRuleVO.builder().domain(AlertDomain.CLUSTER).metric("broker.disk.usage_ratio")
+                .operator(">=").threshold(85).thresholdUnit("%").enabled(true).build();
+
+        AlertEvaluationResult result = evaluator.evaluate(rule, sample(MetricAvailability.AVAILABLE, 0.9));
+
+        assertThat(result.conditionMet()).isTrue();
+    }
+
+    @Test
     void unavailableMetricDoesNotBehaveAsZero() {
         AlertRuleVO rule = AlertRuleVO.builder().domain(AlertDomain.CLUSTER).metric("broker.disk.usage_ratio")
                 .operator("<").threshold(0.1).enabled(true).build();

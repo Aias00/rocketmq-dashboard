@@ -37,7 +37,12 @@ import {
 import type { ColumnsType, TableRowSelection } from 'antd/es/table/interface';
 import PageHeader from '../../components/PageHeader';
 import { useLang } from '../../i18n/LangContext';
-import type { AlertRule, AlertRuleDomain, AlertRuleTestResult } from '../../api/ops';
+import type {
+  AlertRule,
+  AlertRuleDomain,
+  AlertRuleTestResult,
+  NativeAlertMetricInfo,
+} from '../../api/ops';
 import type { AlertRuleTransfer } from '../../api/ops';
 import {
   createAlertRule,
@@ -87,6 +92,11 @@ const availabilityMetrics = new Set([
   'proxy.availability',
   'cloud.instance.availability',
 ]);
+const nativeRatioMetrics = new Set([
+  'broker.disk.usage_ratio',
+  'broker.jvm.heap.usage_ratio',
+  'broker.send_queue.usage_ratio',
+]);
 
 const nativeMetricTranslationKeys: Record<string, string> = {
   'nameserver.availability': 'alerts.metrics.nameserverAvailability',
@@ -110,9 +120,12 @@ const legacyMetricTranslationKeys: Record<string, string> = {
 export const supportsUnavailableOperator = (metric?: string): boolean =>
   metric != null && availabilityMetrics.has(metric);
 
-const formatThresholdCondition = (rule: AlertRule): string => {
+export const formatThresholdCondition = (rule: AlertRule): string => {
   if (rule.operator === 'UNAVAILABLE') {
     return '指标不可用时触发';
+  }
+  if (nativeRatioMetrics.has(rule.metric) && !rule.thresholdUnit) {
+    return `${rule.operator} ${rule.threshold * 100}%`;
   }
   return `${rule.operator} ${rule.threshold}${rule.thresholdUnit ?? ''}`;
 };
@@ -137,7 +150,7 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
   const [form] = Form.useForm();
   const selectedMetric = Form.useWatch('metric', form);
   const selectedOperator = Form.useWatch('operator', form);
-  const [metricOptions, setMetricOptions] = useState<{ label: string; value: string }[]>([]);
+  const [metricOptions, setMetricOptions] = useState<NativeAlertMetricInfo[]>([]);
   const [selectedInstanceId, setSelectedInstanceId] = useState<string>();
   const [metricLoading, setMetricLoading] = useState(false);
   const [instances, setInstances] = useState<Instance[]>([]);
@@ -145,6 +158,7 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
   const metricRequestVersion = useRef(0);
   const importInputRef = useRef<HTMLInputElement>(null);
   const supportsUnavailableCondition = supportsUnavailableOperator(selectedMetric);
+  const selectedMetricIsRatio = selectedMetric != null && nativeRatioMetrics.has(selectedMetric);
   const editingLegacyRule = Boolean(editingRule && !editingRule.instanceId?.trim());
 
   const metricLabel = (metric: string, fallback = metric) => {
@@ -252,13 +266,15 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
     try {
       const metrics = await listNativeAlertMetrics(instanceId.trim(), domain);
       if (requestVersion !== metricRequestVersion.current) return;
-      setMetricOptions(
-        metrics.map((metric) => ({
-          label: metricLabel(metric.key, metric.label),
-          value: metric.key,
-        })),
-      );
+      setMetricOptions(metrics);
       if (resetMetric) form.setFieldValue('metric', undefined);
+      if (
+        !resetMetric &&
+        nativeRatioMetrics.has(form.getFieldValue('metric')) &&
+        !form.getFieldValue('thresholdUnit')
+      ) {
+        form.setFieldValue('threshold', Number(form.getFieldValue('threshold')) * 100);
+      }
       if (metrics.length === 0) message.warning('该实例暂不支持原生告警指标');
     } catch {
       if (requestVersion === metricRequestVersion.current) {
@@ -499,7 +515,10 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields();
-      const payload = values as Partial<AlertRule>;
+      const payload = {
+        ...values,
+        ...(nativeRatioMetrics.has(values.metric) ? { thresholdUnit: '%' } : {}),
+      } as Partial<AlertRule>;
       setSubmitting(true);
       if (editingRule) {
         const updated = await (domain === 'CLUSTER'
@@ -530,11 +549,15 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
 
   const handleTest = async () => {
     try {
-      const values = (await form.validateFields()) as Partial<AlertRule>;
+      const values = await form.validateFields();
+      const payload = {
+        ...values,
+        ...(nativeRatioMetrics.has(values.metric) ? { thresholdUnit: '%' } : {}),
+      } as Partial<AlertRule>;
       setTesting(true);
       const result = await (domain === 'CLUSTER'
-        ? testAlertRule(values)
-        : testAlertRule(values, domain));
+        ? testAlertRule(payload)
+        : testAlertRule(payload, domain));
       setTestResult(result);
       if (result.samples.length === 0) {
         message.warning('未采集到匹配样本，请检查实例和指标作用域');
@@ -758,7 +781,10 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
             >
               <Select
                 placeholder={metricLoading ? '正在加载监控指标' : '请选择监控指标'}
-                options={metricOptions}
+                options={metricOptions.map((metric) => ({
+                  label: metricLabel(metric.key, metric.label),
+                  value: metric.key,
+                }))}
                 disabled={!selectedInstanceId || metricLoading}
                 loading={metricLoading}
                 onChange={(metric) => {
@@ -844,11 +870,21 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
                   noStyle
                   rules={[{ required: true, message: '请输入阈值' }]}
                 >
-                  <InputNumber placeholder="阈值" style={{ flex: 1 }} />
+                  <InputNumber
+                    placeholder="阈值"
+                    style={{ flex: 1 }}
+                    addonAfter={selectedMetricIsRatio ? '%' : undefined}
+                    min={selectedMetricIsRatio ? 0 : undefined}
+                    max={selectedMetricIsRatio ? 100 : undefined}
+                    precision={selectedMetricIsRatio ? 2 : undefined}
+                  />
                 </Form.Item>
               )}
             </Flex>
             {selectedOperator === 'UNAVAILABLE' && '采集到指标不可用状态时触发。'}
+            {selectedOperator !== 'UNAVAILABLE' && selectedMetricIsRatio && (
+              <span>比例指标以百分比填写，例如 85 表示 85%。</span>
+            )}
           </Form.Item>
 
           <Form.Item

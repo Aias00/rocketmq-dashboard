@@ -22,7 +22,7 @@ class AlertNotificationTemplateTest {
                 .threshold(85).thresholdUnit("%").build();
         SystemAlertVO alert = SystemAlertVO.builder().level(AlertLevel.warning).title("Disk threshold")
                 .description("FIRING broker.disk.usage_ratio on local").transition("FIRING")
-                .instanceId("local").currentValue(86.5).time(LocalDateTime.of(2026, 8, 23, 12, 0))
+                .instanceId("local").currentValue(0.865).time(LocalDateTime.of(2026, 8, 23, 12, 0))
                 .labels(Map.of("brokerName", "broker-a", "brokerAddr", "127.0.0.1:10911")).build();
 
         String rendered = AlertNotificationTemplate.render(
