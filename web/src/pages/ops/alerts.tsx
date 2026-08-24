@@ -154,6 +154,7 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
   const [form] = Form.useForm();
   const selectedMetric = Form.useWatch('metric', form);
   const selectedOperator = Form.useWatch('operator', form);
+  const selectedThresholdUnit = Form.useWatch('thresholdUnit', form);
   const [metricOptions, setMetricOptions] = useState<NativeAlertMetricInfo[]>([]);
   const [selectedInstanceId, setSelectedInstanceId] = useState<string>();
   const [metricLoading, setMetricLoading] = useState(false);
@@ -164,6 +165,9 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
   const notificationTemplateRef = useRef<TextAreaRef>(null);
   const supportsUnavailableCondition = supportsUnavailableOperator(selectedMetric);
   const selectedMetricIsRatio = selectedMetric != null && nativeRatioMetrics.has(selectedMetric);
+  const selectedMetricUsesPercentage =
+    selectedMetricIsRatio || selectedThresholdUnit === '%' || selectedThresholdUnit === 'ratio';
+  const thresholdUnitSuffix = selectedThresholdUnit === 'ratio' ? '%' : selectedThresholdUnit;
 
   const metricLabel = (metric: string, fallback = metric) => {
     const key = nativeMetricTranslationKeys[metric] ?? legacyMetricTranslationKeys[metric];
@@ -838,6 +842,11 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
               disabled={!selectedInstanceId || metricLoading}
               loading={metricLoading}
               onChange={(metric) => {
+                const metricInfo = metricOptions.find((option) => option.key === metric);
+                form.setFieldValue(
+                  'thresholdUnit',
+                  nativeRatioMetrics.has(metric) ? '%' : (metricInfo?.thresholdUnit ?? ''),
+                );
                 if (
                   form.getFieldValue('operator') === 'UNAVAILABLE' &&
                   !supportsUnavailableOperator(metric)
@@ -886,6 +895,9 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
             </>
           )}
 
+          <Form.Item name="thresholdUnit" hidden>
+            <Input />
+          </Form.Item>
           <Form.Item label={t('alerts.threshold')}>
             <Flex gap={8}>
               <Form.Item
@@ -922,16 +934,16 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
                   <InputNumber
                     placeholder="阈值"
                     style={{ flex: 1 }}
-                    addonAfter={selectedMetricIsRatio ? '%' : undefined}
-                    min={selectedMetricIsRatio ? 0 : undefined}
-                    max={selectedMetricIsRatio ? 100 : undefined}
-                    precision={selectedMetricIsRatio ? 2 : undefined}
+                    addonAfter={thresholdUnitSuffix || undefined}
+                    min={selectedMetricUsesPercentage ? 0 : undefined}
+                    max={selectedMetricUsesPercentage ? 100 : undefined}
+                    precision={selectedMetricUsesPercentage ? 2 : undefined}
                   />
                 </Form.Item>
               )}
             </Flex>
             {selectedOperator === 'UNAVAILABLE' && '采集到指标不可用状态时触发。'}
-            {selectedOperator !== 'UNAVAILABLE' && selectedMetricIsRatio && (
+            {selectedOperator !== 'UNAVAILABLE' && selectedMetricUsesPercentage && (
               <span>比例指标以百分比填写，例如 85 表示 85%。</span>
             )}
           </Form.Item>

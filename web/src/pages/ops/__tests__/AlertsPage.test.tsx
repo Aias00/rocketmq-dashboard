@@ -354,6 +354,7 @@ describe('AlertsPage', () => {
     expect(await screen.findByRole('combobox', { name: '监控指标' })).toBeEnabled();
     expect(screen.getByRole('combobox', { name: 'RocketMQ 实例' })).toBeInTheDocument();
     expect((await screen.findAllByText('消费积压总量')).length).toBeGreaterThan(1);
+    expect(screen.getByText('%')).toBeInTheDocument();
   });
 
   it('uses English metric labels when English is selected', async () => {
