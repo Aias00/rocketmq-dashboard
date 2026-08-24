@@ -224,64 +224,69 @@ const NotificationDeliveriesPage = () => {
 
   return (
     <>
-      <PageHeader title={t('deliveries.title')} subtitle={t('deliveries.subtitle')} />
-      <Card bodyStyle={{ padding: 20 }}>
-        <Flex gap={12} wrap="wrap" style={{ marginBottom: 20 }}>
-          <Button
-            icon={<ArrowClockwise size={18} />}
-            disabled={!items.some((item) => item.status === 'FAILED')}
-            loading={retryingVisible}
-            onClick={() => void retryVisibleFailures()}
-          >
-            {t('deliveries.retryCurrentPage')}
-          </Button>
-          <Select
-            allowClear
-            placeholder={t('deliveries.allChannels')}
-            value={channel}
-            style={{ width: 220, flex: '1 1 220px' }}
-            options={['dingtalk', 'email', 'sms'].map((value) => ({ value, label: value }))}
-            onChange={(value) => resetPage(() => setChannel(value))}
+      <div style={{ padding: 24 }}>
+        <PageHeader title={t('deliveries.title')} subtitle={t('deliveries.subtitle')} />
+        <Card bodyStyle={{ padding: 20 }}>
+          <Flex gap={12} wrap="wrap" style={{ marginBottom: 20 }}>
+            <Button
+              icon={<ArrowClockwise size={18} />}
+              disabled={!items.some((item) => item.status === 'FAILED')}
+              loading={retryingVisible}
+              onClick={() => void retryVisibleFailures()}
+            >
+              {t('deliveries.retryCurrentPage')}
+            </Button>
+            <Select
+              allowClear
+              placeholder={t('deliveries.allChannels')}
+              value={channel}
+              style={{ width: 220, flex: '1 1 220px' }}
+              options={['dingtalk', 'email', 'sms'].map((value) => ({ value, label: value }))}
+              onChange={(value) => resetPage(() => setChannel(value))}
+            />
+            <Select
+              allowClear
+              placeholder={t('deliveries.allStatuses')}
+              value={status}
+              style={{ width: 220, flex: '1 1 220px' }}
+              options={Object.keys(statusColors).map((value) => ({ value, label: value }))}
+              onChange={(value) => resetPage(() => setStatus(value))}
+            />
+            <Select
+              allowClear
+              showSearch
+              optionFilterProp="label"
+              placeholder={t('deliveries.allInstances')}
+              value={instanceId}
+              style={{ width: 280, flex: '1 1 280px' }}
+              options={instances.map((instance) => ({
+                value: instance.name,
+                label: instance.name,
+              }))}
+              onChange={(value) => resetPage(() => setInstanceId(value))}
+            />
+          </Flex>
+          <Table
+            rowKey="id"
+            columns={columns}
+            dataSource={items}
+            loading={loading}
+            scroll={{ x: tableScrollX(columns) }}
+            pagination={{
+              current: page,
+              pageSize,
+              total,
+              showSizeChanger: true,
+              showTotal: (count) => `${t('common.total')} ${count}`,
+              onChange: (nextPage, nextPageSize) => {
+                setLoading(true);
+                setPage(nextPage);
+                setPageSize(nextPageSize);
+              },
+            }}
           />
-          <Select
-            allowClear
-            placeholder={t('deliveries.allStatuses')}
-            value={status}
-            style={{ width: 220, flex: '1 1 220px' }}
-            options={Object.keys(statusColors).map((value) => ({ value, label: value }))}
-            onChange={(value) => resetPage(() => setStatus(value))}
-          />
-          <Select
-            allowClear
-            showSearch
-            optionFilterProp="label"
-            placeholder={t('deliveries.allInstances')}
-            value={instanceId}
-            style={{ width: 280, flex: '1 1 280px' }}
-            options={instances.map((instance) => ({ value: instance.name, label: instance.name }))}
-            onChange={(value) => resetPage(() => setInstanceId(value))}
-          />
-        </Flex>
-        <Table
-          rowKey="id"
-          columns={columns}
-          dataSource={items}
-          loading={loading}
-          scroll={{ x: tableScrollX(columns) }}
-          pagination={{
-            current: page,
-            pageSize,
-            total,
-            showSizeChanger: true,
-            showTotal: (count) => `${t('common.total')} ${count}`,
-            onChange: (nextPage, nextPageSize) => {
-              setLoading(true);
-              setPage(nextPage);
-              setPageSize(nextPageSize);
-            },
-          }}
-        />
-      </Card>
+        </Card>
+      </div>
       <Drawer
         title={t('deliveries.details')}
         width={640}
