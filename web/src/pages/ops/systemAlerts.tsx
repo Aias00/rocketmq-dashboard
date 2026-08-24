@@ -54,10 +54,16 @@ import type {
   PageResult,
   SystemAlert,
 } from '../../api/ops';
+import { formatDateTime, formatNumber } from '../../utils/format';
 
 const { Text } = Typography;
 
 const normalizeAlertLevel = (level?: string | null) => (level ?? '').toLowerCase();
+const formatAlertTransition = (transition?: SystemAlert['transition']) => {
+  if (transition === 'FIRING') return '触发中';
+  if (transition === 'RESOLVED') return '已恢复';
+  return transition;
+};
 
 const parseSilenceLabels = (value?: string): Record<string, string> | undefined => {
   if (!value?.trim()) return undefined;
@@ -466,7 +472,7 @@ const SystemAlertsPage = () => {
                         {alert.domain === 'CLUSTER' ? '集群' : '业务'}
                       </Tag>
                     )}
-                    {alert.transition && <Tag>{alert.transition}</Tag>}
+                    {alert.transition && <Tag>{formatAlertTransition(alert.transition)}</Tag>}
                   </Flex>
                   <Text type="secondary" style={{ fontSize: 14 }}>
                     {alert.description}
@@ -474,21 +480,24 @@ const SystemAlertsPage = () => {
                   {alert.instanceId && (
                     <Text type="secondary" style={{ display: 'block', fontSize: 12 }}>
                       {alert.instanceId}
-                      {alert.currentValue != null ? ` · ${alert.currentValue}` : ''}
+                      {alert.currentValue != null ? ` · ${formatNumber(alert.currentValue)}` : ''}
                     </Text>
                   )}
                   {alert.acknowledgedAt && (
                     <Text type="secondary" style={{ display: 'block', fontSize: 12 }}>
-                      确认：{alert.acknowledgedBy ?? 'system'} · {alert.acknowledgedAt}
+                      确认：{alert.acknowledgedBy ?? 'system'} ·{' '}
+                      {formatDateTime(alert.acknowledgedAt)}
                     </Text>
                   )}
                   {alert.labels && Object.keys(alert.labels).length > 0 && (
                     <Flex gap={4} wrap="wrap" style={{ marginTop: 6 }}>
-                      {Object.entries(alert.labels).map(([key, value]) => (
-                        <Tag key={key}>
-                          {key}={value}
-                        </Tag>
-                      ))}
+                      {Object.entries(alert.labels)
+                        .sort(([left], [right]) => left.localeCompare(right))
+                        .map(([key, value]) => (
+                          <Tag key={key}>
+                            {key}={value}
+                          </Tag>
+                        ))}
                     </Flex>
                   )}
                   {loadingDeliveries.has(alert.id) && <Spin size="small" />}
@@ -545,7 +554,7 @@ const SystemAlertsPage = () => {
                 </div>
                 <Flex align="center" gap={8} style={{ flexShrink: 0 }}>
                   <Text type="secondary" style={{ fontSize: 14 }}>
-                    {alert.time}
+                    {formatDateTime(alert.time)}
                   </Text>
                   <Button size="small" type="link" onClick={() => void loadDeliveries(alert.id)}>
                     投递记录

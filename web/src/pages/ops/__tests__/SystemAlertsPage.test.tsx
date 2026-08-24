@@ -111,6 +111,32 @@ describe('SystemAlertsPage', () => {
     expect(screen.getByText('A newer backend emitted this level')).toBeInTheDocument();
   });
 
+  it('formats event timestamps and native transition labels', async () => {
+    vi.mocked(listSystemAlertsPage).mockResolvedValue({
+      items: [
+        {
+          id: 9,
+          level: 'warning',
+          title: 'Disk recovered',
+          description: 'disk usage returned to normal',
+          time: '2026-08-23T10:35:38.590731',
+          transition: 'RESOLVED',
+          acknowledged: true,
+          acknowledgedBy: 'admin',
+          acknowledgedAt: '2026-08-23T10:40:00.000000',
+        },
+      ],
+      total: 1,
+      page: 1,
+      size: 20,
+    });
+    renderPage();
+
+    expect(await screen.findByText('2026-08-23 10:35:38')).toBeInTheDocument();
+    expect(screen.getByText('已恢复')).toBeInTheDocument();
+    expect(screen.getByText('确认：admin · 2026-08-23 10:40:00')).toBeInTheDocument();
+  });
+
   it('filters backend alert levels case-insensitively', async () => {
     vi.mocked(listSystemAlertsPage).mockReset();
     vi.mocked(listSystemAlertsPage)
