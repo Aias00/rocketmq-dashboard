@@ -611,14 +611,27 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
         message.warning('未采集到匹配样本，请检查实例和指标作用域');
         return;
       }
+      const unavailable = result.samples.filter(
+        (sample) => sample.availability !== 'AVAILABLE',
+      ).length;
+      if (unavailable === result.samples.length) {
+        message.warning(
+          domain === 'BUSINESS'
+            ? `采集到 ${unavailable} 个样本，但均不可用。请确认该实例存在可查询消费进度的在线消费组。`
+            : `采集到 ${unavailable} 个样本，但均不可用。请检查实例连接和目标资源状态。`,
+        );
+        return;
+      }
       const matched = result.samples.filter((sample) => sample.conditionMet).length;
+      const available = result.samples.length - unavailable;
       const valuesSummary = result.samples
+        .filter((sample) => sample.availability === 'AVAILABLE')
         .slice(0, 3)
-        .map(
-          (sample) => `${sample.currentValue ?? '不可用'}${sample.conditionMet ? '（命中）' : ''}`,
-        )
+        .map((sample) => `${sample.currentValue}${sample.conditionMet ? '（命中）' : ''}`)
         .join('，');
-      message.info(`采集到 ${result.samples.length} 个样本，${matched} 个命中：${valuesSummary}`);
+      message.info(
+        `采集到 ${result.samples.length} 个样本（可用 ${available}，不可用 ${unavailable}），${matched} 个命中：${valuesSummary}`,
+      );
     } catch (error) {
       if (error && typeof error === 'object' && 'errorFields' in error) return;
       message.error('规则试运行失败，请检查实例连接和指标配置');
