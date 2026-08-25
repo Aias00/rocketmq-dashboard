@@ -62,6 +62,9 @@ public class AlertRuleVO {
     private int consecutiveSamples = 1;
     @Builder.Default
     private String reminderInterval = "30m";
+    /** Seconds between notifications for a still-unacknowledged firing alert; zero disables reminders. */
+    @Builder.Default
+    private int cooldownSeconds = 1800;
     /** Optional per-rule notification body template. */
     private String notificationTemplate;
 }

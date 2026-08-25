@@ -93,7 +93,7 @@ public class MybatisPlusAlertStateRepository implements AlertStateRepository {
 
     private static AlertRuleRuntimeVO toRuntime(RmqAlertState entity, AlertRuleVO rule) {
         LocalDateTime next = entity.getLastNotifiedAt() == null || rule == null ? null
-                : entity.getLastNotifiedAt().plus(AlertRuleDuration.parse(rule.getReminderInterval()));
+                : entity.getLastNotifiedAt().plusSeconds(Math.max(0, rule.getCooldownSeconds()));
         return AlertRuleRuntimeVO.builder().ruleId(entity.getRuleId()).fingerprint(entity.getFingerprint())
                 .status(AlertStateStatus.valueOf(entity.getStatus())).consecutiveHits(entity.getConsecutiveHits() == null ? 0 : entity.getConsecutiveHits())
                 .currentValue(entity.getCurrentValue()).lastNotifiedAt(entity.getLastNotifiedAt()).nextReminderAt(next).build();

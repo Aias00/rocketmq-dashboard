@@ -284,6 +284,11 @@ const translations: Record<string, Record<Lang, string>> = {
   'alerts.threshold': { zh: '阈值条件', en: 'Threshold' },
   'alerts.duration': { zh: '持续时间', en: 'Duration' },
   'alerts.reminderInterval': { zh: '重提醒间隔', en: 'Reminder Interval' },
+  'alerts.cooldownSeconds': {
+    zh: '重复通知冷却秒数',
+    en: 'Repeat Notification Cooldown (seconds)',
+  },
+  'alerts.cooldownDisabled': { zh: '已禁用', en: 'Disabled' },
   'alerts.channels': { zh: '通知渠道', en: 'Channels' },
   'alerts.lastTriggered': { zh: '最近触发', en: 'Last Triggered' },
   'alerts.neverTriggered': { zh: '从未触发', en: 'Never' },

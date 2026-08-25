@@ -76,6 +76,9 @@ final class NativeAlertRulePolicy {
         if (rule.getConsecutiveSamples() < 1) {
             throw new BusinessException(400, "consecutiveSamples must be at least 1");
         }
+        if (rule.getCooldownSeconds() < 0) {
+            throw new BusinessException(400, "cooldownSeconds must not be negative");
+        }
     }
 
     private static void validateChannels(AlertRuleVO rule) {

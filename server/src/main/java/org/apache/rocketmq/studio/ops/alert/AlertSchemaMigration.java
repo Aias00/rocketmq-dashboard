@@ -74,6 +74,7 @@ public class AlertSchemaMigration implements ApplicationRunner {
             new Column("rmq_alert_rule", "topic", "VARCHAR(255)"),
             new Column("rmq_alert_rule", "consecutive_samples", "INT NOT NULL DEFAULT 1"),
             new Column("rmq_alert_rule", "reminder_interval", "VARCHAR(32) NOT NULL DEFAULT '30m'"),
+            new Column("rmq_alert_rule", "cooldown_seconds", "INT NOT NULL DEFAULT 1800"),
             new Column("rmq_alert_rule", "notification_template", "TEXT"),
             new Column("rmq_alert_rule", "semantic_fingerprint", "CHAR(64)"),
             new Column("rmq_alert_state", "last_notified_at", "DATETIME"),

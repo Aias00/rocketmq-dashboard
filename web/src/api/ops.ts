@@ -10,6 +10,7 @@ export interface AlertRule {
   thresholdUnit?: string | null;
   duration: string;
   reminderInterval?: string;
+  cooldownSeconds?: number;
   aggregation?: 'LAST' | 'MAX' | 'MIN' | 'AVG' | 'SUM';
   windowSeconds?: number;
   channels: string[];

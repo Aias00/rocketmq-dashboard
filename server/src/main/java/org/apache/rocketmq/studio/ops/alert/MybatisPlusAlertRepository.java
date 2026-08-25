@@ -174,6 +174,7 @@ public class MybatisPlusAlertRepository implements AlertRepository {
         vo.setTopic(entity.getTopic());
         vo.setConsecutiveSamples(entity.getConsecutiveSamples() == null ? 1 : entity.getConsecutiveSamples());
         vo.setReminderInterval(StringUtils.hasText(entity.getReminderInterval()) ? entity.getReminderInterval() : "30m");
+        vo.setCooldownSeconds(entity.getCooldownSeconds() == null ? 1800 : entity.getCooldownSeconds());
         vo.setNotificationTemplate(entity.getNotificationTemplate());
         return vo;
     }
@@ -204,6 +205,7 @@ public class MybatisPlusAlertRepository implements AlertRepository {
         entity.setTopic(rule.getTopic());
         entity.setConsecutiveSamples(Math.max(1, rule.getConsecutiveSamples()));
         entity.setReminderInterval(StringUtils.hasText(rule.getReminderInterval()) ? rule.getReminderInterval() : "30m");
+        entity.setCooldownSeconds(Math.max(0, rule.getCooldownSeconds()));
         entity.setNotificationTemplate(rule.getNotificationTemplate());
         entity.setSemanticFingerprint(AlertRuleSemanticFingerprint.of(rule));
         entity.setGmtModified(LocalDateTime.now());

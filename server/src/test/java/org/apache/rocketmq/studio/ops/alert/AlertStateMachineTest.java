@@ -103,6 +103,22 @@ class AlertStateMachineTest {
         assertThat(noReminder.transition()).isEqualTo(AlertStateTransition.NONE);
     }
 
+    @Test
+    void allowsSecondPrecisionCooldownAndLetsZeroDisableReminders() {
+        AlertRuleState firing = new AlertRuleState(AlertStateStatus.FIRING, 1, 0.9, now, now, now, null);
+
+        AlertStateUpdate beforeDue = stateMachine.advance(firing, met(), 1, Duration.ZERO,
+                Duration.ofSeconds(45), now.plusSeconds(44));
+        AlertStateUpdate due = stateMachine.advance(firing, met(), 1, Duration.ZERO,
+                Duration.ofSeconds(45), now.plusSeconds(45));
+        AlertStateUpdate disabled = stateMachine.advance(firing, met(), 1, Duration.ZERO,
+                Duration.ZERO, now.plusSeconds(3600));
+
+        assertThat(beforeDue.transition()).isEqualTo(AlertStateTransition.NONE);
+        assertThat(due.transition()).isEqualTo(AlertStateTransition.REMINDER);
+        assertThat(disabled.transition()).isEqualTo(AlertStateTransition.NONE);
+    }
+
     private static AlertEvaluationResult met() {
         return new AlertEvaluationResult(true, true, 0.9, MetricAvailability.AVAILABLE);
     }

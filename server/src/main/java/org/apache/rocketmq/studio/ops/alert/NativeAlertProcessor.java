@@ -69,7 +69,7 @@ public class NativeAlertProcessor {
                         AlertFingerprint.of(rule.getId(), sample.instanceId(), sample.labels()));
                 AlertStateUpdate update = stateMachine.advance(stateRepository.find(key).orElse(null), evaluation,
                         Math.max(1, rule.getConsecutiveSamples()), AlertRuleDuration.parse(rule.getDuration()),
-                        AlertRuleDuration.parse(rule.getReminderInterval()), sample.collectedAt());
+                        Duration.ofSeconds(Math.max(0, rule.getCooldownSeconds())), sample.collectedAt());
                 if (!stateRepository.save(key, update.state())) {
                     continue;
                 }

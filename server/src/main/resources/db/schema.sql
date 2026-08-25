@@ -265,6 +265,7 @@ CREATE TABLE IF NOT EXISTS rmq_alert_rule (
   topic VARCHAR(255) COMMENT 'Optional topic selector for topic backlog metrics',
   consecutive_samples INT NOT NULL DEFAULT 1 COMMENT 'Consecutive native samples required before firing',
   reminder_interval VARCHAR(32) NOT NULL DEFAULT '30m' COMMENT 'Repeat notification interval while unacknowledged',
+  cooldown_seconds INT NOT NULL DEFAULT 1800 COMMENT 'Seconds between repeat notifications; zero disables reminders',
   notification_template TEXT COMMENT 'Optional notification body template',
   semantic_fingerprint CHAR(64) NOT NULL COMMENT 'SHA-256 identity of the rule evaluation conditions',
   UNIQUE KEY uk_alert_rule_semantic_fingerprint (semantic_fingerprint),

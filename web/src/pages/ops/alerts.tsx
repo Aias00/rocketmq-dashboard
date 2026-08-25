@@ -75,7 +75,6 @@ const channelColors: Record<string, string> = {
 };
 
 const durationOptions = ['1m', '5m', '15m', '30m'];
-const reminderIntervalOptions = ['5m', '15m', '30m', '1h', '4h'];
 const notificationTemplateVariables = [
   'ruleName',
   'title',
@@ -484,10 +483,11 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
       sorter: (a, b) => (a.duration ?? '').localeCompare(b.duration ?? ''),
     },
     {
-      title: t('alerts.reminderInterval'),
-      dataIndex: 'reminderInterval',
+      title: t('alerts.cooldownSeconds'),
+      dataIndex: 'cooldownSeconds',
       width: 130,
-      render: (value) => value ?? '30m',
+      render: (value) =>
+        (value ?? 1800) === 0 ? t('alerts.cooldownDisabled') : `${value ?? 1800}s`,
     },
     {
       title: t('alerts.channels'),
@@ -1018,11 +1018,11 @@ const AlertsPage = ({ domain = 'CLUSTER' }: AlertsPageProps) => {
               />
             </Form.Item>
             <Form.Item
-              name="reminderInterval"
-              label={t('alerts.reminderInterval')}
-              initialValue="30m"
+              name="cooldownSeconds"
+              label={t('alerts.cooldownSeconds')}
+              initialValue={1800}
             >
-              <Select options={reminderIntervalOptions.map((value) => ({ label: value, value }))} />
+              <InputNumber min={0} precision={0} style={{ width: '100%' }} />
             </Form.Item>
 
             <Form.Item name="aggregation" label={t('alerts.windowAggregation')} initialValue="LAST">

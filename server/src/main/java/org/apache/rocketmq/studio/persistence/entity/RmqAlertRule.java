@@ -70,6 +70,7 @@ public class RmqAlertRule {
 
     private Integer consecutiveSamples;
     private String reminderInterval;
+    private Integer cooldownSeconds;
     private String notificationTemplate;
 
     private String semanticFingerprint;

@@ -58,6 +58,8 @@ public class AlertRuleRequestDTO {
     private Integer consecutiveSamples;
     @Pattern(regexp = "(?:[0-9]+(?:ms|s|m|h|d|w|y))+", message = "reminderInterval is invalid")
     private String reminderInterval;
+    @Min(value = 0, message = "cooldownSeconds must not be negative")
+    private Integer cooldownSeconds;
     @Size(max = 4000, message = "notificationTemplate must not exceed 4000 characters")
     private String notificationTemplate;
 
@@ -83,6 +85,7 @@ public class AlertRuleRequestDTO {
                 .topic(topic)
                 .consecutiveSamples(consecutiveSamples == null ? 1 : consecutiveSamples)
                 .reminderInterval(reminderInterval == null ? "30m" : reminderInterval)
+                .cooldownSeconds(cooldownSeconds == null ? 1800 : cooldownSeconds)
                 .notificationTemplate(notificationTemplate)
                 .build();
     }
